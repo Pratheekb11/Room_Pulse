@@ -20,7 +20,7 @@ export function JoinForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-8" noValidate>
+    <form onSubmit={onSubmit} className="mt-8 max-w-md" noValidate>
       <div className="flex flex-col gap-3 sm:flex-row">
       <label htmlFor="code" className="sr-only">
         Session code
@@ -41,14 +41,14 @@ export function JoinForm() {
         placeholder="k7m2qp"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? "code-error" : undefined}
-        className="font-display min-w-0 flex-1 rounded-2xl border-2 border-ink bg-canvas px-5 py-4 text-3xl font-bold tracking-[0.2em] placeholder:text-ink/25 focus:bg-white focus:outline-none focus-visible:outline-3 focus-visible:outline-sky"
+        className="font-mono h-14 min-w-0 flex-1 rounded-lg border border-line-strong bg-white px-4 text-2xl tracking-[0.18em] placeholder:text-muted-soft focus:border-ink focus:outline-none"
       />
-      <button type="submit" className="key font-display rounded-2xl bg-violet px-7 py-4 text-xl font-bold text-white">
+      <button type="submit" className="key h-14 rounded-lg bg-primary px-7 text-base font-medium text-white">
         Join
       </button>
       </div>
       {error && (
-        <p id="code-error" role="alert" className="mt-3 text-sm font-semibold text-[#c2193f]">
+        <p id="code-error" role="alert" className="mt-3 text-sm font-semibold text-error">
           {error}
         </p>
       )}

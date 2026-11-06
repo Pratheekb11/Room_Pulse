@@ -4,7 +4,7 @@ import { useState } from "react";
 import { apiFetch } from "./api";
 import { formatPin, rememberGuestPin } from "./guestPin";
 
-const field = "mt-1 w-full rounded-xl border-2 border-ink px-3 py-2.5 text-lg";
+const field = "mt-1 w-full rounded-lg border border-line-strong px-3 py-2.5 text-lg";
 
 /** "Continue as guest" (shows the PIN once) and "Return as guest" (code + PIN). */
 export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
@@ -60,20 +60,20 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
     return (
       // Full-page, so nothing else on the screen competes with the PIN.
       <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-canvas p-5">
-      <div className="slab w-full max-w-sm rounded-[24px] bg-white p-6 text-center" role="dialog" aria-modal="true" aria-labelledby="pin-h">
-        <h2 id="pin-h" className="font-display text-2xl font-extrabold">
+      <div className="slab w-full max-w-sm rounded-xl bg-white p-6 text-center" role="dialog" aria-modal="true" aria-labelledby="pin-h">
+        <h2 id="pin-h" className="font-display text-2xl font-semibold">
           Save your guest PIN
         </h2>
         <p className="mt-1 text-sm text-ink-soft">You need it to get back in after closing the browser.</p>
-        <div className="mt-4 flex items-center justify-center gap-3 rounded-2xl bg-sun px-4 py-3">
-          <span className="font-display text-[clamp(2rem,9vw,2.5rem)] font-extrabold tracking-[0.12em] whitespace-nowrap tabular-nums" aria-label={`PIN ${pin.split("").join(" ")}`}>
+        <div className="mt-4 flex items-center justify-center gap-3 rounded-xl bg-sun px-4 py-3">
+          <span className="font-display text-[clamp(2rem,9vw,2.5rem)] font-semibold tracking-[0.12em] whitespace-nowrap tabular-nums" aria-label={`PIN ${pin.split("").join(" ")}`}>
             {formatPin(pin)}
           </span>
-          <button type="button" onClick={copyPin} className="rounded-lg border-2 border-ink bg-white px-2.5 py-1 text-sm font-bold">
+          <button type="button" onClick={copyPin} className="rounded-lg border border-line-strong bg-white px-2.5 py-1 text-sm font-bold">
             {copied ? "Copied" : "Copy"}
           </button>
         </div>
-        <button type="button" onClick={onSignedIn} className="key mt-5 w-full rounded-xl bg-violet py-3 text-lg font-bold text-white">
+        <button type="button" onClick={onSignedIn} className="key mt-5 w-full rounded-lg bg-primary py-3 text-lg font-bold text-white">
           I&rsquo;ve saved it
         </button>
       </div>
@@ -83,8 +83,8 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (mode === "return") {
     return (
-      <form onSubmit={comeBack} className="slab mt-6 rounded-[24px] bg-white p-6" noValidate>
-        <h2 className="font-display text-2xl font-extrabold">Return as guest</h2>
+      <form onSubmit={comeBack} className="slab mt-6 rounded-xl bg-white p-6" noValidate>
+        <h2 className="font-display text-2xl font-semibold">Return as guest</h2>
         <p className="mt-1 text-sm text-ink-soft">Enter the code of any presentation you made, and your PIN.</p>
         <label className="mt-4 block font-semibold">
           Presentation code
@@ -100,8 +100,8 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
             className={`${field} tracking-[0.3em]`}
           />
         </label>
-        {error && <p role="alert" className="mt-3 rounded-xl bg-coral/15 px-3 py-2 text-sm font-semibold text-[#a3122f]">{error}</p>}
-        <button type="submit" disabled={busy || code.trim().length < 4 || enteredPin.length !== 6} className="key mt-5 w-full rounded-xl bg-violet py-3 text-lg font-bold text-white">
+        {error && <p role="alert" className="mt-3 rounded-lg bg-coral/15 px-3 py-2 text-sm font-semibold text-error">{error}</p>}
+        <button type="submit" disabled={busy || code.trim().length < 4 || enteredPin.length !== 6} className="key mt-5 w-full rounded-lg bg-primary py-3 text-lg font-bold text-white">
           {busy ? "Checking…" : "Get back in"}
         </button>
         <button type="button" onClick={() => setMode("idle")} className="mt-3 w-full text-sm font-bold underline underline-offset-4">
@@ -114,7 +114,7 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
   return (
     <div className="mt-5 text-center">
       <div className="flex flex-wrap justify-center gap-2">
-        <button type="button" disabled={busy} onClick={start} className="rounded-full border-2 border-ink bg-white px-5 py-2 font-bold hover:bg-canvas">
+        <button type="button" disabled={busy} onClick={start} className="rounded-full border border-line-strong bg-white px-5 py-2 font-bold hover:bg-canvas">
           {busy ? "Starting…" : "Continue as guest"}
         </button>
         <button type="button" onClick={() => setMode("return")} className="rounded-full px-4 py-2 font-bold underline underline-offset-4">
@@ -122,7 +122,7 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
         </button>
       </div>
       <p className="mt-2 text-sm text-ink-soft">No sign-up. Results are kept for 3 days.</p>
-      {error && <p role="alert" className="mt-2 text-sm font-semibold text-[#a3122f]">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm font-semibold text-error">{error}</p>}
     </div>
   );
 }

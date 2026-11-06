@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Logo } from "../Logo";
-import { Shapes } from "../Shapes";
 import { apiFetch } from "./api";
 import { GuestOptions } from "./GuestOptions";
 
@@ -51,15 +50,14 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
   );
 
   return (
-    <main className="relative isolate flex min-h-dvh flex-col overflow-hidden px-5 py-5">
-      <Shapes variant="quiet" />
+    <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
       <Logo />
       <div className="mx-auto my-auto w-full max-w-sm">
-        <h1 className="font-display text-center text-4xl font-extrabold leading-tight tracking-tight">
+        <h1 className="font-display text-center text-4xl font-semibold leading-tight tracking-tight">
           {mode === "login" ? "Welcome back" : "Run your first session"}
         </h1>
-        <form onSubmit={submit} className="slab mt-6 rounded-[24px] bg-white p-6" noValidate>
-          <div role="tablist" aria-label="Account" className="flex rounded-full border-2 border-ink p-0.5">
+        <form onSubmit={submit} className="slab mt-6 rounded-xl bg-white p-6" noValidate>
+          <div role="tablist" aria-label="Account" className="flex rounded-full border border-line-strong p-0.5">
             {tab("login", "Log in")}
             {tab("signup", "Sign up")}
           </div>
@@ -72,13 +70,13 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               required
-              className="mt-1 w-full rounded-xl border-2 border-ink px-3 py-2.5 text-lg"
+              className="mt-1 w-full rounded-lg border border-line-strong px-3 py-2.5 text-lg"
             />
           </label>
 
           <label className="mt-4 block font-semibold">
             Password
-            <div className="mt-1 flex rounded-xl border-2 border-ink focus-within:outline-3 focus-within:outline-sky">
+            <div className="mt-1 flex rounded-lg border border-line-strong focus-within:outline-3 focus-within:outline-sky">
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
@@ -88,7 +86,7 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
                 maxLength={128}
                 required
                 aria-describedby={mode === "signup" ? "pw-hint" : undefined}
-                className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-lg focus:outline-none"
+                className="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-lg focus:outline-none"
               />
               <button
                 type="button"
@@ -108,13 +106,13 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
             </p>
           )}
           {mode === "signup" && (
-            <p id="pw-hint" className={`mt-1.5 text-sm ${tooShort ? "font-semibold text-[#c2193f]" : "text-ink-soft"}`}>
+            <p id="pw-hint" className={`mt-1.5 text-sm ${tooShort ? "font-semibold text-error" : "text-ink-soft"}`}>
               At least 10 characters. A short phrase is easy to remember.
             </p>
           )}
 
           {error && (
-            <p role="alert" className="mt-3 rounded-xl bg-coral/15 px-3 py-2 text-sm font-semibold text-[#a3122f]">
+            <p role="alert" className="mt-3 rounded-lg bg-coral/15 px-3 py-2 text-sm font-semibold text-error">
               {error}
             </p>
           )}
@@ -122,7 +120,7 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
           <button
             type="submit"
             disabled={busy || !email || !password || tooShort}
-            className="key font-display mt-5 w-full rounded-xl bg-violet py-3 text-xl font-bold text-white"
+            className="key font-display mt-5 w-full rounded-lg bg-primary py-3 text-xl font-bold text-white"
           >
             {busy ? "One moment…" : mode === "login" ? "Log in" : "Create account"}
           </button>

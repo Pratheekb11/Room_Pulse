@@ -1,4 +1,4 @@
-import { scaleColor, topicColor } from "@/lib/colors";
+import { scaleColor, topicColor, topicInk } from "@/lib/colors";
 import { summarizeFocus, type FocusGroup } from "@/lib/focus";
 import { avg, cellKey, fmt1, sumAggs, type Agg } from "@/lib/stats";
 import { pollTally, wordWeights } from "@/lib/answers";
@@ -31,10 +31,10 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
               key={g.focus.id}
               type="button"
               onClick={() => onOpen(i)}
-              className="slab group flex flex-col rounded-[26px] bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
+              className="slab group flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
             >
               <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">{KIND_LABEL[g.kind]}</p>
-              <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-extrabold leading-tight break-words">{g.focus.name}</h2>
+              <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
               {tally && (
                 <ol className="mt-4 flex flex-col gap-2">
                   {[...tally.rows].sort((a, b) => b.n - a.n).slice(0, 3).map((r) => (
@@ -42,10 +42,10 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
                       <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.name}>
                         {r.name}
                       </span>
-                      <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#ebe7fb]">
+                      <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#efeee8]">
                         <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${r.pct}%`, backgroundColor: topicColor(r.index) }} />
                       </span>
-                      <span className="font-display w-[4ch] text-right font-extrabold tabular-nums">{r.pct}%</span>
+                      <span className="font-display w-[4ch] text-right font-semibold tabular-nums">{r.pct}%</span>
                     </li>
                   ))}
                 </ol>
@@ -53,7 +53,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
               {g.kind === "words" && (
                 <ul className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   {cloud.slice(0, 8).map((w, j) => (
-                    <li key={w.word} className="font-display font-extrabold" style={{ fontSize: `${0.95 + w.weight * 0.9}rem`, color: topicColor(j) === "#FFB81F" ? "#c98a00" : topicColor(j) }}>
+                    <li key={w.word} className="font-display font-semibold" style={{ fontSize: `${0.95 + w.weight * 0.9}rem`, color: topicInk(j) }}>
                       {w.word}
                     </li>
                   ))}
@@ -64,7 +64,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
                 <span className="text-ink-soft">
                   {count} {g.kind === "poll" ? "votes" : "answers"}
                 </span>
-                <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-violet">See results</span>
+                <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-primary">See results</span>
               </span>
             </button>
           );
@@ -84,7 +84,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
             key={g.focus.id || "loose"}
             type="button"
             onClick={() => onOpen(i)}
-            className="slab group flex flex-col rounded-[26px] bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
+            className="slab group flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
             aria-label={`Open ${g.focus.name}: overall ${fmt1(s.average)}`}
           >
             <div className="flex items-start justify-between gap-3">
@@ -92,10 +92,10 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
                 <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">
                   Rating, {g.topics.length} {g.topics.length === 1 ? "topic" : "topics"}
                 </p>
-                <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-extrabold leading-tight break-words">{g.focus.name}</h2>
+                <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
               </div>
               <span
-                className="font-display flex aspect-square w-[clamp(3.6rem,5vw,5.4rem)] shrink-0 items-center justify-center rounded-full border-2 border-ink text-[clamp(1.3rem,2vw,2.3rem)] font-extrabold"
+                className="font-display flex aspect-square w-[clamp(3.6rem,5vw,5.4rem)] shrink-0 items-center justify-center rounded-full border border-line-strong text-[clamp(1.3rem,2vw,2.3rem)] font-semibold"
                 style={badge ? { backgroundColor: badge.bg, color: badge.fg } : undefined}
               >
                 {fmt1(s.average)}
@@ -108,20 +108,20 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
                   <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.item.name}>
                     {r.item.name}
                   </span>
-                  <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#ebe7fb]">
+                  <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#efeee8]">
                     <span
                       className="block h-full rounded-full transition-[width] duration-700"
                       style={{ width: `${r.value === null ? 0 : (r.value / scaleMax) * 100}%`, backgroundColor: topicColor(r.index) }}
                     />
                   </span>
-                  <span className="font-display w-[3ch] text-right font-extrabold tabular-nums">{fmt1(r.value)}</span>
+                  <span className="font-display w-[3ch] text-right font-semibold tabular-nums">{fmt1(r.value)}</span>
                 </li>
               ))}
             </ol>
 
             <span className="mt-auto flex items-center justify-between pt-4 text-[clamp(0.8rem,0.95vw,1.05rem)] font-bold">
               <span className="text-ink-soft">{s.n} ratings</span>
-              <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-violet">See breakdown</span>
+              <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-primary">See breakdown</span>
             </span>
           </button>
         );

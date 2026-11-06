@@ -1,14 +1,14 @@
 import Link from "next/link";
 
+/** Wordmark: a small orange pulse mark and the name in ink. */
 export function Logo({ size = "md" }: { size?: "md" | "lg" }) {
-  const text = size === "lg" ? "text-3xl" : "text-xl";
+  const text = size === "lg" ? "text-2xl" : "text-[17px]";
   return (
-    <Link href="/" className={`font-display ${text} inline-flex items-center gap-2 font-extrabold tracking-tight`}>
-      <span aria-hidden className="relative inline-flex h-[1em] w-[1em] items-end justify-between gap-[2px]">
-        <span className="h-[45%] w-[28%] rounded-sm bg-coral" />
-        <span className="h-full w-[28%] rounded-sm bg-violet" />
-        <span className="h-[70%] w-[28%] rounded-sm bg-sun" />
-      </span>
+    <Link href="/" className={`${text} inline-flex items-center gap-2 font-medium tracking-[-0.02em] text-ink`}>
+      <svg aria-hidden viewBox="0 0 20 20" className="h-[1.05em] w-[1.05em]">
+        <rect width="20" height="20" rx="5" fill="var(--color-primary)" />
+        <path d="M3.5 11h3l2-5 3 9 2-4h3" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
       LiveRate
     </Link>
   );

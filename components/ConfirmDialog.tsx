@@ -43,10 +43,10 @@ export function ConfirmDialog(p: Props) {
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="slab w-full max-w-md rounded-[24px] bg-white p-6"
+        className="slab w-full max-w-md rounded-xl bg-white p-6"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <h2 id={titleId} className="font-display text-2xl font-extrabold">
+        <h2 id={titleId} className="font-display text-2xl font-semibold">
           {p.title}
         </h2>
         <p className="mt-2 text-ink-soft">{p.body}</p>
@@ -65,18 +65,18 @@ export function ConfirmDialog(p: Props) {
                 onChange={(e) => setTyped(e.target.value)}
                 autoComplete="off"
                 autoCapitalize="characters"
-                className="mt-1 block w-full rounded-xl border-2 border-ink px-3 py-2 text-lg font-bold"
+                className="mt-1 block w-full rounded-lg border border-line-strong px-3 py-2 text-lg font-bold"
               />
             </label>
           )}
           <div className="mt-6 flex justify-end gap-3">
-            <button ref={cancelRef} type="button" onClick={onCancel} className="key rounded-xl bg-white px-4 py-2 font-bold">
+            <button ref={cancelRef} type="button" onClick={onCancel} className="key rounded-lg bg-white px-4 py-2 font-bold">
               Cancel
             </button>
             <button
               type="submit"
               disabled={!ok || p.busy}
-              className={`key rounded-xl px-4 py-2 font-bold text-white ${p.danger ? "bg-[#c2193f]" : "bg-violet"}`}
+              className={`key rounded-lg px-4 py-2 font-bold text-white ${p.danger ? "bg-error" : "bg-primary"}`}
             >
               {p.busy ? "Working…" : p.confirmLabel}
             </button>

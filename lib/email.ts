@@ -60,14 +60,14 @@ export function siteUrlForEmail(): string {
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function layout(heading: string, body: string, cta: string, link: string, footer: string): string {
-  return `<!doctype html><html><body style="margin:0;background:#f4f2ff;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1446">
+  return `<!doctype html><html><body style="margin:0;background:#f7f7f4;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#26251e">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
-<table role="presentation" width="100%" style="max-width:480px;background:#ffffff;border:2px solid #1a1446;border-radius:20px" cellpadding="0" cellspacing="0"><tr><td style="padding:28px">
+<table role="presentation" width="100%" style="max-width:480px;background:#ffffff;border:1px solid #e6e5e0;border-radius:20px" cellpadding="0" cellspacing="0"><tr><td style="padding:28px">
 <p style="margin:0 0 4px;font-weight:800;font-size:18px">LiveRate</p>
 <h1 style="margin:16px 0 8px;font-size:24px">${escape(heading)}</h1>
 <p style="margin:0 0 24px;font-size:16px;line-height:1.5">${escape(body)}</p>
-<a href="${escape(link)}" style="display:inline-block;background:#6a3df5;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:12px;border:2px solid #1a1446">${escape(cta)}</a>
-<p style="margin:24px 0 0;font-size:13px;color:#4a4478;line-height:1.5">${escape(footer)}</p>
+<a href="${escape(link)}" style="display:inline-block;background:#f54e00;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:12px;border:1px solid #e6e5e0">${escape(cta)}</a>
+<p style="margin:24px 0 0;font-size:13px;color:#5a5852;line-height:1.5">${escape(footer)}</p>
 </td></tr></table></td></tr></table></body></html>`;
 }
 

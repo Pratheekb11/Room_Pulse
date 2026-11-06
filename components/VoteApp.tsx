@@ -71,6 +71,9 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
     >,
   );
   const [statuses, setStatuses] = useState<Record<string, SaveStatus>>({});
+  // Word clouds count as done at 3 answers, or when the voter says "that's all".
+  const finishedKey = `liverate:finished:${code}`;
+  const [finished, setFinished] = useState<string[]>(() => readJSON<string[]>(finishedKey, []));
   const [isOpen, setIsOpen] = useState(session.isOpen);
 
   const onStatus = useCallback(
@@ -172,9 +175,10 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
     (step: Step, r: Record<string, number>, a: Record<string, Answer>) => {
       if (step.kind === "rating") return criteria.every((c) => r[cellKey(step.item.id, c.id)] !== undefined);
       const v = a[groups[step.gi].focus.id];
-      return step.kind === "poll" ? typeof v === "string" : Array.isArray(v) && v.length > 0;
+      if (step.kind === "poll") return typeof v === "string";
+      return Array.isArray(v) && (v.length >= 3 || (v.length > 0 && finished.includes(groups[step.gi].focus.id)));
     },
-    [criteria, groups],
+    [criteria, groups, finished],
   );
 
   const unitsTotal = validKeys.size + steps.filter((s) => s.kind !== "rating").length;
@@ -229,8 +233,20 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
     [steps, stepDone, groups, goTo],
   );
 
+  // Reward loop: "+10" floats up on every answer; quick answers build a combo.
+  const lastAnswerAt = useRef(0);
+  const [combo, setCombo] = useState(0);
+  const [plus, setPlus] = useState(0);
+  const reward = useCallback(() => {
+    const now = Date.now();
+    setCombo((c) => (now - lastAnswerAt.current < 4000 ? c + 1 : 1));
+    lastAnswerAt.current = now;
+    setPlus((n) => n + 1);
+  }, []);
+
   const onRate = useCallback(
     (topicId: string, criterionId: string, score: number) => {
+      if (ratings[cellKey(topicId, criterionId)] === undefined) reward();
       const key = cellKey(topicId, criterionId);
       const next = { ...ratings, [key]: score };
       const i = steps.findIndex((s) => s.kind === "rating" && s.item.id === topicId);
@@ -240,12 +256,13 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
       queue.set(key, score);
       afterChange(i, next, answers, wasDone, true);
     },
-    [ratings, answers, steps, stepDone, ratingsKey, queue, afterChange],
+    [ratings, answers, steps, stepDone, ratingsKey, queue, afterChange, reward],
   );
 
   const onAnswer = useCallback(
     (gi: number, value: Answer) => {
       const focusId = groups[gi].focus.id;
+      if (answers[focusId] === undefined) reward();
       const next = { ...answers, [focusId]: value };
       const i = steps.findIndex((s) => s.kind !== "rating" && s.gi === gi);
       const wasDone = stepDone(steps[i], ratings, answers);
@@ -255,7 +272,28 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
       // Polls move on by themselves; word clouds wait so people can add more answers.
       afterChange(i, ratings, next, wasDone, steps[i].kind === "poll");
     },
-    [answers, ratings, groups, steps, stepDone, answersKey, answerQueue, afterChange],
+    [answers, ratings, groups, steps, stepDone, answersKey, answerQueue, afterChange, reward],
+  );
+
+  const onFinishWords = useCallback(
+    (gi: number) => {
+      const focusId = groups[gi].focus.id;
+      const i = steps.findIndex((s) => s.kind === "words" && s.gi === gi);
+      const wasDone = stepDone(steps[i], ratings, answers);
+      const next = [...new Set([...finished, focusId])];
+      setFinished(next);
+      writeJSON(finishedKey, next);
+      // stepDone reads `finished`, so evaluate the next step with the updated list.
+      const v = answers[focusId];
+      if (!wasDone && Array.isArray(v) && v.length > 0) {
+        const target = steps.findIndex((s, j) => j !== i && !stepDone(s, ratings, answers) && !(s.kind === "words" && next.includes(groups[s.gi].focus.id)));
+        if (target !== -1) {
+          cancelAdvance();
+          advanceTimer.current = setTimeout(() => goTo(target), 450);
+        }
+      }
+    },
+    [groups, steps, stepDone, ratings, answers, finished, finishedKey, goTo],
   );
 
   // Confetti only when the voter finishes during this visit, not on reload.
@@ -275,13 +313,15 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
   const here = steps[current];
   const group = here ? groups[here.gi] : null;
 
+  if (complete) return <ThankYou title={session.title} statuses={statuses} celebrate={celebrate} />;
+
   return (
     <div className="min-h-dvh pb-16">
       {(celebrate || levelUp) && <Confetti />}
       {levelUp && (
-        <div role="status" className="pointer-events-none fixed inset-x-0 top-24 z-40 flex justify-center px-4">
-          <div className="slab animate-pop rounded-2xl bg-sun px-5 py-3 text-center">
-            <p className="font-display text-xl font-extrabold">Level complete!</p>
+        <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
+          <div className="slab animate-pop rounded-xl bg-sun px-5 py-3 text-center">
+            <p className="font-display text-xl font-semibold">Level complete!</p>
             <p className="text-sm font-semibold">{levelUp} is done</p>
           </div>
         </div>
@@ -290,15 +330,27 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
       <header className="mx-auto max-w-xl px-4 pt-5">
         <div className="flex items-center justify-between">
           <Logo />
-          <span
-            key={points}
-            className="font-display animate-pop rounded-full border-2 border-ink bg-sun px-3 py-0.5 text-sm font-extrabold tabular-nums"
-            aria-label={`${points} points`}
-          >
-            ★ {points} pts
+          <span className="relative flex items-center gap-2">
+            {combo >= 3 && (
+              <span key={`combo-${combo}`} className="animate-pop rounded-full bg-lavender px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase">
+                Combo ×{combo}
+              </span>
+            )}
+            <span
+              key={points}
+              className="font-mono animate-pop rounded-full border border-line bg-white px-3 py-1 text-sm tabular-nums"
+              aria-label={`${points} points`}
+            >
+              <span className="text-primary">★</span> {points}
+            </span>
+            {plus > 0 && (
+              <span key={`plus-${plus}`} aria-hidden className="float-up font-mono absolute -top-1 right-1 text-sm font-medium text-primary">
+                +10
+              </span>
+            )}
           </span>
         </div>
-        <h1 className="font-display mt-4 text-[clamp(1.7rem,7vw,2.4rem)] font-extrabold leading-[1.02] tracking-tight break-words">
+        <h1 className="font-display mt-4 text-[clamp(1.7rem,7vw,2.4rem)] font-semibold leading-[1.02] tracking-tight break-words">
           {session.title}
         </h1>
         <p className="mt-1.5 text-[0.95rem] text-ink-soft">
@@ -306,11 +358,11 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
         </p>
       </header>
 
-      <div className="sticky top-0 z-20 mt-4 border-b-2 border-ink bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
+      <div className="sticky top-0 z-20 mt-4 border-b border-line-strong bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
         <div className="mx-auto max-w-xl px-4 py-3">
           <div className="flex items-center gap-3">
             <div
-              className="h-4 flex-1 overflow-hidden rounded-full border-2 border-ink bg-white"
+              className="h-4 flex-1 overflow-hidden rounded-full border border-line-strong bg-white"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={unitsTotal}
@@ -318,7 +370,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
               aria-label="Answers completed"
             >
               <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-violet),var(--color-coral))] transition-[width] duration-500"
+                className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary),#ff8a4c)] transition-[width] duration-500"
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -339,7 +391,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
                     type="button"
                     onClick={() => goTo(steps.findIndex((s) => s.gi === gi))}
                     aria-current={active ? "step" : undefined}
-                    className={`shrink-0 rounded-full border-2 border-ink px-3 py-1 text-xs font-bold whitespace-nowrap ${
+                    className={`shrink-0 rounded-full border border-line-strong px-3 py-1 text-xs font-bold whitespace-nowrap ${
                       active ? "bg-ink text-white" : finished ? "bg-mint" : "bg-white"
                     }`}
                   >
@@ -356,15 +408,15 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
 
       <main className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-5">
         {!isOpen && (
-          <div role="status" className="slab rounded-2xl bg-sun px-5 py-4">
-            <p className="font-display text-xl font-extrabold">Voting is closed</p>
+          <div role="status" className="slab rounded-xl bg-sun px-5 py-4">
+            <p className="font-display text-xl font-semibold">Voting is closed</p>
             <p className="text-sm font-medium">Your saved answers are kept. The presenter can reopen voting.</p>
           </div>
         )}
 
         {complete && (
-          <div role="status" className="slab rounded-2xl bg-mint px-5 py-4 text-ink">
-            <p className="font-display text-xl font-extrabold">All done — thank you! 🏆</p>
+          <div role="status" className="slab rounded-xl bg-mint px-5 py-4 text-ink">
+            <p className="font-display text-xl font-semibold">All done — thank you! 🏆</p>
             <p className="text-sm font-medium">You can change any answer until voting closes.</p>
           </div>
         )}
@@ -413,7 +465,9 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
                   value={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : undefined}
                   status={statuses[group.focus.id]}
                   disabled={!isOpen}
+                  finished={finished.includes(group.focus.id)}
                   onSend={(words) => onAnswer(here.gi, words)}
+                  onFinish={() => onFinishWords(here.gi)}
                 />
               )}
             </div>
@@ -423,7 +477,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
                 type="button"
                 onClick={() => goTo(current - 1)}
                 disabled={current === 0}
-                className="key shrink-0 rounded-xl bg-white px-3.5 py-2.5 font-bold whitespace-nowrap"
+                className="key shrink-0 rounded-lg bg-white px-3.5 py-2.5 font-bold whitespace-nowrap"
               >
                 ← Back
               </button>
@@ -455,7 +509,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
                 type="button"
                 onClick={() => goTo(current + 1)}
                 disabled={current === steps.length - 1}
-                className="key shrink-0 rounded-xl bg-violet px-3.5 py-2.5 font-bold whitespace-nowrap text-white"
+                className="key shrink-0 rounded-lg bg-primary px-3.5 py-2.5 font-bold whitespace-nowrap text-white"
               >
                 Next →
               </button>
@@ -464,5 +518,50 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
         )}
       </main>
     </div>
+  );
+}
+
+/** Shown once every question is answered: the ballot closes; saving status stays honest. */
+function ThankYou({ title, statuses, celebrate }: { title: string; statuses: Record<string, SaveStatus>; celebrate: boolean }) {
+  const values = Object.values(statuses);
+  const saving = values.some((s) => s === "saving" || s === "retrying");
+  const closed = values.some((s) => s === "closed");
+  return (
+    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+      {celebrate && <Confetti />}
+      <svg viewBox="0 0 64 64" className="h-20 w-20" aria-hidden>
+        <circle cx="32" cy="32" r="29" fill="none" stroke="var(--color-line)" strokeWidth="3" />
+        <circle
+          cx="32"
+          cy="32"
+          r="29"
+          fill="none"
+          stroke="var(--color-primary)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          pathLength={100}
+          strokeDasharray="100"
+          className="origin-center -rotate-90 animate-[draw_700ms_var(--ease-out-soft)_both]"
+        />
+        <path d="M20 33l8 8 16-17" fill="none" stroke="var(--color-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" pathLength={100} strokeDasharray="100" className="animate-[draw_500ms_300ms_var(--ease-out-soft)_both]" />
+      </svg>
+      <h1 className="font-display animate-rise mt-8 text-[clamp(2.5rem,12vw,4rem)] leading-none text-ink [animation-delay:200ms]">Thank you.</h1>
+      <p className="animate-rise mt-4 max-w-xs text-[17px] leading-relaxed text-ink-soft [animation-delay:320ms]">
+        Your answers to <span className="text-ink">{title}</span> are in. You can close this page.
+      </p>
+      <p role="status" aria-live="polite" className="font-mono animate-fade mt-8 text-xs text-muted [animation-delay:600ms]">
+        {closed ? (
+          <span className="text-error">Voting closed before your last answer was saved.</span>
+        ) : saving ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> Saving your last answers…
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" /> All saved
+          </span>
+        )}
+      </p>
+    </main>
   );
 }

@@ -27,9 +27,9 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
             key={t.id}
             onClick={() => onOpen(i)}
             aria-label={`Open vote distribution for ${t.name}`}
-            className="slab group flex flex-col overflow-hidden rounded-[22px] bg-white p-4 text-left transition-transform hover:-translate-y-1"
+            className="slab group flex flex-col overflow-hidden rounded-xl bg-white p-4 text-left transition-transform hover:-translate-y-1"
           >
-            <h3 className="flex items-center gap-2 text-[clamp(1rem,1.3vw,1.5rem)] font-extrabold leading-tight">
+            <h3 className="flex items-center gap-2 text-[clamp(1rem,1.3vw,1.5rem)] font-semibold leading-tight">
               <span aria-hidden className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: topicColor(index) }} />
               <span className="line-clamp-2" title={t.name}>
                 {t.name}
@@ -48,9 +48,9 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
                       <span className="truncate" title={c.name}>
                         {c.name}
                       </span>
-                      <span className="font-display font-extrabold tabular-nums">{fmt1(v)}</span>
+                      <span className="font-display font-semibold tabular-nums">{fmt1(v)}</span>
                     </div>
-                    <div className="mt-0.5 h-[clamp(0.5rem,1vh,0.8rem)] overflow-hidden rounded-full bg-[#ebe7fb]">
+                    <div className="mt-0.5 h-[clamp(0.5rem,1vh,0.8rem)] overflow-hidden rounded-full bg-[#efeee8]">
                       <div
                         className="h-full rounded-full transition-[width] duration-700 ease-out"
                         style={{ width: `${v === null ? 0 : (v / scaleMax) * 100}%`, backgroundColor: topicColor(index) }}
@@ -61,7 +61,7 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
               })}
             </ul>
             </div>
-            <span className="mt-3 self-end rounded-full bg-ink px-3 py-1 text-[clamp(0.75rem,0.9vw,1rem)] font-bold text-white group-hover:bg-violet">
+            <span className="mt-3 self-end rounded-full bg-ink px-3 py-1 text-[clamp(0.75rem,0.9vw,1rem)] font-bold text-white group-hover:bg-primary">
               See vote distribution
             </span>
           </button>

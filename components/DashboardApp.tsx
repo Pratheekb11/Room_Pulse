@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useClientValue } from "./useClientValue";
+import { CountUp } from "./CountUp";
 import { avg, cellKey, indexCells, sumAggs, topicHistograms } from "@/lib/stats";
 import { voterUrl } from "@/lib/site";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
@@ -165,18 +166,18 @@ function Stage({
       <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1">
           <Logo />
-          <h1 className="font-display mt-2 text-[clamp(2rem,3.6vw,4.2rem)] font-extrabold leading-[0.98] tracking-tight break-words">
+          <h1 className="font-display mt-2 text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[0.98] tracking-tight break-words">
             {session.title}
           </h1>
         </div>
         <div className="flex flex-col items-end gap-3">
           <div className="flex flex-wrap items-center justify-end gap-2.5">
             <LiveBadge lastOkAt={lastOkAt} />
-            <span className="rounded-full border-2 border-ink bg-white px-3.5 py-1 text-lg font-bold tabular-nums">
-              {voters} {voters === 1 ? "person" : "people"} voted
+            <span className="rounded-full border border-line-strong bg-white px-3.5 py-1 text-lg font-bold tabular-nums">
+              <CountUp value={voters} /> {voters === 1 ? "person" : "people"} voted
             </span>
             <span
-              className={`rounded-full border-2 border-ink px-3.5 py-1 text-lg font-bold ${
+              className={`rounded-full border border-line-strong px-3.5 py-1 text-lg font-bold ${
                 r.isOpen ? "bg-mint text-ink" : "bg-ink text-white"
               }`}
             >
@@ -185,7 +186,7 @@ function Stage({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 text-sm font-semibold">
             {group && CHARTS[group.kind].length > 1 && (
-              <div role="tablist" aria-label="Chart" className="flex rounded-full border-2 border-ink bg-white p-0.5">
+              <div role="tablist" aria-label="Chart" className="flex rounded-full border border-line-strong bg-white p-0.5">
                 {CHARTS[group.kind].map((c, i) => (
                   <button
                     key={c.id}
@@ -202,7 +203,7 @@ function Stage({
               </div>
             )}
             {group?.kind === "rating" && view === "heatmap" && (
-              <label className="flex items-center gap-1.5 rounded-full border-2 border-ink bg-white py-0.5 pl-3 pr-1">
+              <label className="flex items-center gap-1.5 rounded-full border border-line-strong bg-white py-0.5 pl-3 pr-1">
                 Sort
                 <select
                   value={sort}
@@ -219,11 +220,11 @@ function Stage({
               aria-pressed={showQr}
               title="Shortcut: Q"
               onClick={() => setShowQr((s) => !s)}
-              className={`rounded-full border-2 border-ink px-3 py-1 ${showQr ? "bg-sun" : "bg-white"}`}
+              className={`rounded-full border border-line-strong px-3 py-1 ${showQr ? "bg-sun" : "bg-white"}`}
             >
               {showQr ? "Hide QR" : "Show QR"}
             </button>
-            <button type="button" onClick={toggleFullscreen} className="rounded-full border-2 border-ink bg-white px-3 py-1">
+            <button type="button" onClick={toggleFullscreen} className="rounded-full border border-line-strong bg-white px-3 py-1">
               {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             </button>
           </div>
@@ -238,7 +239,7 @@ function Stage({
                 type="button"
                 onClick={() => setFocusIndex(null)}
                 aria-current={focusIndex === null ? "page" : undefined}
-                className={`rounded-full border-2 border-ink px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${
+                className={`rounded-full border border-line-strong px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${
                   focusIndex === null ? "bg-ink text-white" : "bg-white"
                 }`}
               >
@@ -250,8 +251,8 @@ function Stage({
                   type="button"
                   onClick={() => setFocusIndex(i)}
                   aria-current={focusIndex === i ? "page" : undefined}
-                  className={`flex items-center gap-2 rounded-full border-2 border-ink px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${
-                    focusIndex === i ? "bg-violet text-white" : "bg-white"
+                  className={`flex items-center gap-2 rounded-full border border-line-strong px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${
+                    focusIndex === i ? "bg-ink text-white" : "bg-white"
                   }`}
                 >
                   {g.focus.name}
@@ -260,6 +261,7 @@ function Stage({
             </nav>
           )}
 
+          <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
           {topics.length === 0 || criteria.length === 0 ? (
             <p className="text-xl text-ink-soft">This presentation has no topics or criteria.</p>
           ) : !group ? (
@@ -273,8 +275,8 @@ function Stage({
               onOpen={setFocusIndex}
             />
           ) : group.kind === "poll" ? (
-            <section className="slab rounded-[28px] bg-white p-[clamp(1rem,2vw,2.25rem)]">
-              <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-extrabold leading-tight">
+            <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
+              <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight">
                 {group.focus.name}
               </h2>
               {(() => {
@@ -286,8 +288,8 @@ function Stage({
               })()}
             </section>
           ) : group.kind === "words" ? (
-            <section className="slab rounded-[28px] bg-white p-[clamp(1rem,2vw,2.25rem)]">
-              <h2 className="font-display text-center text-[clamp(1.6rem,2.6vw,3rem)] font-extrabold leading-tight">{group.focus.name}</h2>
+            <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
+              <h2 className="font-display text-center text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight">{group.focus.name}</h2>
               {view === "list" ? (
                 <WordList words={wordWeights(r.words ?? [], group.focus.id)} />
               ) : (
@@ -296,7 +298,7 @@ function Stage({
             </section>
           ) : view === "heatmap" ? (
             <div className="flex flex-col gap-[clamp(0.75rem,2vh,1.75rem)]">
-              <section className="slab rounded-[28px] bg-white p-[clamp(0.75rem,1.3vw,1.5rem)]">
+              <section className="slab rounded-xl bg-white p-[clamp(0.75rem,1.3vw,1.5rem)]">
                 <Heatmap
                   topics={sortedTopics}
                   criteria={criteria}
@@ -305,14 +307,14 @@ function Stage({
                   flash={flash}
                 />
               </section>
-              <section className="slab rounded-[28px] bg-white p-[clamp(0.75rem,1.3vw,1.5rem)]">
-                <h2 className="font-display mb-3 text-[clamp(1.1rem,1.5vw,1.7rem)] font-extrabold">Overall by topic</h2>
+              <section className="slab rounded-xl bg-white p-[clamp(0.75rem,1.3vw,1.5rem)]">
+                <h2 className="font-display mb-3 text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold">Overall by topic</h2>
                 <OverallBars data={sortedBars} scaleMax={session.scaleMax} />
               </section>
             </div>
           ) : view === "ranking" ? (
-            <section className="slab rounded-[28px] bg-white p-[clamp(1rem,2vw,2.25rem)]">
-              <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.4rem,2.2vw,2.5rem)] font-extrabold">
+            <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
+              <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.4rem,2.2vw,2.5rem)] font-semibold">
                 Top rated in {group.focus.name}
               </h2>
               <OverallBars data={byOverall} scaleMax={session.scaleMax} size="large" ranked />
@@ -339,6 +341,7 @@ function Stage({
               voterCount={voters}
             />
           )}
+          </div>
           {voters === 0 && (
             <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">
               Waiting for the first rating. Scan the QR code to start.

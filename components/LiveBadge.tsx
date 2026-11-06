@@ -13,7 +13,7 @@ export function LiveBadge({ lastOkAt }: { lastOkAt: number | null }) {
   return (
     <span
       role="status"
-      className={`inline-flex items-center gap-2 rounded-full border-2 border-ink px-3.5 py-1 text-lg font-bold ${
+      className={`inline-flex items-center gap-2 rounded-full border border-line-strong px-3.5 py-1 text-lg font-bold ${
         live ? "bg-white" : "bg-sun"
       }`}
     >

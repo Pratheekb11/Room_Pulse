@@ -119,14 +119,14 @@ function Console({
         <Logo />
         <div className="flex items-center gap-3 text-sm">
           {guest ? (
-            <span className="rounded-full border-2 border-ink bg-sun px-3 py-1 font-bold">Guest</span>
+            <span className="rounded-full border border-line-strong bg-sun px-3 py-1 font-bold">Guest</span>
           ) : (
             <span className="hidden font-semibold text-ink-soft sm:inline">{email}</span>
           )}
           <button
             type="button"
             onClick={guest ? () => setConfirmLeave(true) : onSignOut}
-            className="rounded-full border-2 border-ink bg-white px-4 py-1.5 font-bold"
+            className="rounded-full border border-line-strong bg-white px-4 py-1.5 font-bold"
           >
             Log out
           </button>
@@ -154,7 +154,7 @@ function Console({
 
         <section aria-labelledby="sessions-h">
           <div className="flex items-baseline justify-between">
-            <h2 id="sessions-h" className="font-display text-3xl font-extrabold">
+            <h2 id="sessions-h" className="font-display text-3xl font-semibold">
               Your presentations
             </h2>
             <button type="button" onClick={() => void refresh()} className="text-sm font-bold underline underline-offset-4">
@@ -162,13 +162,13 @@ function Console({
             </button>
           </div>
           {error && (
-            <p role="alert" className="mt-3 rounded-xl border-2 border-ink bg-sun px-4 py-2 font-semibold">
+            <p role="alert" className="mt-3 rounded-lg border border-line-strong bg-sun px-4 py-2 font-semibold">
               {error}
             </p>
           )}
           {sessions === null && !error && <p className="mt-4 text-ink-soft">Loading…</p>}
           {sessions?.length === 0 && (
-            <p className="mt-4 rounded-2xl border-2 border-dashed border-ink/30 p-6 text-ink-soft">
+            <p className="mt-4 rounded-xl border border-dashed border-line-strong p-6 text-ink-soft">
               Nothing here yet. Build a presentation with the form; it appears here with its links and QR code.
             </p>
           )}
@@ -215,15 +215,15 @@ function VerifyBanner({ email, onVerified }: { email: string; onVerified: () => 
   }
 
   return (
-    <div role="status" className="slab mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sun px-5 py-4">
+    <div role="status" className="slab mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sun px-5 py-4">
       <div>
-        <p className="font-display text-xl font-extrabold">Verify your email to start creating presentations</p>
+        <p className="font-display text-xl font-semibold">Verify your email to start creating presentations</p>
         <p className="text-sm font-medium">
           We sent a link to <strong className="break-all">{email}</strong>. This page unlocks by itself once you click it.
         </p>
         {note && <p className="mt-1 text-sm font-bold">{note}</p>}
       </div>
-      <button type="button" onClick={resend} disabled={busy} className="key rounded-xl bg-white px-4 py-2 font-bold">
+      <button type="button" onClick={resend} disabled={busy} className="key rounded-lg bg-white px-4 py-2 font-bold">
         {busy ? "Sending…" : "Resend email"}
       </button>
     </div>
@@ -255,10 +255,10 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div role="status" className="slab mt-6 rounded-2xl bg-sun px-5 py-4">
+    <div role="status" className="slab mt-6 rounded-xl bg-sun px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-display text-xl font-extrabold">You&rsquo;re using a guest account</p>
+          <p className="font-display text-xl font-semibold">You&rsquo;re using a guest account</p>
           <p className="text-sm font-medium">
             Votes and results save live, and stay available for 3 days after you create each presentation. Then they&rsquo;re deleted.
             Guests can run up to 3 presentations. Closing the browser signs you out; come back with your PIN and a presentation code.
@@ -270,7 +270,7 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
           )}
         </div>
         {!open && (
-          <button type="button" onClick={() => setOpen(true)} className="key rounded-xl bg-white px-4 py-2 font-bold">
+          <button type="button" onClick={() => setOpen(true)} className="key rounded-lg bg-white px-4 py-2 font-bold">
             Save account
           </button>
         )}
@@ -292,10 +292,10 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
               className={`${inputClass} bg-white text-base`}
             />
           </label>
-          <button type="submit" disabled={busy || !email.includes("@") || password.length < 10} className="key rounded-xl bg-violet px-4 py-3 font-bold text-white">
+          <button type="submit" disabled={busy || !email.includes("@") || password.length < 10} className="key rounded-lg bg-primary px-4 py-3 font-bold text-white">
             {busy ? "Saving…" : "Save and keep everything"}
           </button>
-          {error && <p className="text-sm font-bold text-[#a3122f] sm:col-span-3">{error}</p>}
+          {error && <p className="text-sm font-bold text-error sm:col-span-3">{error}</p>}
         </form>
       )}
     </div>

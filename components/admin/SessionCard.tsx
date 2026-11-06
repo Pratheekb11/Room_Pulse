@@ -29,11 +29,11 @@ function CopyLink({ label, url, newTab }: { label: string; url: string; newTab?:
           href={url}
           target={newTab ? "_blank" : undefined}
           rel={newTab ? "noopener noreferrer" : undefined}
-          className="min-w-0 truncate font-semibold underline decoration-violet decoration-2 underline-offset-4"
+          className="min-w-0 truncate font-semibold underline decoration-primary decoration-2 underline-offset-4"
         >
           {shortUrl(url)}
         </a>
-        <button type="button" onClick={copy} className="shrink-0 rounded-lg border-2 border-ink px-2 py-0.5 text-xs font-bold">
+        <button type="button" onClick={copy} className="shrink-0 rounded-lg border border-line-strong px-2 py-0.5 text-xs font-bold">
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
@@ -114,13 +114,13 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
   }
 
   const created = new Date(s.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-  const btn = "key rounded-xl px-3 py-1.5 text-sm font-bold";
+  const btn = "key rounded-lg px-3 py-1.5 text-sm font-bold";
 
   return (
-    <article className="slab rounded-[24px] bg-white p-5" aria-labelledby={`s-${s.code}`}>
+    <article className="slab rounded-xl bg-white p-5" aria-labelledby={`s-${s.code}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 id={`s-${s.code}`} className="font-display text-2xl font-extrabold leading-tight break-words">
+          <h3 id={`s-${s.code}`} className="font-display text-2xl font-semibold leading-tight break-words">
             {s.title}
           </h3>
           <p className="mt-1 text-sm text-ink-soft">
@@ -130,11 +130,11 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {s.expiresAt && (
-            <span className="rounded-full border-2 border-ink bg-sun px-3 py-0.5 text-sm font-bold" title={new Date(s.expiresAt).toLocaleString()}>
+            <span className="rounded-full border border-line-strong bg-sun px-3 py-0.5 text-sm font-bold" title={new Date(s.expiresAt).toLocaleString()}>
               Deleted in {timeLeft(s.expiresAt)}
             </span>
           )}
-          <span className={`rounded-full border-2 border-ink px-3 py-0.5 text-sm font-bold ${s.isOpen ? "bg-mint" : "bg-ink text-white"}`}>
+          <span className={`rounded-full border border-line-strong px-3 py-0.5 text-sm font-bold ${s.isOpen ? "bg-mint" : "bg-ink text-white"}`}>
             {s.isOpen ? "Open" : "Closed"}
           </span>
         </div>
@@ -142,11 +142,11 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
 
       <div className="mt-4 grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
         <div className="flex flex-col items-center gap-2">
-          <div className="rounded-xl border-2 border-ink bg-white p-2">
-            {urls && <QRCodeSVG value={urls.voter} size={128} marginSize={0} fgColor="#1a1446" title={`QR code for ${urls.voter}`} />}
+          <div className="rounded-lg border border-line-strong bg-white p-2">
+            {urls && <QRCodeSVG value={urls.voter} size={128} marginSize={0} fgColor="#26251e" title={`QR code for ${urls.voter}`} />}
           </div>
           <div ref={canvasWrap} className="hidden" aria-hidden>
-            {urls && <QRCodeCanvas value={urls.voter} size={1024} marginSize={4} fgColor="#1a1446" />}
+            {urls && <QRCodeCanvas value={urls.voter} size={1024} marginSize={4} fgColor="#26251e" />}
           </div>
           <button type="button" onClick={downloadPng} className="text-xs font-bold underline underline-offset-4">
             Download PNG
@@ -188,18 +188,18 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
         <button type="button" onClick={() => setDialog("reset")} disabled={pending !== null} className={`${btn} bg-white`}>
           Reset votes
         </button>
-        <button type="button" onClick={() => setDialog("delete")} disabled={pending !== null} className={`${btn} bg-[#c2193f] text-white`}>
+        <button type="button" onClick={() => setDialog("delete")} disabled={pending !== null} className={`${btn} bg-white text-error`}>
           Delete
         </button>
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 text-sm font-semibold text-[#c2193f]">
+        <p role="alert" className="mt-3 text-sm font-semibold text-error">
           {error}
         </p>
       )}
       {notice && !error && (
-        <p role="status" className="mt-3 text-sm font-semibold text-[#0b7a59]">
+        <p role="status" className="mt-3 text-sm font-semibold text-success">
           {notice}
         </p>
       )}

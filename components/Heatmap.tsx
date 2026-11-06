@@ -1,5 +1,6 @@
 import { scaleColor } from "@/lib/colors";
-import { avg, cellKey, fmt1, sumAggs, type Agg } from "@/lib/stats";
+import { avg, cellKey, sumAggs, type Agg } from "@/lib/stats";
+import { CountUp } from "./CountUp";
 import type { NamedItem } from "@/lib/types";
 
 interface Props {
@@ -17,13 +18,13 @@ function Cell({ agg, scaleMax, flashKey, strong }: { agg: Agg; scaleMax: number;
     <td className="p-1">
       <div
         key={flashKey}
-        className={`flex h-full min-h-[clamp(3rem,5.6vh,5.5rem)] flex-col items-center justify-center rounded-xl transition-colors duration-500 ${
+        className={`flex h-full min-h-[clamp(3rem,5.6vh,5.5rem)] flex-col items-center justify-center rounded-lg transition-colors duration-500 ${
           flashKey ? "animate-flash" : ""
-        } ${colors ? "" : "border-2 border-dashed border-line bg-white text-ink/40"} ${strong ? "ring-2 ring-ink ring-offset-0" : ""}`}
+        } ${colors ? "" : "border border-dashed border-line-strong bg-white text-ink/40"} ${strong ? "ring-1 ring-black/15" : ""}`}
         style={colors ? { backgroundColor: colors.bg, color: colors.fg } : undefined}
       >
-        <span className="font-display text-[clamp(1.4rem,2.3vw,2.6rem)] font-extrabold leading-none tabular-nums">
-          {fmt1(value)}
+        <span className="font-display text-[clamp(1.4rem,2.3vw,2.6rem)] font-semibold leading-none tabular-nums">
+          <CountUp value={value} format={(v) => v.toFixed(1)} />
         </span>
         {agg.n > 0 && <span className="mt-1 text-[clamp(0.75rem,0.85vw,1rem)] font-semibold opacity-80">n={agg.n}</span>}
       </div>
@@ -49,7 +50,7 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
                 {c.name}
               </th>
             ))}
-            <th scope="col" className="px-1 pb-2 text-center align-bottom text-[clamp(0.9rem,1.15vw,1.35rem)] font-extrabold">
+            <th scope="col" className="px-1 pb-2 text-center align-bottom text-[clamp(0.9rem,1.15vw,1.35rem)] font-semibold">
               Overall
             </th>
           </tr>
@@ -76,7 +77,7 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
         </tbody>
         <tfoot>
           <tr>
-            <th scope="row" className="pr-3 pt-1 text-left text-[clamp(1rem,1.3vw,1.55rem)] font-extrabold">
+            <th scope="row" className="pr-3 pt-1 text-left text-[clamp(1rem,1.3vw,1.55rem)] font-semibold">
               Average
             </th>
             {criteria.map((c) => (

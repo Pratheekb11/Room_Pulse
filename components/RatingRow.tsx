@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { Burst, haptic } from "./Burst";
 import { readableOn } from "@/lib/colors";
 import type { SaveStatus } from "@/lib/vote-queue";
 
@@ -14,10 +15,10 @@ const STATUS_TEXT: Record<SaveStatus, string> = {
 
 const STATUS_CLASS: Record<SaveStatus, string> = {
   saving: "text-ink-soft",
-  saved: "text-[#0b7a59]",
+  saved: "text-success",
   retrying: "text-[#9a5b00]",
-  error: "text-[#c2193f]",
-  closed: "text-[#c2193f]",
+  error: "text-error",
+  closed: "text-error",
 };
 
 interface Props {
@@ -40,6 +41,12 @@ export const faceFor = (score: number, scaleMax: number) =>
 
 export function RatingRow(p: Props) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [burst, setBurst] = useState<{ score: number; key: number } | null>(null);
+  const rate = (score: number) => {
+    haptic();
+    setBurst({ score, key: (burst?.key ?? 0) + 1 });
+    p.onRate(score);
+  };
   const scores = Array.from({ length: p.scaleMax }, (_, i) => i + 1);
   const cols = p.scaleMax <= 7 ? p.scaleMax : Math.ceil(p.scaleMax / 2);
   const fg = readableOn(p.color);
@@ -56,7 +63,7 @@ export function RatingRow(p: Props) {
     else return;
     e.preventDefault();
     refs.current[next]?.focus();
-    p.onRate(next + 1);
+    rate(next + 1);
   }
 
   return (
@@ -90,15 +97,16 @@ export function RatingRow(p: Props) {
               aria-label={`${p.criterionName} for ${p.topicName}: ${score}`}
               tabIndex={i === focusIndex ? 0 : -1}
               disabled={p.disabled}
-              onClick={() => p.onRate(score)}
+              onClick={() => rate(score)}
               onKeyDown={(e) => onKeyDown(e, i)}
-              className={`key font-display flex min-h-11 min-w-11 flex-col items-center justify-center rounded-2xl font-bold ${
+              className={`key relative flex min-h-11 min-w-11 flex-col items-center justify-center rounded-xl font-medium ${
                 faces ? "h-[4.25rem] gap-0.5" : "h-12 text-xl"
-              } ${selected ? "animate-pop translate-y-[3px] shadow-[var(--shadow-key-down)]" : "bg-white"} ${
+              } ${selected ? "animate-pop " : "bg-white"} ${
                 p.value && !selected ? "opacity-60" : ""
               }`}
               style={selected ? { backgroundColor: p.color, color: fg } : undefined}
             >
+              {burst?.score === score && <Burst key={burst.key} color={p.color} />}
               {faces && (
                 <span aria-hidden className={`text-[1.7rem] leading-none ${selected ? "" : "grayscale-[35%]"}`}>
                   {faceFor(score, p.scaleMax)}

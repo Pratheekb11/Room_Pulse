@@ -23,18 +23,18 @@ export function TopicCard(p: Props) {
   const fg = readableOn(p.color);
 
   return (
-    <section aria-labelledby={`topic-${p.topic.id}`} className="slab overflow-hidden rounded-[24px] bg-white">
+    <section aria-labelledby={`topic-${p.topic.id}`} className="slab overflow-hidden rounded-xl bg-white">
       <header className="flex items-start justify-between gap-3 px-5 pb-4 pt-4" style={{ backgroundColor: p.color, color: fg }}>
         <div className="min-w-0">
           <p className="text-sm font-semibold opacity-80">
             Topic {p.index + 1} of {p.total}
           </p>
-          <h2 id={`topic-${p.topic.id}`} className="font-display text-2xl font-extrabold leading-tight break-words">
+          <h2 id={`topic-${p.topic.id}`} className="font-display text-2xl font-semibold leading-tight break-words">
             {p.topic.name}
           </h2>
         </div>
         <span
-          className="mt-1 shrink-0 rounded-full border-2 px-2.5 py-0.5 text-sm font-bold"
+          className="mt-1 shrink-0 rounded-full border px-2.5 py-0.5 text-sm font-medium"
           style={{ borderColor: fg }}
           aria-label={`${rated} of ${p.criteria.length} rated`}
         >

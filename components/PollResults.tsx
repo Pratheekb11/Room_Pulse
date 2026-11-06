@@ -1,5 +1,6 @@
 import { readableOn, topicColor } from "@/lib/colors";
 import type { PollTally } from "@/lib/answers";
+import { CountUp } from "./CountUp";
 
 const LETTERS = "ABCDEFGHIJ";
 
@@ -12,7 +13,7 @@ export function PollBars({ tally }: { tally: PollTally }) {
         return (
           <li key={r.id} className="flex items-center gap-3">
             <span
-              className="font-display flex h-[clamp(2.4rem,4.6vh,3.4rem)] w-[clamp(2.4rem,4.6vh,3.4rem)] shrink-0 items-center justify-center rounded-xl border-2 border-ink text-[clamp(1.1rem,1.5vw,1.7rem)] font-extrabold"
+              className="font-display flex h-[clamp(2.4rem,4.6vh,3.4rem)] w-[clamp(2.4rem,4.6vh,3.4rem)] shrink-0 items-center justify-center rounded-lg border border-line-strong text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold"
               style={{ backgroundColor: c, color: readableOn(c) }}
               aria-hidden
             >
@@ -21,14 +22,14 @@ export function PollBars({ tally }: { tally: PollTally }) {
             <span className="w-[26%] shrink-0 text-[clamp(1.05rem,1.5vw,1.8rem)] font-bold leading-tight break-words">
               {r.name} {lead && <span aria-label="leading">👑</span>}
             </span>
-            <span className="relative h-[clamp(2.4rem,5vh,3.8rem)] flex-1 overflow-hidden rounded-full border-2 border-ink bg-white">
+            <span className="relative h-[clamp(2.4rem,5vh,3.8rem)] flex-1 overflow-hidden rounded-full border border-line-strong bg-white">
               <span
                 className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
                 style={{ width: `${r.pct}%`, backgroundColor: c }}
               />
             </span>
-            <span className="font-display w-[4ch] shrink-0 text-right text-[clamp(1.4rem,2.2vw,2.6rem)] font-extrabold tabular-nums">
-              {r.pct}%
+            <span className="font-display w-[4ch] shrink-0 text-right text-[clamp(1.4rem,2.2vw,2.6rem)] font-semibold tabular-nums">
+              <CountUp value={r.pct} />%
             </span>
             <span className="w-[8ch] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold whitespace-nowrap text-ink-soft">
               {r.n} {r.n === 1 ? "vote" : "votes"}
@@ -48,16 +49,16 @@ export function PollColumns({ tally }: { tally: PollTally }) {
         const c = topicColor(r.index);
         return (
           <div key={r.id} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
-            <span className="font-display text-[clamp(1.4rem,2.4vw,2.8rem)] font-extrabold tabular-nums leading-none">{r.pct}%</span>
+            <span className="font-display text-[clamp(1.4rem,2.4vw,2.8rem)] font-semibold tabular-nums leading-none"><CountUp value={r.pct} />%</span>
             <span className="mb-2 text-[clamp(0.8rem,1vw,1.1rem)] font-semibold text-ink-soft">
               {r.n} {r.n === 1 ? "vote" : "votes"}
             </span>
             <div
-              className="w-full max-w-[9rem] rounded-t-2xl border-2 border-b-0 border-ink transition-[height] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
+              className="w-full max-w-[9rem] rounded-t-2xl border border-b-0 border-black/10 transition-[height] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
               style={{ height: `${Math.max(r.pct, r.n ? 2 : 0)}%`, backgroundColor: c }}
             />
-            <div className="w-full border-t-2 border-ink pt-2 text-center">
-              <span className="font-display mr-1 font-extrabold">{LETTERS[r.index]}</span>
+            <div className="w-full border-t border-line-strong pt-2 text-center">
+              <span className="font-display mr-1 font-semibold">{LETTERS[r.index]}</span>
               <span className="text-[clamp(0.9rem,1.25vw,1.4rem)] font-bold break-words">{r.name}</span>
               {tally.leader?.id === r.id && <span aria-label="leading"> 👑</span>}
             </div>
@@ -78,7 +79,7 @@ export function PollPie({ tally, hole = true }: { tally: PollTally; hole?: boole
     <div className="flex flex-wrap items-center justify-center gap-[clamp(1rem,4vw,5rem)]">
       <div className="relative aspect-square w-[clamp(16rem,32vw,34rem)]">
         <svg viewBox="0 0 100 100" className="h-full w-full" role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
-          <circle cx="50" cy="50" r={R} fill="none" stroke="#ebe7fb" strokeWidth={W} />
+          <circle cx="50" cy="50" r={R} fill="none" stroke="#efeee8" strokeWidth={W} />
           {tally.total > 0 &&
             tally.rows.map((r) => {
               if (r.n === 0) return null;
@@ -106,7 +107,7 @@ export function PollPie({ tally, hole = true }: { tally: PollTally; hole?: boole
         </svg>
         {hole && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="font-display text-[clamp(2rem,3.4vw,3.8rem)] font-extrabold leading-none">{tally.total}</span>
+            <span className="font-display text-[clamp(2rem,3.4vw,3.8rem)] font-semibold leading-none"><CountUp value={tally.total} /></span>
             <span className="text-[clamp(0.85rem,1vw,1.15rem)] font-semibold text-ink-soft">votes</span>
           </div>
         )}
@@ -114,9 +115,9 @@ export function PollPie({ tally, hole = true }: { tally: PollTally; hole?: boole
       <ul className="flex flex-col gap-3">
         {tally.rows.map((r) => (
           <li key={r.id} className="flex items-center gap-3 text-[clamp(1rem,1.4vw,1.6rem)] font-bold">
-            <span aria-hidden className="h-6 w-6 shrink-0 rounded-md border-2 border-ink" style={{ backgroundColor: topicColor(r.index) }} />
+            <span aria-hidden className="h-6 w-6 shrink-0 rounded-md border border-line-strong" style={{ backgroundColor: topicColor(r.index) }} />
             <span className="max-w-[18ch] break-words">{r.name}</span>
-            <span className="font-display ml-auto pl-6 font-extrabold tabular-nums">{r.pct}%</span>
+            <span className="font-display ml-auto pl-6 font-semibold tabular-nums">{r.pct}%</span>
           </li>
         ))}
       </ul>

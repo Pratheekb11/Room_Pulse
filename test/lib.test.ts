@@ -112,3 +112,11 @@ describe("criterionHistograms", () => {
     expect(h).toEqual({ x: [2, 0, 5, 0, 0], y: [0, 0, 0, 0, 1], z: [0, 0, 0, 0, 0] });
   });
 });
+
+import { TOPIC_INKS } from "@/lib/colors";
+
+describe("topic text colours", () => {
+  it("are readable on white (≥ 4.5:1)", () => {
+    for (const c of TOPIC_INKS) expect(contrast(c, "#ffffff"), c).toBeGreaterThanOrEqual(4.5);
+  });
+});

@@ -62,7 +62,7 @@ export function ResetForm() {
             aria-describedby="pw-hint"
           />
         </label>
-        <p id="pw-hint" className={`mt-1.5 text-sm ${tooShort ? "font-semibold text-[#c2193f]" : "text-ink-soft"}`}>
+        <p id="pw-hint" className={`mt-1.5 text-sm ${tooShort ? "font-semibold text-error" : "text-ink-soft"}`}>
           At least 10 characters.
         </p>
         <label className="mt-4 block font-semibold">
@@ -76,7 +76,7 @@ export function ResetForm() {
             className={inputClass}
           />
         </label>
-        {mismatch && <p className="mt-1.5 text-sm font-semibold text-[#c2193f]">The two passwords don&rsquo;t match.</p>}
+        {mismatch && <p className="mt-1.5 text-sm font-semibold text-error">The two passwords don&rsquo;t match.</p>}
         <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} className="h-4 w-4" />
           Show passwords

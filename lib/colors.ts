@@ -1,31 +1,36 @@
 // Colour helpers shared by the voting page and the dashboard.
 
-/** Topic identity colours (used for chips, ranking bars). Cycles after 8. */
+/** Topic identity colours: soft pastels for fills (bars, slices, chips). Cycles after 8. */
 export const TOPIC_COLORS = [
-  "#6A3DF5", // violet
-  "#FF5C7A", // coral
-  "#FFB81F", // sun
-  "#12B886", // mint
-  "#2F86FF", // sky
-  "#FF7A33", // tangerine
-  "#C04CE0", // orchid
-  "#00A3B4", // lagoon
+  "#dfa88f", // peach
+  "#9fbbe0", // sky
+  "#9fc9a2", // mint
+  "#c0a8dd", // lavender
+  "#d9b56e", // gold
+  "#e3a5b8", // rose
+  "#93c4c0", // sea
+  "#c9b79c", // sand
 ] as const;
+
+/** Darker partner of each topic colour, for text drawn in that colour on white (≥ 4.5:1). */
+export const TOPIC_INKS = ["#9a4a26", "#2f5f99", "#2f7340", "#6a4799", "#7d5a12", "#9b3a5a", "#2a6e69", "#6e5a3a"] as const;
+
+export const topicInk = (index: number) => TOPIC_INKS[index % TOPIC_INKS.length];
 
 export const topicColor = (index: number) => TOPIC_COLORS[index % TOPIC_COLORS.length];
 
-const INK: RGB = [26, 20, 70]; // #1A1446
+const INK: RGB = [38, 37, 30]; // #26251e
 const WHITE: RGB = [255, 255, 255];
 type RGB = [number, number, number];
 
-// Single-hue sequential scale (light lavender → deep violet), in sRGB stops.
+// Single-hue sequential scale (warm cream → deep burnt orange), in sRGB stops.
 const SCALE: RGB[] = [
-  [240, 236, 255],
-  [208, 196, 255],
-  [160, 135, 250],
-  [112, 74, 232],
-  [72, 34, 180],
-  [42, 16, 120],
+  [246, 239, 228],
+  [243, 214, 190],
+  [238, 175, 135],
+  [229, 124, 72],
+  [196, 74, 22],
+  [120, 42, 10],
 ];
 
 function hex([r, g, b]: RGB): string {
@@ -90,5 +95,5 @@ function parseHex(h: string): RGB {
 /** Ink or white, whichever reads better on the given background. */
 export function readableOn(bgHex: string): string {
   const rgb = parseHex(bgHex);
-  return contrast(rgb, WHITE) >= contrast(rgb, INK) ? "#ffffff" : "#1a1446";
+  return contrast(rgb, WHITE) >= contrast(rgb, INK) ? "#ffffff" : "#26251e";
 }
