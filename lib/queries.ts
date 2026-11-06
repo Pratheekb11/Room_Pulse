@@ -12,8 +12,8 @@ import type {
   TopicItem,
   WordCount,
 } from "./types";
-import type { AnswerInput, CreateSessionInput, VoteInput } from "./validation";
-import { generateCode } from "./code";
+import type { AnswerInput, CreateSessionInput, EditSessionInput, VoteInput } from "./validation";
+import { generateCode, generateDashboardKey } from "./code";
 
 // All SQL lives here. Every statement is a parameterised tagged template.
 
@@ -21,7 +21,7 @@ import { generateCode } from "./code";
 
 export async function getSession(code: string): Promise<SessionPayload | null> {
   const rows = (await sql`
-    select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open,
+    select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open, s.revision,
       coalesce((select json_agg(json_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
                   'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end))
                   order by f.position)
@@ -39,6 +39,7 @@ export async function getSession(code: string): Promise<SessionPayload | null> {
     low_label: string;
     high_label: string;
     is_open: boolean;
+    revision: number;
     focus_topics: FocusItem[];
     topics: TopicItem[];
     criteria: NamedItem[];
@@ -53,11 +54,18 @@ export async function getSession(code: string): Promise<SessionPayload | null> {
       lowLabel: r.low_label,
       highLabel: r.high_label,
       isOpen: r.is_open,
+      revision: r.revision,
     },
     focusTopics: r.focus_topics,
     topics: r.topics,
     criteria: r.criteria,
   };
+}
+
+/** Open/closed state and question revision; `null` when the session does not exist. */
+export async function getSessionStatus(code: string): Promise<{ isOpen: boolean; revision: number } | null> {
+  const rows = (await sql`select is_open, revision from live_sessions where code = ${code}`) as { is_open: boolean; revision: number }[];
+  return rows[0] ? { isOpen: rows[0].is_open, revision: rows[0].revision } : null;
 }
 
 /** `null` when the session does not exist. */
@@ -93,9 +101,19 @@ export async function saveVote(v: VoteInput): Promise<VoteOutcome> {
   return "invalid";
 }
 
-export async function getResults(code: string): Promise<ResultsPayload | null> {
+/**
+ * Live results, only for someone holding the presentation's dashboard key or its signed-in owner.
+ * Anyone else gets `null`, exactly like a missing presentation.
+ */
+export async function getResults(
+  code: string,
+  access: { dashboardKey?: string | null; ownerId?: string | null },
+): Promise<ResultsPayload | null> {
+  const key = access.dashboardKey ?? null;
+  const owner = access.ownerId ?? null;
+  if (!key && !owner) return null;
   const rows = (await sql`
-    select s.is_open,
+    select s.is_open, s.revision,
       (select count(*)::int from (
           select voter_id from votes where session_id = s.id
           union select voter_id from poll_answers where session_id = s.id
@@ -125,8 +143,10 @@ export async function getResults(code: string): Promise<ResultsPayload | null> {
                where w.rk <= 80), '[]'::json) as words
     from live_sessions s
     where s.code = ${code}
+      and (s.dashboard_key = ${key}::text or s.owner_id = ${owner}::uuid)
   `) as {
     is_open: boolean;
+    revision: number;
     voter_count: number;
     cells: ResultCell[];
     dist: ScoreBucket[];
@@ -135,14 +155,14 @@ export async function getResults(code: string): Promise<ResultsPayload | null> {
   }[];
   const r = rows[0];
   if (!r) return null;
-  return { isOpen: r.is_open, voterCount: r.voter_count, cells: r.cells, dist: r.dist, polls: r.polls, words: r.words };
+  return { isOpen: r.is_open, voterCount: r.voter_count, cells: r.cells, dist: r.dist, polls: r.polls, words: r.words, revision: r.revision };
 }
 
 // ---------------------------------------------------------------- admin
 
 export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> {
   const rows = (await sql`
-    select s.code, s.title, s.is_open, s.created_at, s.expires_at,
+    select s.code, s.title, s.is_open, s.created_at, s.expires_at, s.dashboard_key,
       (select count(*)::int from focus_topics f where f.session_id = s.id) as focus_count,
       (select count(*)::int from topics t where t.session_id = s.id)   as topic_count,
       (select count(*)::int from criteria c where c.session_id = s.id) as criterion_count,
@@ -164,6 +184,7 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     is_open: boolean;
     created_at: Date | string;
     expires_at: Date | string | null;
+    dashboard_key: string;
     focus_count: number;
     topic_count: number;
     criterion_count: number;
@@ -181,6 +202,7 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     criterionCount: r.criterion_count,
     voterCount: r.voter_count,
     totalVotes: r.total_votes,
+    dashboardKey: r.dashboard_key,
   }));
 }
 
@@ -194,14 +216,19 @@ function isCodeCollision(err: unknown): boolean {
  * retries on code collision. Topic positions are global (focus position × 100 + index)
  * so ordering by topics.position keeps focus topics together.
  */
-export async function createSession(input: CreateSessionInput, ownerId: string, expiresInDays: number | null = null): Promise<string> {
+export async function createSession(
+  input: CreateSessionInput,
+  ownerId: string,
+  expiresInDays: number | null = null,
+): Promise<{ code: string; dashboardKey: string }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateCode();
+    const dashboardKey = generateDashboardKey();
     try {
       await sql`
         with s as (
-          insert into sessions (code, title, scale_max, low_label, high_label, owner_id, expires_at)
-          values (${code}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${ownerId},
+          insert into sessions (code, dashboard_key, title, scale_max, low_label, high_label, owner_id, expires_at)
+          values (${code}, ${dashboardKey}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${ownerId},
                   case when ${expiresInDays}::int is null then null else now() + make_interval(days => ${expiresInDays}::int) end)
           returning id
         ), input as (
@@ -225,7 +252,7 @@ export async function createSession(input: CreateSessionInput, ownerId: string, 
         select s.id, u.name, u.ord - 1
         from s, unnest(${input.criteria}::text[]) with ordinality as u(name, ord)
       `;
-      return code;
+      return { code, dashboardKey };
     } catch (err) {
       if (isCodeCollision(err) && attempt < 4) continue;
       throw err;
@@ -622,4 +649,112 @@ export async function findGuestByPresentationCode(code: string): Promise<{ id: s
      where s.code = ${code} and u.is_guest and u.guest_pin_hash is not null
   `) as { id: string; guest_pin_hash: string }[];
   return rows[0] ? { id: rows[0].id, pinHash: rows[0].guest_pin_hash } : null;
+}
+
+// ---------------------------------------------------------------- editing
+
+/** Answers stored per question, option/thing-to-rate and rating scale, for the edit form's warnings. */
+export async function getAnswerCounts(code: string, ownerId: string): Promise<{ counts: Record<string, number>; scaleLocked: boolean } | null> {
+  const rows = (await sql`
+    with s as (select id from live_sessions where code = ${code} and owner_id = ${ownerId}::uuid),
+    c as (
+      select topic_id as id, count(*)::int as n from votes where session_id = (select id from s) group by topic_id
+      union all
+      select criterion_id, count(*)::int from votes where session_id = (select id from s) group by criterion_id
+      union all
+      select topic_id, count(*)::int from poll_answers where session_id = (select id from s) group by topic_id
+      union all
+      select t.focus_id, count(*)::int from votes v join topics t on t.id = v.topic_id
+       where v.session_id = (select id from s) and t.focus_id is not null group by t.focus_id
+      union all
+      select focus_id, count(*)::int from poll_answers where session_id = (select id from s) group by focus_id
+      union all
+      select focus_id, count(distinct voter_id)::int from word_answers where session_id = (select id from s) group by focus_id
+    )
+    select (select count(*) from s)::int as found,
+           exists (select 1 from votes where session_id = (select id from s)) as scale_locked,
+           coalesce((select json_object_agg(id, n) from (select id, sum(n)::int as n from c group by id) x), '{}'::json) as counts
+  `) as { found: number; scale_locked: boolean; counts: Record<string, number> }[];
+  const r = rows[0];
+  if (!r || !r.found) return null;
+  return { counts: r.counts, scaleLocked: r.scale_locked };
+}
+
+export type EditOutcome = "ok" | "not_found" | "invalid" | "scale_locked";
+
+/**
+ * Replaces a presentation's questions with the edited version. Items that keep their id keep their
+ * answers; items left out are deleted with their answers; items without an id are created.
+ * A question's type never changes, and the rating scale can't change once ratings exist.
+ */
+export async function updateSession(code: string, ownerId: string, input: EditSessionInput): Promise<EditOutcome> {
+  const current = (await sql`
+    select s.id, s.scale_max,
+      exists (select 1 from votes v where v.session_id = s.id) as has_ratings,
+      coalesce((select json_agg(json_build_object('id', f.id, 'kind', f.kind)) from focus_topics f where f.session_id = s.id), '[]'::json) as focus,
+      coalesce((select json_agg(json_build_object('id', t.id, 'focusId', t.focus_id)) from topics t where t.session_id = s.id), '[]'::json) as topics,
+      coalesce((select json_agg(c.id) from criteria c where c.session_id = s.id), '[]'::json) as criteria
+    from live_sessions s
+    where s.code = ${code} and s.owner_id = ${ownerId}::uuid
+  `) as {
+    id: string;
+    scale_max: number;
+    has_ratings: boolean;
+    focus: { id: string; kind: string }[];
+    topics: { id: string; focusId: string | null }[];
+    criteria: string[];
+  }[];
+  const cur = current[0];
+  if (!cur) return "not_found";
+
+  // Every id must already belong to this presentation, in the same place, with the same question type.
+  const focusKind = new Map(cur.focus.map((f) => [f.id, f.kind]));
+  const topicFocus = new Map(cur.topics.map((t) => [t.id, t.focusId]));
+  const criteria = new Set(cur.criteria);
+  for (const f of input.focusTopics) {
+    if (f.id && focusKind.get(f.id) !== f.kind) return "invalid";
+    for (const t of f.topics) if (t.id && (!f.id || topicFocus.get(t.id) !== f.id)) return "invalid";
+  }
+  for (const c of input.criteria) if (c.id && !criteria.has(c.id)) return "invalid";
+  if (input.scaleMax !== cur.scale_max && cur.has_ratings) return "scale_locked";
+
+  // New items get their ids here, so topics can point at new questions in the same transaction.
+  const focus = input.focusTopics.map((f, pos) => ({ ...f, id: f.id ?? crypto.randomUUID(), isNew: !f.id, pos }));
+  const topics = focus.flatMap((f) => f.topics.map((t, i) => ({ id: t.id ?? crypto.randomUUID(), isNew: !t.id, focusId: f.id, name: t.name, pos: f.pos * 100 + i })));
+  const crit = input.criteria.map((c, pos) => ({ id: c.id ?? crypto.randomUUID(), isNew: !c.id, name: c.name, pos }));
+  const keepFocus = focus.filter((f) => !f.isNew).map((f) => f.id);
+  const keepTopics = topics.filter((t) => !t.isNew).map((t) => t.id);
+  const keepCriteria = crit.filter((c) => !c.isNew).map((c) => c.id);
+  const sid = cur.id;
+  const rows = (list: object[]) => JSON.stringify(list);
+
+  await sql.transaction([
+    // The scale guard repeats the check, in case a rating arrived since the read above.
+    sql`update sessions set title = ${input.title}, low_label = ${input.lowLabel}, high_label = ${input.highLabel},
+          scale_max = case when exists (select 1 from votes where session_id = ${sid}::uuid) then scale_max else ${input.scaleMax}::int end,
+          revision = revision + 1
+        where id = ${sid}::uuid`,
+    sql`delete from focus_topics where session_id = ${sid}::uuid and not (id = any(${keepFocus}::uuid[]))`,
+    sql`delete from topics where session_id = ${sid}::uuid and not (id = any(${keepTopics}::uuid[]))`,
+    sql`delete from criteria where session_id = ${sid}::uuid and not (id = any(${keepCriteria}::uuid[]))`,
+    sql`update focus_topics f set name = x.name, chart = x.chart, position = x.pos
+        from jsonb_to_recordset(${rows(focus.filter((f) => !f.isNew))}::jsonb) as x(id uuid, name text, chart text, pos int)
+        where f.id = x.id and f.session_id = ${sid}::uuid`,
+    sql`insert into focus_topics (id, session_id, name, kind, chart, position)
+        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos
+        from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb) as x(id uuid, name text, kind text, chart text, pos int)`,
+    sql`update topics t set name = x.name, position = x.pos
+        from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int)
+        where t.id = x.id and t.session_id = ${sid}::uuid`,
+    sql`insert into topics (id, session_id, focus_id, name, position)
+        select x.id, ${sid}::uuid, x."focusId", x.name, x.pos
+        from jsonb_to_recordset(${rows(topics.filter((t) => t.isNew))}::jsonb) as x(id uuid, "focusId" uuid, name text, pos int)`,
+    sql`update criteria c set name = x.name, position = x.pos
+        from jsonb_to_recordset(${rows(crit.filter((c) => !c.isNew))}::jsonb) as x(id uuid, name text, pos int)
+        where c.id = x.id and c.session_id = ${sid}::uuid`,
+    sql`insert into criteria (id, session_id, name, position)
+        select x.id, ${sid}::uuid, x.name, x.pos
+        from jsonb_to_recordset(${rows(crit.filter((c) => c.isNew))}::jsonb) as x(id uuid, name text, pos int)`,
+  ]);
+  return "ok";
 }

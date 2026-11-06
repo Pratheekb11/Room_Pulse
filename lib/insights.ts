@@ -1,6 +1,6 @@
 // Summary statistics for the executive views.
 
-export type AgreementLabel = "Strong agreement" | "Mixed views" | "Split views";
+export type AgreementLabel = "Most people agree" | "Opinions vary" | "People disagree";
 
 /**
  * How much the room agrees, from a score histogram (counts[score - 1]).
@@ -20,7 +20,7 @@ export function agreement(counts: number[], scaleMax: number): { sd: number; lab
   counts.forEach((c, i) => (sq += c * (i + 1 - mean) ** 2));
   const sd = Math.sqrt(sq / n);
   const relative = sd / Math.max(1, scaleMax - 1);
-  const label: AgreementLabel = relative <= 0.2 ? "Strong agreement" : relative <= 0.33 ? "Mixed views" : "Split views";
+  const label: AgreementLabel = relative <= 0.2 ? "Most people agree" : relative <= 0.33 ? "Opinions vary" : "People disagree";
   return { sd, label };
 }
 
@@ -51,8 +51,8 @@ export function takeaways(topics: TopicStat[], criteria: string[], scaleMax: num
       : `${first.name} leads with ${f1(first.overall)} out of ${scaleMax}, ${f1(margin)} ahead of ${second.name}.`,
   );
 
-  const split = rated.filter((t) => t.agreement === "Split views").map((t) => t.name);
-  if (split.length) out.push(`The room is split on ${list(split)}. Worth discussing before deciding.`);
+  const split = rated.filter((t) => t.agreement === "People disagree").map((t) => t.name);
+  if (split.length) out.push(`People disagree about ${list(split)}. Talk these through before deciding.`);
 
   const last = rated[rated.length - 1];
   const weakest = last.perCriterion
@@ -68,7 +68,7 @@ export function takeaways(topics: TopicStat[], criteria: string[], scaleMax: num
       return { name, v: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
     });
     const low = means.filter((m): m is { name: string; v: number } => m.v !== null).sort((a, b) => a.v - b.v)[0];
-    if (low) out.push(`${low.name} scores lowest across the board (${f1(low.v)} average).`);
+    if (low) out.push(`${low.name} gets the lowest scores overall (${f1(low.v)} on average).`);
   }
   return out;
 }

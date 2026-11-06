@@ -45,7 +45,7 @@ function vote(body: Record<string, unknown>) {
 }
 
 async function results(code: string) {
-  const res = await resultsRoute.GET(new Request(url(`/api/results/${code}`)), ctx(code));
+  const res = await resultsRoute.GET(new Request(url(`/api/results/${code}`), admin()), ctx(code));
   return { res, body: (await res.json()) as ResultsPayload };
 }
 
@@ -83,7 +83,7 @@ describe("POST /api/admin/sessions", () => {
     expect(code).toMatch(/^[abcdefghjkmnpqrstuvwxyz23456789]{6}$/);
 
     const info = (await (await sessionRoute.GET(new Request(url("/x")), ctx(code))).json()) as SessionPayload;
-    expect(info.session).toEqual({ code, title: "Demo", scaleMax: 5, lowLabel: "Low", highLabel: "High", isOpen: true });
+    expect(info.session).toEqual({ code, title: "Demo", scaleMax: 5, lowLabel: "Low", highLabel: "High", isOpen: true, revision: 0 });
     expect(info.focusTopics.map((f) => f.name)).toEqual(["Growth", "Platform"]);
     const [growth, platform] = info.focusTopics;
     expect(info.topics.map((t) => [t.name, t.focusId])).toEqual([
@@ -150,7 +150,7 @@ describe("GET /api/session/[code]/status", () => {
   it("returns isOpen with a short CDN cache", async () => {
     const { code } = await demo();
     const res = await statusRoute.GET(new Request(url("/x")), ctx(code));
-    expect(await res.json()).toEqual({ isOpen: true });
+    expect(await res.json()).toEqual({ isOpen: true, revision: 0 });
     expect(res.headers.get("cache-control")).toBe("public, s-maxage=5, stale-while-revalidate=5");
     expect((await statusRoute.GET(new Request(url("/x")), ctx("zzzzzz"))).status).toBe(404);
   });
@@ -166,7 +166,7 @@ describe("POST /api/vote + GET /api/results", () => {
     expect(await res.json()).toEqual({ ok: true });
 
     const { body, res: rr } = await results(code);
-    expect(rr.headers.get("cache-control")).toBe("no-store");
+    expect(rr.headers.get("cache-control")).toBe("private, no-store");
     expect(body.voterCount).toBe(1);
     expect(body.cells).toEqual([{ topicId: t.id, criterionId: c.id, n: 1, sum: 4 }]);
     expect(body.dist).toEqual([{ topicId: t.id, criterionId: c.id, score: 4, n: 1 }]);
@@ -249,7 +249,7 @@ describe("POST /api/vote + GET /api/results", () => {
     const v = voter();
     await vote({ code, topicId: info.topics[0].id, criterionId: info.criteria[0].id, voterId: v, score: 3 });
     const texts = [
-      await (await resultsRoute.GET(new Request(url("/x")), ctx(code))).text(),
+      await (await resultsRoute.GET(new Request(url("/x"), admin()), ctx(code))).text(),
       await (await sessionRoute.GET(new Request(url("/x")), ctx(code))).text(),
       await (await adminSessions.GET(new Request(url("/x"), admin()))).text(),
       await (await exportRoute.GET(new Request(url("/x?type=raw"), admin()), ctx(code))).text(),
@@ -334,13 +334,13 @@ describe("admin actions", () => {
     expect([...buf.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // UTF-8 BOM
     const lines = new TextDecoder().decode(buf.slice(3)).trim().split("\r\n");
     expect(lines).toEqual([
-      "Focus topic,Topic,Criterion,Average,Votes",
+      "Question,Item or option,Measure,Average score,Answers",
       "Focus,A,Impact,4.50,2",
       "Focus,A,Feasibility,2.00,1",
-      "Focus,A,Overall,3.67,3",
+      "Focus,A,All measures,3.67,3",
       "Focus,B,Impact,1.00,1",
       "Focus,B,Feasibility,,0",
-      "Focus,B,Overall,1.00,1",
+      "Focus,B,All measures,1.00,1",
     ]);
   });
 
@@ -348,7 +348,7 @@ describe("admin actions", () => {
     const { code } = await seeded();
     const text = await (await exportRoute.GET(new Request(url("/x?type=raw"), admin()), ctx(code))).text();
     const rows = text.replace(/^﻿/, "").trim().split("\r\n").map((l) => l.split(","));
-    expect(rows[0]).toEqual(["Respondent", "Focus topic", "Topic", "Criterion", "Score", "UpdatedAt"]);
+    expect(rows[0]).toEqual(["Person", "Question", "Item or option", "Measure", "Score", "Answered at"]);
     expect(rows.slice(1).map((r) => r.slice(0, 5))).toEqual([
       ["R1", "Focus", "A", "Impact", "4"],
       ["R1", "Focus", "A", "Feasibility", "2"],

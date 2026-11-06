@@ -23,13 +23,13 @@ export function VerifyEmail() {
     };
   }, [token]);
 
-  if (state === "checking") return <AuthShell title="Verifying…"><p className="text-center text-lg">One moment.</p></AuthShell>;
+  if (state === "checking") return <AuthShell title="Confirming your email…"><p className="text-center text-lg">One moment.</p></AuthShell>;
   if (state === "verified")
     return (
-      <AuthShell title="Email verified 🎉">
+      <AuthShell title="Email confirmed">
         <p className="text-lg">You&rsquo;re all set to create presentations.</p>
         <Link href="/admin" className={`${primaryButton} block text-center`}>
-          Open the console
+          Go to your presentations
         </Link>
       </AuthShell>
     );

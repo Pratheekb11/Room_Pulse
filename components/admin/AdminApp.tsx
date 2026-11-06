@@ -6,7 +6,7 @@ import { Logo } from "../Logo";
 import { LoadingScreen } from "../StatusScreens";
 import { apiFetch, UnauthorizedError } from "./api";
 import { AuthScreen } from "./AuthScreen";
-import { NewSessionForm } from "./NewSessionForm";
+import { PresentationForm } from "./PresentationForm";
 import { SessionCard } from "./SessionCard";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { inputClass } from "../auth/AuthShell";
@@ -138,7 +138,7 @@ function Console({
       {confirmLeave && (
         <ConfirmDialog
           title="Log out of the guest account?"
-          body="To get back in later, you'll need your guest PIN and one of your presentation codes. Your presentations keep running until they expire."
+          body="To get back in later, you need your guest PIN and the code of one of your presentations. Your presentations keep working while you're logged out."
           confirmLabel="Log out anyway"
           danger
           onConfirm={() => {
@@ -150,7 +150,7 @@ function Console({
       )}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
-        <NewSessionForm call={call} onCreated={refresh} locked={mustVerify} />
+        <PresentationForm call={call} mode={{ kind: "create" }} onDone={refresh} locked={mustVerify} />
 
         <section aria-labelledby="sessions-h">
           <div className="flex items-baseline justify-between">
@@ -169,7 +169,7 @@ function Console({
           {sessions === null && !error && <p className="mt-4 text-ink-soft">Loading…</p>}
           {sessions?.length === 0 && (
             <p className="mt-4 rounded-xl border border-dashed border-line-strong p-6 text-ink-soft">
-              Nothing here yet. Build a presentation with the form; it appears here with its links and QR code.
+              You have no presentations yet. Fill in the form to make your first one. It will show up here with its QR code and links.
             </p>
           )}
           <div className="mt-4 flex flex-col gap-6">
@@ -217,7 +217,7 @@ function VerifyBanner({ email, onVerified }: { email: string; onVerified: () => 
   return (
     <div role="status" className="slab mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sun px-5 py-4">
       <div>
-        <p className="font-display text-xl font-semibold">Verify your email to start creating presentations</p>
+        <p className="font-display text-xl font-semibold">Confirm your email address to start making presentations</p>
         <p className="text-sm font-medium">
           We sent a link to <strong className="break-all">{email}</strong>. This page unlocks by itself once you click it.
         </p>
@@ -260,8 +260,8 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
         <div>
           <p className="font-display text-xl font-semibold">You&rsquo;re using a guest account</p>
           <p className="text-sm font-medium">
-            Votes and results save live, and stay available for 3 days after you create each presentation. Then they&rsquo;re deleted.
-            Guests can run up to 3 presentations. Closing the browser signs you out; come back with your PIN and a presentation code.
+            Everything saves as people answer. Each presentation is deleted 3 days after you make it, and you can have up to 3.
+            Closing the browser logs you out. To get back in, use your PIN and a presentation code. Save your account to keep everything for good.
           </p>
           {pin && (
             <p className="mt-1 text-sm font-bold">
@@ -271,7 +271,7 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
         </div>
         {!open && (
           <button type="button" onClick={() => setOpen(true)} className="key rounded-lg bg-white px-4 py-2 font-bold">
-            Save account
+            Save my account
           </button>
         )}
       </div>

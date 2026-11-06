@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duplicateIndexes, filledItems, insertAfter, moveItem, pasteInto, removeAt, setAt, toItems } from "@/lib/list-edit";
+import { duplicateIndexes, filledItems, filledRows, insertAfter, moveItem, pasteInto, removeAt, rowsFrom, setAt, toItems, type Row } from "@/lib/list-edit";
 
 describe("list editor helpers", () => {
   it("setAt replaces one item without touching the others", () => {
@@ -60,5 +60,46 @@ describe("list editor helpers", () => {
     expect(toItems(undefined)).toEqual([""]);
     expect(toItems(["x", "y"])).toEqual(["x", "y"]);
     expect(toItems([])).toEqual([""]);
+  });
+
+  describe("rows that remember which saved item they are (editing keeps answers)", () => {
+    const rows: Row[] = [
+      { id: "a", name: "Lisbon" },
+      { id: "b", name: "Kyoto" },
+    ];
+
+    it("renaming or moving a row keeps its id", () => {
+      expect(setAt(rows, 0, "Porto")).toEqual([{ id: "a", name: "Porto" }, { id: "b", name: "Kyoto" }]);
+      expect(moveItem(rows, 0, 1).map((r) => r.id)).toEqual(["b", "a"]);
+    });
+
+    it("new rows have no id", () => {
+      expect(insertAfter(rows, 0, 10)[1]).toEqual({ name: "" });
+      expect(removeAt([rows[0]], 0)).toEqual([{ name: "" }]);
+    });
+
+    it("pasting over a saved row keeps its id on the first line; the other lines are new", () => {
+      expect(pasteInto(rows, 1, "Osaka\nNara", 10)?.items).toEqual([
+        { id: "a", name: "Lisbon" },
+        { id: "b", name: "Osaka" },
+        { name: "Nara" },
+      ]);
+    });
+
+    it("filledRows keeps ids, cleans names and drops empty rows", () => {
+      expect(filledRows([{ id: "a", name: "  Lis   bon " }, { name: " " }, { name: "New" }])).toEqual([
+        { id: "a", name: "Lis bon" },
+        { name: "New" },
+      ]);
+    });
+
+    it("rowsFrom builds rows from saved items and always gives at least one row", () => {
+      expect(rowsFrom([{ id: "x", name: "X" }])).toEqual([{ id: "x", name: "X" }]);
+      expect(rowsFrom([])).toEqual([{ name: "" }]);
+    });
+
+    it("duplicateIndexes works on rows too", () => {
+      expect([...duplicateIndexes([{ name: "a" }, { id: "z", name: " A " }])]).toEqual([1]);
+    });
   });
 });

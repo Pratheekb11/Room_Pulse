@@ -5,8 +5,8 @@ import { shortUrl } from "@/lib/site";
 
 export function QrPanel({ url, code }: { url: string; code: string }) {
   return (
-    <aside className="slab flex flex-col items-center rounded-xl bg-white p-6 text-center" aria-label="Join this session">
-      <p className="font-display text-[clamp(1.4rem,1.8vw,2rem)] font-semibold leading-tight">Scan to rate</p>
+    <aside className="slab flex flex-col items-center rounded-xl bg-white p-6 text-center" aria-label="How to join">
+      <p className="font-display text-[clamp(1.4rem,1.8vw,2rem)] font-semibold leading-tight">Scan with your phone camera</p>
       <div className="mt-4 rounded-xl border border-line-strong bg-white p-3">
         <QRCodeSVG value={url} size={240} marginSize={0} fgColor="#26251e" level="M" title={`QR code for ${url}`} />
       </div>
@@ -16,7 +16,7 @@ export function QrPanel({ url, code }: { url: string; code: string }) {
         <wbr />
         {shortUrl(url).match(/\/s\/.*$/)?.[0]}
       </p>
-      <p className="mt-3 text-base font-semibold text-ink-soft">or enter code</p>
+      <p className="mt-3 text-base font-semibold text-ink-soft">or go to the address above and type this code</p>
       <p className="font-mono rounded-lg bg-ink px-5 py-2 text-[clamp(1.8rem,2.8vw,3rem)] tracking-[0.1em] text-canvas">
         {code}
       </p>

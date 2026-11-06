@@ -77,13 +77,13 @@ export function TopicDistribution(p: Props) {
   const cols = p.criteria.length <= 3 ? p.criteria.length : p.criteria.length <= 6 ? 3 : 4;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={`Vote distribution for ${item.name}`} className="fixed inset-0 z-50 overflow-y-auto bg-canvas">
+    <div role="dialog" aria-modal="true" aria-label={`How people scored ${item.name}`} className="fixed inset-0 z-50 overflow-y-auto bg-canvas">
       <div className="flex min-h-full flex-col gap-[clamp(0.75rem,1.6vh,1.5rem)] px-[clamp(1rem,2.2vw,2.75rem)] py-[clamp(0.75rem,2vh,1.75rem)]">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="flex items-center gap-2 text-[clamp(0.9rem,1.1vw,1.25rem)] font-semibold text-ink-soft">
               <span aria-hidden className="h-4 w-4 rounded-full" style={{ backgroundColor: topicColor(index) }} />
-              Vote distribution
+              How people scored
             </p>
             <h2 className="font-display text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[1] tracking-tight break-words">{item.name}</h2>
           </div>
@@ -116,7 +116,7 @@ export function TopicDistribution(p: Props) {
             </p>
           </div>
           <div>
-            <h3 className="mb-2 text-[clamp(0.95rem,1.2vw,1.35rem)] font-semibold">All criteria</h3>
+            <h3 className="mb-2 text-[clamp(0.95rem,1.2vw,1.35rem)] font-semibold">Each measure</h3>
             <Columns counts={all} scaleMax={p.scaleMax} tall />
           </div>
         </section>

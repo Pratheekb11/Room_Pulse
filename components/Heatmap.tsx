@@ -37,7 +37,7 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full table-fixed border-separate border-spacing-0">
-        <caption className="sr-only">Average rating per topic and criterion</caption>
+        <caption className="sr-only">Average score for each item on each measure</caption>
         <thead>
           <tr>
             <th scope="col" className="w-[22%]" />

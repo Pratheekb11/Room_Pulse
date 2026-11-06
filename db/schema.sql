@@ -201,6 +201,14 @@ $$;
 alter table sessions add column if not exists expires_at timestamptz;
 create index if not exists sessions_expires_idx on sessions(expires_at) where expires_at is not null;
 
+-- Secret key for the presenter's live results link (unrelated to the public voting code).
+alter table sessions add column if not exists dashboard_key text not null
+  default replace(replace(encode(gen_random_bytes(24), 'base64'), '+', '-'), '/', '_');
+create unique index if not exists sessions_dashboard_key_idx on sessions(dashboard_key);
+
+-- Bumped on every edit so open ballots and dashboards reload the questions.
+alter table sessions add column if not exists revision int not null default 0;
+
 -- Every public lookup goes through this view, so expired presentations behave as if deleted.
 create or replace view live_sessions as
   select * from sessions where expires_at is null or expires_at > now();

@@ -32,7 +32,7 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
               gridAutoFlow: "column",
             }
           : undefined
-      } aria-label="Overall rating per topic">
+      } aria-label="Average score per item">
       {data.map((d, rank) => {
         const pct = d.value === null ? 0 : (d.value / scaleMax) * 100;
         const color = topicColor(d.index);

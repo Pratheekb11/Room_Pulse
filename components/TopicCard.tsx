@@ -27,7 +27,7 @@ export function TopicCard(p: Props) {
       <header className="flex items-start justify-between gap-3 px-5 pb-4 pt-4" style={{ backgroundColor: p.color, color: fg }}>
         <div className="min-w-0">
           <p className="text-sm font-semibold opacity-80">
-            Topic {p.index + 1} of {p.total}
+            Item {p.index + 1} of {p.total}
           </p>
           <h2 id={`topic-${p.topic.id}`} className="font-display text-2xl font-semibold leading-tight break-words">
             {p.topic.name}

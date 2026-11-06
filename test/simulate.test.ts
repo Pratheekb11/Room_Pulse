@@ -48,7 +48,7 @@ describe("scripts/simulate.mjs", () => {
         ], criteria: ["X", "Y"] }),
       }),
     );
-    const { code } = (await res.json()) as { code: string };
+    const { code, dashboardKey } = (await res.json()) as { code: string; dashboardKey: string };
 
     const summary = await simulate({
       baseUrl: "http://sim.test",
@@ -69,7 +69,7 @@ describe("scripts/simulate.mjs", () => {
     expect(summary.changed).toBeGreaterThanOrEqual(1);
 
     const results = (await (
-      await resultsRoute.GET(new Request("http://x"), { params: Promise.resolve({ code }) })
+      await resultsRoute.GET(new Request("http://x", { headers: { "x-dashboard-key": dashboardKey } }), { params: Promise.resolve({ code }) })
     ).json()) as ResultsPayload;
     expect(results.voterCount).toBe(12);
     expect(results.cells).toHaveLength(6);

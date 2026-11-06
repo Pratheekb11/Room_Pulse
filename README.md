@@ -9,7 +9,7 @@ Anonymous, near-real-time audience voting for live sessions. Presenters sign up 
 The audience scans a QR code and answers on their phones: one screen at a time, with emoji rating keys, levels and points. Every tap saves instantly, and the dashboard on the big screen updates about every 1.5 s.
 
 - **Voters** (`/s/[code]`): no login and no names. Each tap saves right away, and a changed rating replaces the old one instead of counting twice.
-- **Dashboard** (`/s/[code]/dashboard`): opens on an overview card per focus topic. Click a card (or press `→`/`←`, `Esc` for the overview, or use `?focus=2`) to see its results:
+- **Results screen** (`/s/[code]/dashboard#k=…`): private. It needs the secret key in the presenter link (after `#`, so it never reaches server logs) or the owner's sign-in; the public voting code alone shows nothing. Opens on an overview card per question. Click a card (or press `→`/`←`, `Esc` for the overview, or use `?focus=2`) to see its results:
   - Rating questions have four views (keys `1`–`4`, or `?view=`):
     - **Heatmap:** topic × criterion averages.
     - **Ranking:** topics ranked by overall score.
@@ -18,6 +18,8 @@ The audience scans a QR code and answers on their phones: one screen at a time, 
   - Polls show bars or a pie chart. Word clouds show a live word cloud.
   - `Q` toggles the QR panel.
 - **Presenter console** (`/admin`): sign up / log in; build presentations; open/close voting; reset, recalculate or delete; export CSVs. Each account only sees its own presentations.
+
+**Editing**: open **Edit questions** from your presentations or from the results screen. Renamed or moved items keep their answers; removed items delete theirs (you're asked first). A question's type can't change, and the scoring range locks once anyone has scored. Phones pick up changes within about 15 seconds.
 
 Stack: Next.js (App Router) + Tailwind on Vercel, and Neon Postgres from the Vercel Marketplace through `@neondatabase/serverless` over HTTP. The dashboard uses short polling on purpose. There are no WebSockets and no third-party realtime services.
 
@@ -76,7 +78,7 @@ On the free plan, Neon sleeps after 5 minutes without activity, and the first re
 ## Running a session
 
 1. Open `/admin`, enter the password, and create a session (title, scale, topics and criteria, one per line).
-2. Open the dashboard link on the projector, with the QR shown and Fullscreen on.
+2. Open the private results link on the projector, with the QR shown and Fullscreen on.
 3. The audience scans and rates. Results fill in live.
 4. Click **Close voting**. Phones show "Voting is closed" within about 10 s.
 5. Export the **Summary CSV** (averages, with an Overall row per topic) or the **Raw CSV** (respondents shown as R1, R2…, never their ids).
@@ -119,7 +121,7 @@ Links in emails always use `NEXT_PUBLIC_SITE_URL` (or Vercel's production URL), 
 ## How correctness is enforced
 
 - A vote is one SQL statement. It checks that the session is open, that the topic and criterion belong to the session, and that the score is within the session's scale. On a repeat vote it upserts on `(session, topic, criterion, voter)`, so a voter can never count twice.
-- The `results` table, which the dashboard reads, is updated by a trigger inside the same statement as the vote. If anything ever drifts, close voting and click **Recalculate totals**. That rebuilds the totals from the raw votes.
+- The `results` table, which the dashboard reads, is updated by a trigger inside the same statement as the vote. If anything ever drifts, close voting and click **Recount totals**. That rebuilds the totals from the raw votes.
 - Poll choices are one row per voter per poll (changing your pick updates it). Word answers are replaced as a set, in one transaction. Results for both are counted straight from these rows on every poll, so their totals can't drift.
 - On the phone, every answer goes through the same save queue. It waits 300 ms after a tap, sends only the latest value, retries with back-off on network errors and 5xx responses, and keeps unsent answers in `localStorage`, so even a page reload while offline doesn't lose them.
 - Voter ids are random UUIDs, one per browser per session, stored in `localStorage`. No IPs, names or request bodies are stored or logged. Exports replace voter ids with R1, R2….

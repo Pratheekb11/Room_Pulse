@@ -54,7 +54,7 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
       <Logo />
       <div className="mx-auto my-auto w-full max-w-sm">
         <h1 className="font-display text-center text-4xl font-semibold leading-tight tracking-tight">
-          {mode === "login" ? "Welcome back" : "Run your first session"}
+          {mode === "login" ? "Welcome back" : "Make your first presentation"}
         </h1>
         <form onSubmit={submit} className="slab mt-6 rounded-xl bg-white p-6" noValidate>
           <div role="tablist" aria-label="Account" className="flex rounded-full border border-line-strong p-0.5">

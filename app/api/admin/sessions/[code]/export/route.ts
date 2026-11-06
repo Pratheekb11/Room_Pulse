@@ -17,7 +17,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/admin/sessions/[
     let csv: string;
     if (type.data === "summary") {
       const rows = await getSummaryRows(code.data);
-      const out: (string | number)[][] = [["Focus topic", "Topic", "Criterion", "Average", "Votes"]];
+      const out: (string | number)[][] = [["Question", "Item or option", "Measure", "Average score", "Answers"]];
       let i = 0;
       while (i < rows.length) {
         // Rows arrive ordered by topic position; group by it (names can repeat across focus topics).
@@ -30,14 +30,14 @@ export async function GET(req: Request, ctx: RouteContext<"/api/admin/sessions/[
           n += r.n;
           sum += r.sum;
         }
-        out.push([focus, topic, "Overall", n ? (sum / n).toFixed(2) : "", n]);
+        out.push([focus, topic, "All measures", n ? (sum / n).toFixed(2) : "", n]);
       }
       for (const r of await getChoiceSummaryRows(s.code)) out.push([r.focus, r.label, r.kind, "", r.n]);
       csv = toCsv(out);
     } else {
       const rows = await getRawRows(code.data);
       csv = toCsv([
-        ["Respondent", "Focus topic", "Topic", "Criterion", "Score", "UpdatedAt"],
+        ["Person", "Question", "Item or option", "Measure", "Score", "Answered at"],
         ...rows.map((r) => [r.respondent, r.focus, r.topic, r.criterion, r.score, r.updatedAt]),
       ]);
     }

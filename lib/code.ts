@@ -19,3 +19,8 @@ export function generateCode(): string {
 export function normalizeCode(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
+
+/** Secret for the presenter's results link: 24 random bytes, URL-safe base64 (32 chars). */
+export function generateDashboardKey(): string {
+  return Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString("base64url");
+}

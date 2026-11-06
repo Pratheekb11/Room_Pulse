@@ -5,7 +5,8 @@ export function siteUrl(): string {
 }
 
 export const voterUrl = (code: string) => `${siteUrl()}/s/${code}`;
-export const dashboardUrl = (code: string) => `${siteUrl()}/s/${code}/dashboard`;
+/** Private results link: the key sits after "#", which browsers never send to any server. */
+export const dashboardUrl = (code: string, key?: string) => `${siteUrl()}/s/${code}/dashboard${key ? `#k=${key}` : ""}`;
 
 /** "https://x.vercel.app/s/abc123" → "x.vercel.app/s/abc123" */
 export const shortUrl = (url: string) => url.replace(/^https?:\/\//, "");

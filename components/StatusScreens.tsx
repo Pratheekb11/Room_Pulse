@@ -10,7 +10,7 @@ export function CenteredMessage({ title, body, link = true }: { title: string; b
         <p className="mt-3 text-lg text-ink-soft">{body}</p>
         {link && (
           <Link href="/" className="key font-display mt-8 rounded-xl bg-primary px-6 py-3 text-lg font-bold text-white">
-            Enter another code
+            Go to the home page
           </Link>
         )}
       </div>

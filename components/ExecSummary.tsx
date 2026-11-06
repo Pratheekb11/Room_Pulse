@@ -13,9 +13,9 @@ interface Props {
 }
 
 const AGREEMENT_STYLE = {
-  "Strong agreement": "bg-mint/30 text-success",
-  "Mixed views": "bg-sun text-[#7a4f12]",
-  "Split views": "bg-peach/35 text-error",
+  "Most people agree": "bg-mint/30 text-success",
+  "Opinions vary": "bg-sun text-[#7a4f12]",
+  "People disagree": "bg-peach/35 text-error",
 } as const;
 
 /** Board-room summary: the answer first, then the findings, then the evidence. */
@@ -45,7 +45,7 @@ export function ExecSummary({ topics, criteria, cells, histograms, scaleMax, vot
     <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)]">
       <div className="flex flex-col gap-[clamp(0.75rem,1.4vw,1.5rem)]">
         <section className="flex flex-1 flex-col rounded-xl bg-ink p-[clamp(1rem,1.8vw,2rem)] text-white">
-          <h2 className="text-[clamp(0.9rem,1.1vw,1.2rem)] font-semibold text-white/70">Top pick</h2>
+          <h2 className="text-[clamp(0.9rem,1.1vw,1.2rem)] font-semibold text-white/70">Highest score</h2>
           {top ? (
             <>
               <p className="font-display mt-1 text-[clamp(1.8rem,3vw,3.4rem)] font-semibold leading-[1.05]">{top.item.name}</p>
@@ -56,7 +56,7 @@ export function ExecSummary({ topics, criteria, cells, histograms, scaleMax, vot
               {top.agree && <p className="mt-2 text-[clamp(0.9rem,1.1vw,1.2rem)] text-white/80">{top.agree.label}</p>}
             </>
           ) : (
-            <p className="mt-2 text-xl text-white/80">Waiting for ratings.</p>
+            <p className="mt-2 text-xl text-white/80">No scores yet.</p>
           )}
         </section>
         <section className="grid grid-cols-2 gap-[clamp(0.75rem,1.4vw,1.5rem)]">
@@ -74,7 +74,7 @@ export function ExecSummary({ topics, criteria, cells, histograms, scaleMax, vot
 
       <div className="flex min-w-0 flex-col gap-[clamp(0.75rem,1.4vw,1.5rem)]">
         <section className="rounded-xl border border-line-strong bg-white p-[clamp(1rem,1.5vw,1.6rem)]">
-          <h2 className="font-display text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold">Key takeaways</h2>
+          <h2 className="font-display text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold">What the room thinks</h2>
           {findings.length ? (
             <ul className="mt-2 flex flex-col gap-1.5">
               {findings.map((f) => (
@@ -85,24 +85,24 @@ export function ExecSummary({ topics, criteria, cells, histograms, scaleMax, vot
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-ink-soft">Takeaways appear once ratings come in.</p>
+            <p className="mt-2 text-ink-soft">A short summary appears here once people start scoring.</p>
           )}
         </section>
 
         <section className="overflow-x-auto rounded-xl border border-line-strong bg-white">
           <table className="w-full border-collapse text-left">
-            <caption className="sr-only">Topics ranked by overall score, with each criterion</caption>
+            <caption className="sr-only">Items ranked by average score, with each measure</caption>
             <thead>
               <tr className="border-b border-line-strong text-[clamp(0.75rem,0.9vw,1rem)] text-ink-soft">
                 <th scope="col" className="w-[3rem] py-2.5 pl-5 font-semibold">Rank</th>
-                <th scope="col" className="py-2.5 pl-2 font-semibold">Topic</th>
-                <th scope="col" className="py-2.5 font-semibold">Overall</th>
+                <th scope="col" className="py-2.5 pl-2 font-semibold">Item</th>
+                <th scope="col" className="py-2.5 font-semibold">Average</th>
                 {criteria.map((c) => (
                   <th key={c.id} scope="col" className="max-w-[9ch] truncate px-1 py-2.5 text-center font-semibold" title={c.name}>
                     {c.name}
                   </th>
                 ))}
-                <th scope="col" className="py-2.5 pl-2 pr-5 font-semibold">Room</th>
+                <th scope="col" className="py-2.5 pl-2 pr-5 font-semibold">Agreement</th>
               </tr>
             </thead>
             <tbody>

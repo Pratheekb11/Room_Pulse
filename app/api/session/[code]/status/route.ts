@@ -1,4 +1,4 @@
-import { getSessionIsOpen } from "@/lib/queries";
+import { getSessionStatus } from "@/lib/queries";
 import { json, logDbError, notFound, unavailable } from "@/lib/http";
 import { codeSchema } from "@/lib/validation";
 
@@ -12,8 +12,8 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/session/[code]/
   const parsed = codeSchema.safeParse((await ctx.params).code);
   if (!parsed.success) return notFound();
   try {
-    const isOpen = await getSessionIsOpen(parsed.data);
-    return isOpen === null ? notFound() : json({ isOpen }, 200, CDN_CACHE);
+    const status = await getSessionStatus(parsed.data);
+    return status === null ? notFound() : json(status, 200, CDN_CACHE);
   } catch (err) {
     logDbError("status", err);
     return unavailable();

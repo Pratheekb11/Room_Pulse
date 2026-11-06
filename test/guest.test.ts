@@ -168,7 +168,7 @@ describe("guest 3-day limit", () => {
       }),
     );
     expect(v.status).toBe(200);
-    const results = (await (await resultsRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).json()) as { cells: { n: number }[] };
+    const results = (await (await resultsRoute.GET(new Request(`${ORIGIN}/x`, { headers: { cookie } }), ctx(code))).json()) as { cells: { n: number }[] };
     expect(results.cells[0].n).toBe(1);
 
     const listed = (await (await adminSessions.GET(new Request(`${ORIGIN}/x`, { headers: { cookie } }))).json()) as {
@@ -185,7 +185,7 @@ describe("guest 3-day limit", () => {
     await db.exec("update sessions set expires_at = now() - interval '1 second'");
 
     expect((await sessionRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).status).toBe(404);
-    expect((await resultsRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).status).toBe(404);
+    expect((await resultsRoute.GET(new Request(`${ORIGIN}/x`, { headers: { cookie } }), ctx(code))).status).toBe(404);
     const v = await voteRoute.POST(
       new Request(`${ORIGIN}/api/vote`, {
         method: "POST",

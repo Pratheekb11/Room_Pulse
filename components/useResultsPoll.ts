@@ -32,11 +32,13 @@ function diffCells(prev: ResultsPayload | null, next: ResultsPayload, flash: Rec
 /**
  * One polling loop: never overlaps requests, backs off to 5 s on errors,
  * pauses while the tab is hidden and resumes immediately when visible.
+ * `dashboardKey` is the secret from the presenter link; without it only the signed-in owner gets results.
  */
-export function useResultsPoll(code: string): PollState {
+export function useResultsPoll(code: string, dashboardKey: string | null, enabled = true): PollState {
   const [state, setState] = useState<PollState>({ data: null, lastOkAt: null, notFound: false, flash: {} });
 
   useEffect(() => {
+    if (!enabled) return;
     let stopped = false;
     let inFlight = false;
     let delay = FAST_MS;
@@ -58,6 +60,7 @@ export function useResultsPoll(code: string): PollState {
         const res = await fetch(`/api/results/${encodeURIComponent(code)}`, {
           cache: "no-store",
           signal: controller.signal,
+          headers: dashboardKey ? { "x-dashboard-key": dashboardKey } : undefined,
         });
         if (res.status === 404) {
           if (!stopped) setState((s) => ({ ...s, notFound: true }));
@@ -102,7 +105,7 @@ export function useResultsPoll(code: string): PollState {
       controller?.abort();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [code]);
+  }, [code, dashboardKey, enabled]);
 
   return state;
 }

@@ -26,7 +26,7 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
             type="button"
             key={t.id}
             onClick={() => onOpen(i)}
-            aria-label={`Open vote distribution for ${t.name}`}
+            aria-label={`See how people scored ${t.name}`}
             className="slab group flex flex-col overflow-hidden rounded-xl bg-white p-4 text-left transition-transform hover:-translate-y-1"
           >
             <h3 className="flex items-center gap-2 text-[clamp(1rem,1.3vw,1.5rem)] font-semibold leading-tight">
@@ -62,7 +62,7 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
             </ul>
             </div>
             <span className="mt-3 self-end rounded-full bg-ink px-3 py-1 text-[clamp(0.75rem,0.9vw,1rem)] font-bold text-white group-hover:bg-primary">
-              See vote distribution
+              See how people scored
             </span>
           </button>
         );

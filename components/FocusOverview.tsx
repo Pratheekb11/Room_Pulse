@@ -16,7 +16,7 @@ interface Props {
 
 const KIND_LABEL = { rating: "Rating", poll: "Poll", words: "Word cloud" } as const;
 
-/** One card per focus topic; click to drill into its per-topic breakdown. */
+/** One card per question; click to see its details. */
 export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words, onOpen }: Props) {
   const cols = groups.length <= 2 ? groups.length : groups.length <= 4 ? 2 : groups.length <= 6 ? 3 : 4;
   return (
@@ -62,7 +62,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
               )}
               <span className="mt-auto flex items-center justify-between pt-4 text-[clamp(0.8rem,0.95vw,1.05rem)] font-bold">
                 <span className="text-ink-soft">
-                  {count} {g.kind === "poll" ? "votes" : "answers"}
+                  {count} {g.kind === "poll" ? (count === 1 ? "vote" : "votes") : count === 1 ? "answer" : "answers"}
                 </span>
                 <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-primary">See results</span>
               </span>
@@ -90,7 +90,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">
-                  Rating, {g.topics.length} {g.topics.length === 1 ? "topic" : "topics"}
+                  Score items: {g.topics.length} {g.topics.length === 1 ? "item" : "items"}
                 </p>
                 <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
               </div>
@@ -120,8 +120,8 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
             </ol>
 
             <span className="mt-auto flex items-center justify-between pt-4 text-[clamp(0.8rem,0.95vw,1.05rem)] font-bold">
-              <span className="text-ink-soft">{s.n} ratings</span>
-              <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-primary">See breakdown</span>
+              <span className="text-ink-soft">{s.n} {s.n === 1 ? "score" : "scores"}</span>
+              <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-primary">See details</span>
             </span>
           </button>
         );

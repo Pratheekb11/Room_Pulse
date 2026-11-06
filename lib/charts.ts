@@ -3,10 +3,10 @@ import type { QuestionKind } from "./types";
 /** Charts a presenter can pick for each question type. The first is the default. */
 export const CHARTS = {
   rating: [
-    { id: "heatmap", label: "Heatmap" },
+    { id: "heatmap", label: "Colour grid" },
     { id: "ranking", label: "Ranking" },
-    { id: "breakdown", label: "Breakdown" },
-    { id: "summary", label: "Executive summary" },
+    { id: "breakdown", label: "Score spread" },
+    { id: "summary", label: "Summary" },
   ],
   poll: [
     { id: "bars", label: "Bars" },

@@ -8,16 +8,16 @@ describe("agreement", () => {
   });
 
   it("reports strong agreement when everyone gives the same or nearby scores", () => {
-    expect(agreement([0, 0, 0, 10, 0], 5)?.label).toBe("Strong agreement");
-    expect(agreement([0, 0, 2, 8, 2], 5)?.label).toBe("Strong agreement");
+    expect(agreement([0, 0, 0, 10, 0], 5)?.label).toBe("Most people agree");
+    expect(agreement([0, 0, 2, 8, 2], 5)?.label).toBe("Most people agree");
   });
 
   it("reports split views when the room is polarised", () => {
-    expect(agreement([10, 0, 0, 0, 10], 5)?.label).toBe("Split views");
+    expect(agreement([10, 0, 0, 0, 10], 5)?.label).toBe("People disagree");
   });
 
   it("reports mixed views in between", () => {
-    expect(agreement([2, 3, 3, 3, 2], 5)?.label).toBe("Mixed views");
+    expect(agreement([2, 3, 3, 3, 2], 5)?.label).toBe("Opinions vary");
   });
 
   it("is relative to the scale size", () => {
@@ -25,8 +25,8 @@ describe("agreement", () => {
     const ten = new Array(10).fill(0);
     ten[4] = 5;
     ten[6] = 5;
-    expect(agreement(ten, 10)?.label).toBe("Strong agreement");
-    expect(agreement([5, 0, 5], 3)?.label).toBe("Split views");
+    expect(agreement(ten, 10)?.label).toBe("Most people agree");
+    expect(agreement([5, 0, 5], 3)?.label).toBe("People disagree");
   });
 
   it("returns the standard deviation", () => {
@@ -39,7 +39,7 @@ import { takeaways, type TopicStat } from "@/lib/insights";
 
 describe("takeaways", () => {
   const crit = ["Impact", "Feasibility"];
-  const t = (name: string, overall: number | null, per: (number | null)[], label: TopicStat["agreement"] = "Strong agreement"): TopicStat => ({
+  const t = (name: string, overall: number | null, per: (number | null)[], label: TopicStat["agreement"] = "Most people agree"): TopicStat => ({
     name,
     overall,
     perCriterion: per,
@@ -57,8 +57,8 @@ describe("takeaways", () => {
   });
 
   it("flags topics that split the room", () => {
-    const out = takeaways([t("A", 4, [4, 4]), t("B", 3, [3, 3], "Split views"), t("C", 2, [2, 2], "Split views")], crit, 5);
-    expect(out).toContain("The room is split on B and C. Worth discussing before deciding.");
+    const out = takeaways([t("A", 4, [4, 4]), t("B", 3, [3, 3], "People disagree"), t("C", 2, [2, 2], "People disagree")], crit, 5);
+    expect(out).toContain("People disagree about B and C. Talk these through before deciding.");
   });
 
   it("points out the lowest topic and its weakest criterion", () => {
@@ -68,7 +68,7 @@ describe("takeaways", () => {
 
   it("names the weakest criterion across all topics", () => {
     const out = takeaways([t("A", 4, [3.2, 4.8]), t("B", 3, [2.8, 3.2])], crit, 5);
-    expect(out).toContain("Impact scores lowest across the board (3.0 average).");
+    expect(out).toContain("Impact gets the lowest scores overall (3.0 on average).");
   });
 
   it("says nothing before any votes, and only the leader with one topic", () => {

@@ -43,7 +43,7 @@ function CopyLink({ label, url, newTab }: { label: string; url: string; newTab?:
 
 export function SessionCard({ session: s, call, onChanged }: { session: AdminSessionRow; call: Call; onChanged: () => Promise<void> }) {
   const voter = useClientValue(() => voterUrl(s.code));
-  const dash = useClientValue(() => dashboardUrl(s.code));
+  const dash = useClientValue(() => dashboardUrl(s.code, s.dashboardKey));
   const urls = voter && dash ? { voter, dash } : null;
   const [pending, setPending] = useState<Pending>(null);
   const [dialog, setDialog] = useState<"reset" | "delete" | null>(null);
@@ -77,12 +77,12 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
     run("reset", async () => {
       await call(`${base}/reset`, { method: "POST" });
       setDialog(null);
-    }, "Votes cleared.");
+    }, "All answers cleared.");
 
   const recalc = () =>
     run("recalc", async () => {
       await call(`${base}/recalculate`, { method: "POST" });
-    }, "Totals recalculated from the raw votes.");
+    }, "Totals recounted. Everything matches the saved answers.");
 
   const remove = () =>
     run("delete", async () => {
@@ -124,8 +124,7 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
             {s.title}
           </h3>
           <p className="mt-1 text-sm text-ink-soft">
-            Code <span className="font-bold text-ink">{s.code}</span>, created {created}. {s.focusCount} focus {s.focusCount === 1 ? "topic" : "topics"}, {s.topicCount} topics ×{" "}
-            {s.criterionCount} criteria.
+            Code <span className="font-bold text-ink">{s.code}</span>, made {created}. {s.focusCount} {s.focusCount === 1 ? "question" : "questions"}.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -156,40 +155,43 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
         <div className="flex min-w-0 flex-col gap-3">
           {urls && (
             <>
-              <CopyLink label="Voter link" url={urls.voter} />
-              <CopyLink label="Dashboard (opens in a new tab)" url={urls.dash} newTab />
+              <CopyLink label="Link for your audience" url={urls.voter} />
+              <CopyLink label="Your results screen (keep this link private)" url={urls.dash} newTab />
             </>
           )}
           <p className="font-display text-lg font-bold">
-            {s.voterCount} {s.voterCount === 1 ? "voter" : "voters"}, {s.totalVotes} {s.totalVotes === 1 ? "vote" : "votes"}
+            {s.voterCount} {s.voterCount === 1 ? "person has" : "people have"} answered
           </p>
         </div>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2.5">
+        <a href={`/admin/edit/${s.code}`} className={`${btn} bg-white`}>
+          Edit questions
+        </a>
         <button type="button" onClick={toggle} disabled={pending !== null} className={`${btn} ${s.isOpen ? "bg-sun" : "bg-mint"}`}>
           {pending === "toggle" ? "Saving…" : s.isOpen ? "Close voting" : "Reopen voting"}
         </button>
         <button type="button" onClick={() => exportCsv("summary")} disabled={pending !== null} className={`${btn} bg-white`}>
-          {pending === "summary" ? "Exporting…" : "Export summary CSV"}
+          {pending === "summary" ? "Downloading…" : "Download results (CSV)"}
         </button>
         <button type="button" onClick={() => exportCsv("raw")} disabled={pending !== null} className={`${btn} bg-white`}>
-          {pending === "raw" ? "Exporting…" : "Export raw CSV"}
+          {pending === "raw" ? "Downloading…" : "Download every answer (CSV)"}
         </button>
         <button
           type="button"
           onClick={recalc}
           disabled={pending !== null || s.isOpen}
-          title={s.isOpen ? "Close voting first" : undefined}
+          title={s.isOpen ? "Close voting first" : "Recounts every total from the saved answers"}
           className={`${btn} bg-white`}
         >
-          {pending === "recalc" ? "Recalculating…" : "Recalculate totals"}
+          {pending === "recalc" ? "Recounting…" : "Recount totals"}
         </button>
         <button type="button" onClick={() => setDialog("reset")} disabled={pending !== null} className={`${btn} bg-white`}>
-          Reset votes
+          Clear all answers
         </button>
         <button type="button" onClick={() => setDialog("delete")} disabled={pending !== null} className={`${btn} bg-white text-error`}>
-          Delete
+          Delete presentation
         </button>
       </div>
 
@@ -206,9 +208,9 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
 
       {dialog === "reset" && (
         <ConfirmDialog
-          title="Reset all votes?"
-          body={`This permanently deletes all ${s.totalVotes} votes in “${s.title}”. Topics and links stay.`}
-          confirmLabel="Reset votes"
+          title="Clear all answers?"
+          body={`This deletes every answer in “${s.title}” for good. Your questions and links stay the same.`}
+          confirmLabel="Clear all answers"
           typeToConfirm="RESET"
           danger
           busy={pending === "reset"}
@@ -218,9 +220,9 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
       )}
       {dialog === "delete" && (
         <ConfirmDialog
-          title="Delete this session?"
-          body={`“${s.title}” and all of its votes will be deleted. Its links stop working.`}
-          confirmLabel="Delete session"
+          title="Delete this presentation?"
+          body={`“${s.title}” and all of its answers will be deleted for good. Its links stop working.`}
+          confirmLabel="Delete presentation"
           danger
           busy={pending === "delete"}
           onConfirm={remove}

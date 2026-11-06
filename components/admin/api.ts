@@ -11,17 +11,17 @@ export class ApiError extends Error {
 
 const MESSAGES: Record<string, string> = {
   close_voting_first: "Close voting first.",
-  unavailable: "The database is waking up. Try again in a moment.",
+  unavailable: "We couldn't reach the server. Try again in a moment.",
   invalid_credentials: "That email and password don't match.",
   too_many_attempts: "Too many failed attempts. Wait 15 minutes, then try again.",
   email_taken: "An account with this email already exists. Log in instead.",
   invalid_link: "This link has expired or was already used.",
-  invalid_guest_pin: "That code and PIN don't match a guest account.",
-  guest_limit: "Guest accounts can run 3 presentations. Save your account to create more.",
+  invalid_guest_pin: "That presentation code and PIN don't match. Check both and try again.",
+  guest_limit: "Guests can have 3 presentations. Save your account to make more.",
   guest_busy: "Guest mode is busy right now. Try again in a few minutes, or sign up.",
-  verify_email: "Verify your email to create presentations.",
+  verify_email: "Confirm your email address to make presentations.",
   too_many_emails: "We've sent several emails in the last hour. Check your inbox (and spam), or try again later.",
-  bad_origin: "This request was blocked. Reload the page and try again.",
+  bad_origin: "Something blocked this. Reload the page and try again.",
 };
 
 /** Same-origin fetch (sends the session cookie). Throws UnauthorizedError on 401, Error otherwise. */

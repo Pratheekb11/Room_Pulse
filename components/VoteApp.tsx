@@ -16,13 +16,16 @@ import { WordsCard } from "./WordsCard";
 import { useSession } from "./useSession";
 
 export function VoteApp({ code }: { code: string }) {
-  const state = useSession(code);
-  if (state.kind === "loading") return <LoadingScreen label="Loading session" />;
+  // Set when the status poll sees the presenter changed the questions; reloads them.
+  const [revision, setRevision] = useState<number | undefined>(undefined);
+  const state = useSession(code, revision);
+  if (state.kind === "loading") return <LoadingScreen label="Loading questions" />;
   if (state.kind === "not_found")
-    return <CenteredMessage title="Session not found" body={`There's no session with the code “${code}”. Check the code on the screen and try again.`} />;
+    return <CenteredMessage title="We can't find that code" body={`There's no presentation with the code “${code}”. Check the code on the screen and try again.`} />;
   if (state.kind === "error")
-    return <CenteredMessage title="Can't reach the session" body="Check your connection. Trying again automatically…" link={false} />;
-  return <Ballot code={code} data={state.data} />;
+    return <CenteredMessage title="No connection" body="Check your internet. We'll keep trying on our own." link={false} />;
+  // A new revision remounts the ballot: answers live in storage, so they carry over to the new questions.
+  return <Ballot key={state.data.session.revision} code={code} data={state.data} onRevision={setRevision} />;
 }
 
 const STATUS_POLL_MS = 10_000;
@@ -33,7 +36,7 @@ type Step =
   | { kind: "rating"; gi: number; item: TopicItem; index: number }
   | { kind: "poll" | "words"; gi: number };
 
-function Ballot({ code, data }: { code: string; data: SessionPayload }) {
+function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload; onRevision: (revision: number) => void }) {
   const { session, topics, criteria } = data;
   const ratingsKey = `liverate:ratings:${code}`;
   const pendingKey = `liverate:pending:${code}`;
@@ -135,8 +138,9 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
       try {
         const res = await fetch(`/api/session/${encodeURIComponent(code)}/status`, { cache: "no-store" });
         if (!res.ok) return;
-        const body = (await res.json()) as { isOpen: boolean };
+        const body = (await res.json()) as { isOpen: boolean; revision?: number };
         setIsOpen(body.isOpen);
+        if (typeof body.revision === "number" && body.revision !== session.revision) onRevision(body.revision);
       } catch {
         /* offline: try again next tick */
       }
@@ -160,7 +164,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [code]);
+  }, [code, session.revision, onRevision]);
 
   // ---- steps: one screen per rated topic, one per poll, one per word cloud
   const steps: Step[] = useMemo(
@@ -354,7 +358,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
           {session.title}
         </h1>
         <p className="mt-1.5 text-[0.95rem] text-ink-soft">
-          Tap to answer. It saves instantly. Anonymous — no names collected.
+          Tap an answer. It saves straight away. Your answers are anonymous.
         </p>
       </header>
 
@@ -379,7 +383,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
             </span>
           </div>
           {groups.length > 1 && (
-            <nav aria-label="Focus topics" className="-mx-1 mt-2.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+            <nav aria-label="Questions" className="-mx-1 mt-2.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
               {groups.map((g, gi) => {
                 const own = steps.filter((s) => s.gi === gi);
                 const doneHere = own.filter((s) => stepDone(s, ratings, answers)).length;
@@ -422,7 +426,7 @@ function Ballot({ code, data }: { code: string; data: SessionPayload }) {
         )}
 
         {!here || !group ? (
-          <p className="text-ink-soft">This session has nothing to answer yet.</p>
+          <p className="text-ink-soft">There are no questions yet. Wait for the presenter to add some.</p>
         ) : (
           <>
             {groups.length > 1 && (

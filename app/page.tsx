@@ -5,23 +5,29 @@ import { Logo } from "@/components/Logo";
 
 const FEATURES = [
   {
-    title: "Rate what matters",
-    body: "Topics scored on your criteria. Heatmaps, rankings and a summary your exec team can read in ten seconds.",
-    pill: "Rating",
+    title: "Score a list of ideas",
+    body: "People give each idea a score, like 1 to 5, on things such as impact and effort. You see which idea wins.",
+    pill: "Score items",
     color: "bg-peach",
   },
   {
-    title: "Polls that move",
-    body: "One tap per person. Bars, columns or a pie that redraws itself as the room makes up its mind.",
+    title: "Run a quick poll",
+    body: "People pick one option with a single tap. The bar or pie chart updates as the votes come in.",
     pill: "Poll",
     color: "bg-sky",
   },
   {
-    title: "Hear every voice",
-    body: "Up to three words each. A word cloud that grows on the projector while people are still typing.",
-    pill: "Words",
+    title: "Collect words",
+    body: "People type up to three words. The words used most show up biggest on your screen.",
+    pill: "Word cloud",
     color: "bg-lavender",
   },
+];
+
+const STEPS = [
+  { title: "Write your questions", body: "Make a presentation with up to 10 questions. It takes a couple of minutes." },
+  { title: "Show the QR code", body: "People scan it with their phone camera, or type the short code. That's all they need." },
+  { title: "Watch the answers", body: "Results appear on your screen as people answer. Show them to the room or keep them to yourself." },
 ];
 
 export default function Home() {
@@ -48,20 +54,37 @@ export default function Home() {
               Watch it answer.
             </h1>
             <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink-soft">
-              Live, anonymous voting for meetings and talks. Every tap lands on the big screen in under a second.
+              Ask your audience questions. They answer on their phones, and the results show up on your screen straight away. Nobody needs an app or an account to answer.
             </p>
             <JoinForm />
-            <p className="mt-3 text-sm text-muted">Got a code from the screen? Enter it above. No sign-up.</p>
+            <p className="mt-3 text-sm text-muted">Joining someone else&rsquo;s presentation? Type the code shown on their screen.</p>
           </div>
           <LiveDemo />
         </section>
 
+        <section className="border-t border-line py-20" aria-labelledby="how-h">
+          <h2 id="how-h" className="font-display text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
+            How it works
+          </h2>
+          <ol className="mt-8 grid gap-6 md:grid-cols-3">
+            {STEPS.map((step, i) => (
+              <li key={step.title} className="flex gap-4">
+                <span className="font-display grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line-strong text-ink">{i + 1}</span>
+                <div>
+                  <h3 className="font-semibold text-ink">{step.title}</h3>
+                  <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         <section className="border-t border-line py-20">
-          <h2 className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">Three ways to ask. One screen that keeps up.</h2>
+          <h2 className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">Three kinds of question</h2>
           <div className="stagger mt-10 grid gap-4 md:grid-cols-3">
             {FEATURES.map((f) => (
               <article key={f.title} className="rounded-xl border border-line bg-white p-6">
-                <span className={`${f.color} rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase`}>{f.pill}</span>
+                <span className={`${f.color} rounded-full px-2.5 py-1 text-xs font-semibold text-ink`}>{f.pill}</span>
                 <h3 className="mt-5 text-lg font-semibold text-ink">{f.title}</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{f.body}</p>
               </article>
@@ -70,18 +93,18 @@ export default function Home() {
         </section>
 
         <section className="border-t border-line py-24 text-center">
-          <h2 className="font-display text-[clamp(1.75rem,3.4vw,2.5rem)] leading-tight text-ink">Your next meeting could decide something.</h2>
+          <h2 className="font-display text-[clamp(1.75rem,3.4vw,2.5rem)] leading-tight text-ink">Ready to try it?</h2>
           <Link href="/admin" className="key mt-8 inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-white">
             Create a presentation
           </Link>
-          <p className="mt-3 text-sm text-muted">Free. Try it as a guest, no sign-up.</p>
+          <p className="mt-3 text-sm text-muted">Free. You can start as a guest without signing up.</p>
         </section>
       </main>
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-5 py-8 text-sm text-ink-soft sm:px-8">
           <Logo />
-          <p>Anonymous by design. No names, no IPs.</p>
+          <p>Answers are anonymous. We don&rsquo;t store names or IP addresses.</p>
         </div>
       </footer>
     </div>

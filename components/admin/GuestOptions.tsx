@@ -85,7 +85,7 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
     return (
       <form onSubmit={comeBack} className="slab mt-6 rounded-xl bg-white p-6" noValidate>
         <h2 className="font-display text-2xl font-semibold">Return as guest</h2>
-        <p className="mt-1 text-sm text-ink-soft">Enter the code of any presentation you made, and your PIN.</p>
+        <p className="mt-1 text-sm text-ink-soft">Type the code of any presentation you made as a guest, and your 6-digit PIN.</p>
         <label className="mt-4 block font-semibold">
           Presentation code
           <input value={code} onChange={(e) => setCode(e.target.value)} autoCapitalize="none" autoComplete="off" maxLength={12} className={`${field} tracking-[0.15em]`} />
@@ -121,7 +121,7 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
           Return as guest
         </button>
       </div>
-      <p className="mt-2 text-sm text-ink-soft">No sign-up. Results are kept for 3 days.</p>
+      <p className="mt-2 text-sm text-ink-soft">No sign-up needed. Guest presentations are deleted after 3 days.</p>
       {error && <p role="alert" className="mt-2 text-sm font-semibold text-error">{error}</p>}
     </div>
   );

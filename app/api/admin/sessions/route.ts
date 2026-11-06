@@ -30,8 +30,8 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return json({ error: "invalid", issues: parsed.error.issues.map((i) => i.message) }, 400);
     }
-    const code = await createSession(parsed.data, user.id, user.isGuest ? GUEST_DAYS : null);
-    return json({ code }, 201);
+    const created = await createSession(parsed.data, user.id, user.isGuest ? GUEST_DAYS : null);
+    return json(created, 201);
   } catch (err) {
     logDbError("admin:create", err);
     return unavailable();

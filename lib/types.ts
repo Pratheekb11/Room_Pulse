@@ -7,6 +7,8 @@ export interface SessionInfo {
   lowLabel: string;
   highLabel: string;
   isOpen: boolean;
+  /** Bumped whenever the presenter edits the questions. */
+  revision: number;
 }
 
 export interface NamedItem {
@@ -68,6 +70,8 @@ export interface ResultsPayload {
   dist: ScoreBucket[];
   polls: PollCount[];
   words: WordCount[];
+  /** Bumped whenever the presenter edits the questions. */
+  revision: number;
 }
 
 export interface AdminSessionRow {
@@ -82,4 +86,6 @@ export interface AdminSessionRow {
   criterionCount: number;
   voterCount: number;
   totalVotes: number;
+  /** Secret for the presenter's results link (#k=…). */
+  dashboardKey: string;
 }

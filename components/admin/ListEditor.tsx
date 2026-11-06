@@ -1,22 +1,24 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { duplicateIndexes, filledItems, insertAfter, moveItem, pasteInto, removeAt, setAt } from "@/lib/list-edit";
+import { duplicateIndexes, filledItems, insertAfter, moveItem, pasteInto, removeAt, setAt, type Row } from "@/lib/list-edit";
 
 interface Props {
   label: string;
   /** Singular noun for buttons and messages, e.g. "option". */
   noun: string;
-  items: string[];
-  onChange: (items: string[]) => void;
+  items: Row[];
+  onChange: (items: Row[]) => void;
   max: number;
   maxLength: number;
   placeholders?: string[];
   hint?: string;
+  /** Answers saved per row id (edit mode), shown so nobody deletes answers by accident. */
+  answers?: Record<string, number>;
 }
 
 /** One input per row. Enter adds a row, Backspace on an empty row removes it, a multi-line paste fills several rows. */
-export function ListEditor({ label, noun, items, onChange, max, maxLength, placeholders = [], hint }: Props) {
+export function ListEditor({ label, noun, items, onChange, max, maxLength, placeholders = [], hint, answers }: Props) {
   const id = useId();
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const focusNext = useRef<number | null>(null);
@@ -34,7 +36,7 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
   const Noun = noun[0].toUpperCase() + noun.slice(1);
   const plural = noun === "criterion" ? "criteria" : `${noun}s`;
 
-  function change(next: string[], focus?: number) {
+  function change(next: Row[], focus?: number) {
     if (focus !== undefined) focusNext.current = focus;
     setNote(null);
     onChange(next);
@@ -49,9 +51,9 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
     if (e.key === "Enter") {
       e.preventDefault();
       // an empty row already waiting below: go there instead of adding another
-      if (items[i + 1] === "") inputs.current[i + 1]?.focus();
+      if (items[i + 1]?.name === "") inputs.current[i + 1]?.focus();
       else add(i);
-    } else if (e.key === "Backspace" && items[i] === "" && items.length > 1) {
+    } else if (e.key === "Backspace" && items[i].name === "" && !items[i].id && items.length > 1) {
       e.preventDefault();
       change(removeAt(items, i), Math.max(0, i - 1));
     } else if (e.key === "ArrowDown" && i < items.length - 1) {
@@ -87,10 +89,12 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
       {hint && <p className="text-xs text-ink-soft">{hint}</p>}
 
       <ol className="mt-1.5 flex flex-col gap-1.5">
-        {items.map((value, i) => {
+        {items.map((row, i) => {
+          const value = row.name;
           const dupe = dupes.has(i);
+          const saved = row.id ? (answers?.[row.id] ?? 0) : 0;
           return (
-            <li key={i} className="animate-fade group flex flex-wrap items-center gap-x-1 sm:flex-nowrap">
+            <li key={row.id ?? `new-${i}`} className="animate-fade group flex flex-wrap items-center gap-x-1 sm:flex-nowrap">
               <label htmlFor={`${id}-${i}`} className="w-full text-xs font-medium text-ink-soft sm:w-[5.75rem] sm:shrink-0 sm:text-sm">
                 {Noun} {i + 1}
               </label>
@@ -128,15 +132,21 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
                 <button
                   type="button"
                   className={`${iconButton} hover:!text-error`}
-                  disabled={items.length === 1 && value === ""}
+                  disabled={items.length === 1 && value === "" && !row.id}
                   onClick={() => change(removeAt(items, i), Math.min(i, items.length - 2))}
                   aria-label={`Remove ${noun} ${i + 1}`}
+                  title={saved ? `Removing this also deletes its ${saved} ${saved === 1 ? "answer" : "answers"}` : undefined}
                 >
                   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
                     <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
                 </button>
               </span>
+              {saved > 0 && (
+                <span className="order-last w-full text-xs text-ink-soft sm:pl-[6rem]">
+                  {saved} {saved === 1 ? "answer" : "answers"} so far
+                </span>
+              )}
               {dupe && (
                 <span id={`${id}-dupe-${i}`} className="sr-only">
                   Same as an earlier {noun}.
@@ -156,7 +166,7 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
       >
         + Add {noun}
       </button>
-      <span className="ml-2 hidden text-xs text-ink-soft sm:inline">Enter adds the next one. Pasting several lines fills several rows.</span>
+      <p className="hidden text-xs text-ink-soft sm:block sm:pl-[6rem]">Tip: press Enter for the next one, or paste a whole list.</p>
       {note && (
         <p role="status" className="mt-1 sm:pl-[6rem] text-xs font-semibold text-ink-soft">
           {note}

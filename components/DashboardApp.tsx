@@ -5,6 +5,7 @@ import { useClientValue } from "./useClientValue";
 import { CountUp } from "./CountUp";
 import { avg, cellKey, indexCells, sumAggs, topicHistograms } from "@/lib/stats";
 import { voterUrl } from "@/lib/site";
+import { readDashboardKey } from "@/lib/dashboard-key";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
 import { Breakdown } from "./Breakdown";
 import { ExecSummary } from "./ExecSummary";
@@ -29,25 +30,35 @@ type View = "heatmap" | "ranking" | "breakdown" | "summary";
 type Sort = "order" | "overall";
 
 const VIEWS: { id: View; label: string; key: string }[] = [
-  { id: "heatmap", label: "Heatmap", key: "1" },
+  { id: "heatmap", label: "Colour grid", key: "1" },
   { id: "ranking", label: "Ranking", key: "2" },
-  { id: "breakdown", label: "Breakdown", key: "3" },
+  { id: "breakdown", label: "Score spread", key: "3" },
   { id: "summary", label: "Summary", key: "4" },
 ];
 
 export function DashboardApp({ code }: { code: string }) {
-  const session = useSession(code);
-  const poll = useResultsPoll(code);
+  // undefined until the browser has read the link's #k=… part
+  const key = useClientValue(() => readDashboardKey(code));
+  const poll = useResultsPoll(code, key ?? null, key !== undefined);
+  // Reload the questions whenever the presenter edits them.
+  const session = useSession(code, poll.data?.revision);
 
-  if (session.kind === "not_found" || poll.notFound)
-    return <CenteredMessage title="Session not found" body={`There's no session with the code “${code}”.`} />;
+  if (session.kind === "not_found")
+    return <CenteredMessage title="Presentation not found" body={`There's no presentation with the code “${code}”. It may have been deleted.`} />;
+  if (poll.notFound)
+    return (
+      <CenteredMessage
+        title="These results are private"
+        body="Open the results screen from your presentations, or use the private results link you copied there. The audience link doesn't show results."
+      />
+    );
   if (session.kind === "error")
-    return <CenteredMessage title="Can't reach the server" body="Trying again automatically…" link={false} />;
-  if (session.kind === "loading") return <LoadingScreen label="Loading dashboard" />;
+    return <CenteredMessage title="No connection" body="Check your internet. We'll keep trying on our own." link={false} />;
+  if (session.kind === "loading") return <LoadingScreen label="Loading results" />;
   return <Stage code={code} info={session.data} results={poll.data} lastOkAt={poll.lastOkAt} flash={poll.flash} />;
 }
 
-const EMPTY: ResultsPayload = { isOpen: true, voterCount: 0, cells: [], dist: [], polls: [], words: [] };
+const EMPTY: ResultsPayload = { isOpen: true, voterCount: 0, cells: [], dist: [], polls: [], words: [], revision: 0 };
 
 function Stage({
   code,
@@ -82,6 +93,7 @@ function Stage({
   const [showQr, setShowQr] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const joinUrl = useClientValue(() => voterUrl(code));
+  const isOwner = useIsOwner(code);
 
   const cells = useMemo(() => indexCells(r.cells), [r.cells]);
   const histograms = useMemo(() => topicHistograms(r.dist, session.scaleMax), [r.dist, session.scaleMax]);
@@ -98,7 +110,8 @@ function Stage({
     if (view) params.set("view", view);
     else params.delete("view");
     const qs = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    // keep the #k=… part: it's what lets this screen read the results
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
   }, [focusIndex, view, single]);
 
   const groupId = group?.focus.id;
@@ -181,7 +194,7 @@ function Stage({
                 r.isOpen ? "bg-mint text-ink" : "bg-ink text-white"
               }`}
             >
-              {r.isOpen ? "Open" : "Closed"}
+              {r.isOpen ? "Voting open" : "Voting closed"}
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 text-sm font-semibold">
@@ -210,8 +223,8 @@ function Stage({
                   onChange={(e) => setSort(e.target.value as Sort)}
                   className="rounded-full bg-transparent px-1 py-0.5 font-semibold"
                 >
-                  <option value="order">Topic order</option>
-                  <option value="overall">Overall (high → low)</option>
+                  <option value="order">Your order</option>
+                  <option value="overall">Highest score first</option>
                 </select>
               </label>
             )}
@@ -225,8 +238,13 @@ function Stage({
               {showQr ? "Hide QR" : "Show QR"}
             </button>
             <button type="button" onClick={toggleFullscreen} className="rounded-full border border-line-strong bg-white px-3 py-1">
-              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              {isFullscreen ? "Exit full screen" : "Full screen"}
             </button>
+            {isOwner && (
+              <a href={`/admin/edit/${code}?back=results`} className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas">
+                Edit questions
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -234,7 +252,7 @@ function Stage({
       <div className="flex min-h-0 flex-1 gap-[clamp(0.75rem,1.6vw,2rem)]">
         <main className="min-w-0 flex-1">
           {!single && (
-            <nav aria-label="Focus topics" className="mb-[clamp(0.6rem,1.4vh,1.25rem)] flex flex-wrap items-center gap-2">
+            <nav aria-label="Questions" className="mb-[clamp(0.6rem,1.4vh,1.25rem)] flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setFocusIndex(null)}
@@ -243,7 +261,7 @@ function Stage({
                   focusIndex === null ? "bg-ink text-white" : "bg-white"
                 }`}
               >
-                All focus topics
+                All questions
               </button>
               {groups.map((g, i) => (
                 <button
@@ -263,7 +281,7 @@ function Stage({
 
           <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
           {topics.length === 0 || criteria.length === 0 ? (
-            <p className="text-xl text-ink-soft">This presentation has no topics or criteria.</p>
+            <p className="text-xl text-ink-soft">This presentation has no questions yet. Use “Edit questions” to add some.</p>
           ) : !group ? (
             <FocusOverview
               groups={groups}
@@ -308,7 +326,7 @@ function Stage({
                 />
               </section>
               <section className="slab rounded-xl bg-white p-[clamp(0.75rem,1.3vw,1.5rem)]">
-                <h2 className="font-display mb-3 text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold">Overall by topic</h2>
+                <h2 className="font-display mb-3 text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold">Average score per item</h2>
                 <OverallBars data={sortedBars} scaleMax={session.scaleMax} />
               </section>
             </div>
@@ -344,7 +362,7 @@ function Stage({
           </div>
           {voters === 0 && (
             <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">
-              Waiting for the first rating. Scan the QR code to start.
+              No scores yet. Ask people to scan the QR code.
             </p>
           )}
         </main>
@@ -372,4 +390,21 @@ function Stage({
       )}
     </div>
   );
+}
+
+/** True when the signed-in account owns this presentation (it can open the edit form). */
+function useIsOwner(code: string): boolean {
+  const [owner, setOwner] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/admin/sessions/${encodeURIComponent(code)}`, { cache: "no-store", credentials: "same-origin" })
+      .then((res) => {
+        if (!cancelled) setOwner(res.ok);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+  return owner;
 }

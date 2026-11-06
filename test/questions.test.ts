@@ -49,7 +49,7 @@ const answer = (body: Record<string, unknown>) =>
   answerRoute.POST(new Request(`${ORIGIN}/api/answer`, { method: "POST", body: JSON.stringify(body) }));
 
 async function results(code: string) {
-  return (await (await resultsRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).json()) as ResultsPayload;
+  return (await (await resultsRoute.GET(new Request(`${ORIGIN}/x`, { headers: { cookie } }), ctx(code))).json()) as ResultsPayload;
 }
 
 beforeAll(async () => {

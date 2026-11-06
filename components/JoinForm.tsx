@@ -23,7 +23,7 @@ export function JoinForm() {
     <form onSubmit={onSubmit} className="mt-8 max-w-md" noValidate>
       <div className="flex flex-col gap-3 sm:flex-row">
       <label htmlFor="code" className="sr-only">
-        Session code
+        Presentation code
       </label>
       <input
         id="code"
