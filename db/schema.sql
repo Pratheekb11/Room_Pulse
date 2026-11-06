@@ -1,0 +1,99 @@
+-- LiveRate schema (run once)
+create extension if not exists pgcrypto;
+
+create table if not exists sessions (
+  id          uuid primary key default gen_random_uuid(),
+  code        text not null unique,              -- short public code used in URLs
+  title       text not null,
+  scale_max   int  not null default 5 check (scale_max between 3 and 10),
+  low_label   text not null default 'Low',
+  high_label  text not null default 'High',
+  is_open     boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists topics (
+  id          uuid primary key default gen_random_uuid(),
+  session_id  uuid not null references sessions(id) on delete cascade,
+  name        text not null,
+  position    int  not null
+);
+
+create table if not exists criteria (
+  id          uuid primary key default gen_random_uuid(),
+  session_id  uuid not null references sessions(id) on delete cascade,
+  name        text not null,
+  position    int  not null
+);
+
+-- One row per voter per topic x criterion
+create table if not exists votes (
+  session_id    uuid not null references sessions(id) on delete cascade,
+  topic_id      uuid not null references topics(id) on delete cascade,
+  criterion_id  uuid not null references criteria(id) on delete cascade,
+  voter_id      uuid not null,                     -- random per-browser id, not a person
+  score         int  not null check (score between 1 and 10),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  primary key (session_id, topic_id, criterion_id, voter_id)
+);
+
+-- Aggregates the dashboard reads. Contains no voter ids.
+create table if not exists results (
+  session_id    uuid not null references sessions(id) on delete cascade,
+  topic_id      uuid not null references topics(id) on delete cascade,
+  criterion_id  uuid not null references criteria(id) on delete cascade,
+  vote_count    int  not null default 0,
+  score_sum     int  not null default 0,
+  primary key (session_id, topic_id, criterion_id)
+);
+
+create index if not exists topics_session_idx      on topics(session_id, position);
+create index if not exists criteria_session_idx    on criteria(session_id, position);
+create index if not exists votes_session_voter_idx on votes(session_id, voter_id);
+
+-- Keep results in sync with votes (atomic, inside the same statement as the vote)
+create or replace function apply_vote() returns trigger
+language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into results (session_id, topic_id, criterion_id, vote_count, score_sum)
+    values (new.session_id, new.topic_id, new.criterion_id, 1, new.score)
+    on conflict (session_id, topic_id, criterion_id) do update
+      set vote_count = results.vote_count + 1,
+          score_sum  = results.score_sum + excluded.score_sum;
+  elsif tg_op = 'UPDATE' then
+    if new.score <> old.score then
+      update results
+         set score_sum = score_sum + new.score - old.score
+       where session_id = new.session_id
+         and topic_id = new.topic_id
+         and criterion_id = new.criterion_id;
+    end if;
+  elsif tg_op = 'DELETE' then
+    update results
+       set vote_count = vote_count - 1,
+           score_sum  = score_sum - old.score
+     where session_id = old.session_id
+       and topic_id = old.topic_id
+       and criterion_id = old.criterion_id;
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists votes_apply on votes;
+create trigger votes_apply
+after insert or update or delete on votes
+for each row execute function apply_vote();
+
+-- Safety net: recompute a session's totals from the raw votes (use when voting is closed)
+create or replace function rebuild_results(p_session_id uuid) returns void
+language sql as $$
+  delete from results where session_id = p_session_id;
+  insert into results (session_id, topic_id, criterion_id, vote_count, score_sum)
+  select session_id, topic_id, criterion_id, count(*), sum(score)
+    from votes
+   where session_id = p_session_id
+   group by session_id, topic_id, criterion_id;
+$$;

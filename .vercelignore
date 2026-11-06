@@ -1,0 +1,7 @@
+# Never upload local env files (they contain local-only DB settings and secrets)
+.env*
+!.env.example
+.local-db
+.next
+node_modules
+coverage
