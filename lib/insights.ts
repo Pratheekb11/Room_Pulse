@@ -24,12 +24,51 @@ export function agreement(counts: number[], scaleMax: number): { sd: number; lab
   return { sd, label };
 }
 
-export type Quadrant = "both_high" | "y_high" | "x_high" | "both_low";
+export interface TopicStat {
+  name: string;
+  overall: number | null;
+  /** Average per criterion, in criteria order. */
+  perCriterion: (number | null)[];
+  agreement: AgreementLabel | null;
+}
 
-/** Which quadrant of the priority matrix a topic falls in. The midpoint counts as high. */
-export function quadrant(x: number, y: number, scaleMax: number): Quadrant {
-  const mid = (1 + scaleMax) / 2;
-  const hx = x >= mid;
-  const hy = y >= mid;
-  return hx && hy ? "both_high" : hy ? "y_high" : hx ? "x_high" : "both_low";
+const f1 = (v: number) => v.toFixed(1);
+const list = (names: string[]) =>
+  names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+/** Plain-language findings for an executive summary, most important first. */
+export function takeaways(topics: TopicStat[], criteria: string[], scaleMax: number): string[] {
+  const rated = topics.filter((t): t is TopicStat & { overall: number } => t.overall !== null).sort((a, b) => b.overall - a.overall);
+  if (rated.length === 0) return [];
+  const [first, second] = rated;
+  if (!second) return [`${first.name} scores ${f1(first.overall)} out of ${scaleMax}.`];
+
+  const out: string[] = [];
+  const margin = first.overall - second.overall;
+  out.push(
+    margin < 0.2
+      ? `${first.name} and ${second.name} are nearly tied at the top (${f1(first.overall)} and ${f1(second.overall)}).`
+      : `${first.name} leads with ${f1(first.overall)} out of ${scaleMax}, ${f1(margin)} ahead of ${second.name}.`,
+  );
+
+  const split = rated.filter((t) => t.agreement === "Split views").map((t) => t.name);
+  if (split.length) out.push(`The room is split on ${list(split)}. Worth discussing before deciding.`);
+
+  const last = rated[rated.length - 1];
+  const weakest = last.perCriterion
+    .map((v, i) => ({ v, name: criteria[i] }))
+    .filter((x): x is { v: number; name: string } => x.v !== null)
+    .sort((a, b) => a.v - b.v)[0];
+  if (weakest && criteria.length > 1) out.push(`${last.name} ranks last at ${f1(last.overall)}, weakest on ${weakest.name} (${f1(weakest.v)}).`);
+  else out.push(`${last.name} ranks last at ${f1(last.overall)}.`);
+
+  if (criteria.length > 1) {
+    const means = criteria.map((name, i) => {
+      const vals = rated.map((t) => t.perCriterion[i]).filter((v): v is number => v !== null);
+      return { name, v: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+    });
+    const low = means.filter((m): m is { name: string; v: number } => m.v !== null).sort((a, b) => a.v - b.v)[0];
+    if (low) out.push(`${low.name} scores lowest across the board (${f1(low.v)} average).`);
+  }
+  return out;
 }

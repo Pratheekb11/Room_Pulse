@@ -36,14 +36,14 @@ describe("groupByFocus with question types", () => {
   it("keeps word clouds (which have no topics) and passes the kind through", () => {
     const g = groupByFocus(
       [
-        { id: "w", name: "One word?", kind: "words" },
+        { id: "w", name: "One word?", kind: "words", chart: "list" },
         { id: "p", name: "Pick", kind: "poll" },
       ],
       [{ id: "o1", name: "Yes", focusId: "p" }],
     );
-    expect(g.map((x) => [x.focus.name, x.kind, x.topics.length])).toEqual([
-      ["One word?", "words", 0],
-      ["Pick", "poll", 1],
+    expect(g.map((x) => [x.focus.name, x.kind, x.chart, x.topics.length])).toEqual([
+      ["One word?", "words", "list", 0],
+      ["Pick", "poll", "bars", 1],
     ]);
   });
 });

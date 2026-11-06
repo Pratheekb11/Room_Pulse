@@ -1,22 +1,28 @@
 import { avg, cellKey, sumAggs, type Agg } from "./stats";
+import { defaultChart } from "./charts";
 import type { NamedItem, QuestionKind, TopicItem } from "./types";
 
 export interface FocusGroup {
   focus: NamedItem;
   kind: QuestionKind;
+  /** Chart the presenter chose; the dashboard opens on it. */
+  chart: string;
   /** `index` is the topic's position in the whole presentation (drives its colour). */
   topics: { item: TopicItem; index: number }[];
 }
 
 /** Topics grouped under their focus topic, in order. Topics without one go in a "Topics" group. */
 export function groupByFocus(
-  focusTopics: (NamedItem & { kind?: QuestionKind })[],
+  focusTopics: (NamedItem & { kind?: QuestionKind; chart?: string })[],
   topics: TopicItem[],
 ): FocusGroup[] {
   const groups = new Map<string, FocusGroup>(
-    focusTopics.map((f) => [f.id, { focus: { id: f.id, name: f.name }, kind: f.kind ?? "rating", topics: [] }]),
+    focusTopics.map((f) => {
+      const kind = f.kind ?? "rating";
+      return [f.id, { focus: { id: f.id, name: f.name }, kind, chart: f.chart ?? defaultChart(kind), topics: [] }];
+    }),
   );
-  const loose: FocusGroup = { focus: { id: "", name: "Topics" }, kind: "rating", topics: [] };
+  const loose: FocusGroup = { focus: { id: "", name: "Topics" }, kind: "rating", chart: "heatmap", topics: [] };
   topics.forEach((item, index) => {
     const g = (item.focusId && groups.get(item.focusId)) || loose;
     g.topics.push({ item, index });

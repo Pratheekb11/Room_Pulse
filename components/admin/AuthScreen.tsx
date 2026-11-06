@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Logo } from "../Logo";
 import { Shapes } from "../Shapes";
@@ -7,7 +8,7 @@ import { apiFetch } from "./api";
 
 type Mode = "login" | "signup";
 
-export function AuthScreen({ onSignedIn }: { onSignedIn: (email: string) => void }) {
+export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,9 +24,9 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: (email: string) => void
     setError(null);
     try {
       const res = await apiFetch(`/api/auth/${mode}`, { method: "POST", body: JSON.stringify({ email, password }) });
-      const body = (await res.json()) as { user: { email: string } };
+      await res.json();
       setPassword("");
-      onSignedIn(body.user.email);
+      onSignedIn();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -98,6 +99,13 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: (email: string) => void
               </button>
             </div>
           </label>
+          {mode === "login" && (
+            <p className="mt-1.5 text-right text-sm">
+              <Link href="/forgot" className="font-semibold underline underline-offset-4">
+                Forgot password?
+              </Link>
+            </p>
+          )}
           {mode === "signup" && (
             <p id="pw-hint" className={`mt-1.5 text-sm ${tooShort ? "font-semibold text-[#c2193f]" : "text-ink-soft"}`}>
               At least 10 characters. A short phrase is easy to remember.
@@ -118,6 +126,29 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: (email: string) => void
             {busy ? "One moment…" : mode === "login" ? "Log in" : "Create account"}
           </button>
         </form>
+
+        <div className="mt-5 text-center">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                await apiFetch("/api/auth/guest", { method: "POST" });
+                onSignedIn();
+              } catch (err) {
+                setError((err as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="rounded-full border-2 border-ink bg-white px-5 py-2 font-bold hover:bg-canvas"
+          >
+            Continue as guest
+          </button>
+          <p className="mt-2 text-sm text-ink-soft">No sign-up. Results are kept for 3 days.</p>
+        </div>
       </div>
     </main>
   );

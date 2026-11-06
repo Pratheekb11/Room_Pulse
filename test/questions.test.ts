@@ -90,6 +90,38 @@ describe("creating question types", () => {
   });
 });
 
+describe("chart type per question", () => {
+  it("stores the presenter's chart choice and defaults per question type", async () => {
+    const res = await create({
+      title: "Charts",
+      focusTopics: [
+        { name: "R1", kind: "rating", topics: ["a"], chart: "summary" },
+        { name: "R2", kind: "rating", topics: ["b"] },
+        { name: "P1", kind: "poll", topics: ["x", "y"], chart: "donut" },
+        { name: "P2", kind: "poll", topics: ["x", "y"] },
+        { name: "W1", kind: "words", chart: "list" },
+        { name: "W2", kind: "words" },
+      ],
+      criteria: ["c", "d"],
+    });
+    expect(res.status).toBe(201);
+    const { code } = (await res.json()) as { code: string };
+    const info = (await (await sessionRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).json()) as SessionPayload;
+    expect(info.focusTopics.map((f) => f.chart)).toEqual(["summary", "heatmap", "donut", "bars", "list", "cloud"]);
+  });
+
+  it("rejects a chart that doesn't fit the question type", async () => {
+    for (const f of [
+      { name: "P", kind: "poll", topics: ["x", "y"], chart: "heatmap" },
+      { name: "W", kind: "words", chart: "pie" },
+      { name: "R", kind: "rating", topics: ["a"], chart: "sparkles" },
+      { name: "M", kind: "rating", topics: ["a"], chart: "matrix" }, // removed chart
+    ]) {
+      expect((await create({ title: "x", focusTopics: [f], criteria: ["c"] })).status, JSON.stringify(f)).toBe(400);
+    }
+  });
+});
+
 describe("POST /api/answer — polls", () => {
   it("saves one choice per voter, lets them change it, and counts it", async () => {
     const { code, poll, options } = await mixed();

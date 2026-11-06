@@ -1,4 +1,6 @@
 import { forbiddenOrigin, isSameOrigin, startSession } from "@/lib/auth";
+import { inBackground, sendLink } from "@/lib/email-links";
+import { emailEnabled } from "@/lib/policy";
 import { json, logDbError, readJson, unavailable } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
 import { createUser } from "@/lib/queries";
@@ -17,7 +19,9 @@ export async function POST(req: Request) {
     const user = await createUser(email, await hashPassword(password));
     if (!user) return json({ error: "email_taken" }, 409);
     const setCookie = await startSession(user.id);
-    return json({ user: { email: user.email } }, 201, { "Cache-Control": "no-store", "Set-Cookie": setCookie });
+    // If the email can't be sent now, the user can resend it from the console.
+    if (emailEnabled()) await inBackground("auth:signup-email", () => sendLink(user, "verify"));
+    return json({ user: { email: user.email, emailVerified: false } }, 201, { "Cache-Control": "no-store", "Set-Cookie": setCookie });
   } catch (err) {
     logDbError("auth:signup", err);
     return unavailable();

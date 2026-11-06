@@ -92,3 +92,23 @@ describe("validation", () => {
     expect(r).toMatchObject({ scaleMax: 5, lowLabel: "Low", highLabel: "High" });
   });
 });
+
+import { criterionHistograms } from "@/lib/stats";
+
+describe("criterionHistograms", () => {
+  it("counts each score per criterion for one topic, ignoring other topics and out-of-range scores", () => {
+    const h = criterionHistograms(
+      [
+        { topicId: "t", criterionId: "x", score: 1, n: 2 },
+        { topicId: "t", criterionId: "x", score: 3, n: 5 },
+        { topicId: "t", criterionId: "y", score: 5, n: 1 },
+        { topicId: "other", criterionId: "x", score: 2, n: 9 },
+        { topicId: "t", criterionId: "x", score: 9, n: 9 },
+      ],
+      "t",
+      ["x", "y", "z"],
+      5,
+    );
+    expect(h).toEqual({ x: [2, 0, 5, 0, 0], y: [0, 0, 0, 0, 1], z: [0, 0, 0, 0, 0] });
+  });
+});

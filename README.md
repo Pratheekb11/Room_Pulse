@@ -10,11 +10,10 @@ The audience scans a QR code and answers on their phones: one screen at a time, 
 
 - **Voters** (`/s/[code]`): no login and no names. Each tap saves right away, and a changed rating replaces the old one instead of counting twice.
 - **Dashboard** (`/s/[code]/dashboard`): opens on an overview card per focus topic. Click a card (or press `→`/`←`, `Esc` for the overview, or use `?focus=2`) to see its results:
-  - Rating questions have five views (keys `1`–`5`, or `?view=`):
+  - Rating questions have four views (keys `1`–`4`, or `?view=`):
     - **Heatmap:** topic × criterion averages.
     - **Ranking:** topics ranked by overall score.
     - **Breakdown:** a donut of the score distribution per topic.
-    - **Matrix:** a 2×2 priority matrix; pick which criteria go on each axis.
     - **Summary:** an executive view with the top pick, the strongest and weakest criterion, and how much the room agrees on each topic.
   - Polls show bars or a pie chart. Word clouds show a live word cloud.
   - `Q` toggles the QR panel.
@@ -62,6 +61,7 @@ npm run dev               # terminal 2
 npm test
 ```
 
+- `test/email-auth.test.ts` covers email verification and password reset: single use, expiry, rate limits, no account discovery, sign-out on reset, and links that can't be redirected via the Host header.
 - `test/auth.test.ts` covers sign-up, log-in, log-out, password hashing, lockout, cross-site blocking and per-account separation.
 - `test/questions.test.ts` covers polls and word clouds: validation, changing answers, closed sessions, reset and exports.
 - `test/api.test.ts` runs every API route against real Postgres (PGlite) through the real Neon driver. It covers validation, 403/404/503 handling, overwrite-not-double-count, concurrent voters, reset/recalculate/delete, CSV exports, and checks that no voter id ever leaks. After the load tests, `db/check.sql` must return zero rows.
@@ -89,6 +89,18 @@ node scripts/simulate.mjs https://your-app.vercel.app <code> 100 20
 
 Every fake voter rates every cell, with realistic per-topic means, random 50–500 ms pauses between taps, about 20% of voters changing a rating at the end, and 503 retries. A summary is printed when it finishes. Then run [`db/check.sql`](db/check.sql) in the Neon SQL Editor. It must return **zero rows**, which proves the dashboard totals match the raw votes.
 
+## Email (verification and password reset)
+
+New accounts must verify their email before they can create presentations, and "Forgot password?" sends a reset link. Emails go through [Resend](https://resend.com) over its HTTP API:
+
+1. In Vercel, open the project → **Storage / Integrations** → add **Resend** from the Marketplace (or create an API key at resend.com).
+2. Verify a sending domain in Resend.
+3. Set `RESEND_API_KEY` and `EMAIL_FROM` (for example `LiveRate <no-reply@yourdomain.com>`) in Project Settings → Environment Variables, then redeploy.
+
+Without `RESEND_API_KEY`, local development prints the links to the server console. In production, emails fail (and are logged as `EmailNotConfiguredError`), so new accounts can't verify. Configure email before relying on sign-up.
+
+Links in emails always use `NEXT_PUBLIC_SITE_URL` (or Vercel's production URL), never the request's Host header.
+
 ## Upgrading an existing database
 
 `db/schema.sql` is idempotent. Re-running it in the Neon SQL Editor adds anything new (accounts, focus topics, polls, word clouds) without touching existing data. Presentations created before accounts existed have no owner, so they don't appear in anyone's console.
@@ -101,7 +113,8 @@ Every fake voter rates every cell, with realistic per-topic means, random 50–5
 - **Lockout:** an email is locked for 15 minutes after 10 failed logins. No IP addresses are stored.
 - **Cross-site writes:** account and presenter changes from another site are rejected (checked with the `Origin` and `Sec-Fetch-Site` headers).
 - **Separation between accounts:** someone else's presentation looks exactly like one that doesn't exist (404).
-- **Open sign-up:** anyone with the URL can create an account. There's no email verification or password reset yet.
+- **Email verification and password reset:** links are random 256-bit tokens, stored only as SHA-256 hashes. They work once and expire (24 hours for verification, 30 minutes for reset). Each account gets at most 3 emails of each kind per hour. The forgot-password form answers the same way for any email, and sends after responding, so neither the answer nor its timing reveals who has an account. A reset signs out every session and clears any login lockout. Pages that receive a link remove the token from the address bar and send no referrer.
+- **Open sign-up:** anyone with the URL can create an account, but must verify their email before creating presentations.
 
 ## How correctness is enforced
 

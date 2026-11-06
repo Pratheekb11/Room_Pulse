@@ -41,3 +41,18 @@ export function topicHistograms(dist: ScoreBucket[], scaleMax: number): Map<stri
 }
 
 export const fmt1 = (v: number | null) => (v === null ? "—" : v.toFixed(1));
+
+/** For one topic: criterionId → counts[score - 1] (every criterion present, zeros included). */
+export function criterionHistograms(
+  dist: ScoreBucket[],
+  topicId: string,
+  criterionIds: string[],
+  scaleMax: number,
+): Record<string, number[]> {
+  const out: Record<string, number[]> = Object.fromEntries(criterionIds.map((id) => [id, new Array<number>(scaleMax).fill(0)]));
+  for (const b of dist) {
+    if (b.topicId !== topicId || !out[b.criterionId] || b.score < 1 || b.score > scaleMax) continue;
+    out[b.criterionId][b.score - 1] += b.n;
+  }
+  return out;
+}

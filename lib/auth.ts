@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { deleteAuthSession, findUserBySessionHash, insertAuthSession, type UserRow } from "./queries";
+import { deleteAuthSession, extendAuthSessions, findUserBySessionHash, insertAuthSession, type UserRow } from "./queries";
 import { json } from "./http";
 
 export const SESSION_DAYS = 30;
@@ -9,7 +9,7 @@ const secure = () => process.env.NODE_ENV === "production";
 /** `__Host-` prefix (production): cookie is Secure, host-only and Path=/, so subdomains can't set or read it. */
 const cookieName = () => (secure() ? "__Host-lr_session" : "lr_session");
 
-const hashToken = (token: string) => createHash("sha256").update(token, "utf8").digest("hex");
+export const hashToken = (token: string) => createHash("sha256").update(token, "utf8").digest("hex");
 
 function readToken(req: Request): string | null {
   const header = req.headers.get("cookie");
@@ -32,10 +32,17 @@ function cookie(value: string, maxAge: number): string {
 }
 
 /** Starts a signed-in session; returns the Set-Cookie header value. */
-export async function startSession(userId: string): Promise<string> {
+export async function startSession(userId: string, days = SESSION_DAYS): Promise<string> {
   const token = randomBytes(32).toString("base64url"); // 256 bits
-  await insertAuthSession(hashToken(token), userId, SESSION_DAYS);
-  return cookie(token, SESSION_DAYS * 24 * 60 * 60);
+  await insertAuthSession(hashToken(token), userId, days);
+  return cookie(token, days * 24 * 60 * 60);
+}
+
+/** Extends this user's sessions to `days` and re-issues the current cookie with the new lifetime. */
+export async function extendSession(req: Request, userId: string, days = SESSION_DAYS): Promise<string | null> {
+  await extendAuthSessions(userId, days);
+  const token = readToken(req);
+  return token ? cookie(token, days * 24 * 60 * 60) : null;
 }
 
 export async function endSession(req: Request): Promise<string> {
@@ -44,7 +51,9 @@ export async function endSession(req: Request): Promise<string> {
   return cookie("", 0);
 }
 
-export async function currentUser(req: Request): Promise<UserRow | null> {
+export type SignedInUser = UserRow & { emailVerified: boolean; isGuest: boolean };
+
+export async function currentUser(req: Request): Promise<SignedInUser | null> {
   const token = readToken(req);
   return token ? findUserBySessionHash(hashToken(token)) : null;
 }
@@ -72,7 +81,7 @@ export const forbiddenOrigin = () => json({ error: "bad_origin" }, 403);
  * For presenter routes: the signed-in user, or a 401/403 Response.
  * Writes (non-GET) must also come from this site.
  */
-export async function requireUser(req: Request): Promise<UserRow | Response> {
+export async function requireUser(req: Request): Promise<SignedInUser | Response> {
   if (req.method !== "GET" && req.method !== "HEAD" && !isSameOrigin(req)) return forbiddenOrigin();
   const user = await currentUser(req);
   return user ?? unauthorized();

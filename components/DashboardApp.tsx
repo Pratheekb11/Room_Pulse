@@ -8,11 +8,12 @@ import type { ResultsPayload, SessionPayload } from "@/lib/types";
 import { Breakdown } from "./Breakdown";
 import { ExecSummary } from "./ExecSummary";
 import { FocusOverview } from "./FocusOverview";
-import { PriorityMatrix } from "./PriorityMatrix";
+import { TopicDistribution } from "./TopicDistribution";
 import { groupByFocus } from "@/lib/focus";
 import { pollTally, wordWeights } from "@/lib/answers";
-import { PollBars, PollPie } from "./PollResults";
-import { WordCloud } from "./WordCloud";
+import { PollBars, PollColumns, PollPie } from "./PollResults";
+import { WordCloud, WordList } from "./WordCloud";
+import { CHARTS, isChartFor } from "@/lib/charts";
 import { ScoreLegend } from "./Donut";
 import { Heatmap } from "./Heatmap";
 import { LiveBadge } from "./LiveBadge";
@@ -23,15 +24,14 @@ import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { useResultsPoll } from "./useResultsPoll";
 import { useSession } from "./useSession";
 
-type View = "heatmap" | "ranking" | "breakdown" | "matrix" | "summary";
+type View = "heatmap" | "ranking" | "breakdown" | "summary";
 type Sort = "order" | "overall";
 
 const VIEWS: { id: View; label: string; key: string }[] = [
   { id: "heatmap", label: "Heatmap", key: "1" },
   { id: "ranking", label: "Ranking", key: "2" },
   { id: "breakdown", label: "Breakdown", key: "3" },
-  { id: "matrix", label: "Matrix", key: "4" },
-  { id: "summary", label: "Summary", key: "5" },
+  { id: "summary", label: "Summary", key: "4" },
 ];
 
 export function DashboardApp({ code }: { code: string }) {
@@ -67,16 +67,16 @@ function Stage({
   const single = groups.length <= 1;
 
   // Stage only renders in the browser (after the session loads), so reading the URL here is safe.
-  const [view, setView] = useState<View>(() => {
-    const v = new URLSearchParams(window.location.search).get("view");
-    return VIEWS.some((x) => x.id === v) ? (v as View) : "heatmap";
-  });
+  const [urlView] = useState(() => new URLSearchParams(window.location.search).get("view"));
+  // Chart picked on the dashboard per focus topic; otherwise the one chosen when building it.
+  const [viewByFocus, setViewByFocus] = useState<Record<string, string>>({});
   // null = overview of all focus topics
   const [focusIndex, setFocusIndex] = useState<number | null>(() => {
     const f = Number(new URLSearchParams(window.location.search).get("focus"));
     return single ? 0 : Number.isInteger(f) && f >= 1 && f <= groups.length ? f - 1 : null;
   });
-  const [pollView, setPollView] = useState<"bars" | "pie">("bars");
+  // Index (within the open focus topic) of the topic shown full screen, or null.
+  const [detail, setDetail] = useState<number | null>(null);
   const [sort, setSort] = useState<Sort>("order");
   const [showQr, setShowQr] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -86,6 +86,17 @@ function Stage({
   const histograms = useMemo(() => topicHistograms(r.dist, session.scaleMax), [r.dist, session.scaleMax]);
 
   const group = focusIndex === null ? null : (groups[focusIndex] ?? null);
+  const view = group
+    ? (viewByFocus[group.focus.id] ?? (urlView && isChartFor(group.kind, urlView) ? urlView : group.chart))
+    : "";
+  const groupId = group?.focus.id;
+  const groupKind = group?.kind;
+  const setView = useCallback(
+    (v: string) => {
+      if (groupId !== undefined) setViewByFocus((m) => ({ ...m, [groupId]: v }));
+    },
+    [groupId],
+  );
   const focusTopics = useMemo(() => group?.topics ?? [], [group]);
 
   const overall: BarDatum[] = useMemo(
@@ -126,7 +137,7 @@ function Stage({
       const target = e.target as HTMLElement | null;
       if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
       const v = VIEWS.find((x) => x.key === e.key);
-      if (v) setView(v.id);
+      if (v && groupKind === "rating") setView(v.id);
       else if (e.key.toLowerCase() === "q") setShowQr((s) => !s);
       else if (!single && e.key === "Escape") setFocusIndex(null);
       else if (!single && e.key === "ArrowRight") setFocusIndex((i) => (i === null ? 0 : Math.min(groups.length - 1, i + 1)));
@@ -134,7 +145,7 @@ function Stage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [single, groups.length]);
+  }, [single, groups.length, setView, groupKind]);
 
   const voters = r.voterCount;
 
@@ -162,35 +173,19 @@ function Stage({
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 text-sm font-semibold">
-            {group?.kind === "poll" && (
+            {group && CHARTS[group.kind].length > 1 && (
               <div role="tablist" aria-label="Chart" className="flex rounded-full border-2 border-ink bg-white p-0.5">
-                {(["bars", "pie"] as const).map((v) => (
+                {CHARTS[group.kind].map((c, i) => (
                   <button
-                    key={v}
+                    key={c.id}
                     role="tab"
                     type="button"
-                    aria-selected={pollView === v}
-                    onClick={() => setPollView(v)}
-                    className={`rounded-full px-3 py-1 ${pollView === v ? "bg-ink text-white" : "hover:bg-canvas"}`}
+                    aria-selected={view === c.id}
+                    title={group.kind === "rating" ? `Shortcut: ${i + 1}` : undefined}
+                    onClick={() => setView(c.id)}
+                    className={`rounded-full px-3 py-1 ${view === c.id ? "bg-ink text-white" : "hover:bg-canvas"}`}
                   >
-                    {v === "bars" ? "Bars" : "Pie"}
-                  </button>
-                ))}
-              </div>
-            )}
-            {group?.kind === "rating" && (
-              <div role="tablist" aria-label="Chart" className="flex rounded-full border-2 border-ink bg-white p-0.5">
-                {VIEWS.map((v) => (
-                  <button
-                    key={v.id}
-                    role="tab"
-                    type="button"
-                    aria-selected={view === v.id}
-                    title={`Shortcut: ${v.key}`}
-                    onClick={() => setView(v.id)}
-                    className={`rounded-full px-3 py-1 ${view === v.id ? "bg-ink text-white" : "hover:bg-canvas"}`}
-                  >
-                    {v.label}
+                    {c.id === "summary" ? "Summary" : c.label}
                   </button>
                 ))}
               </div>
@@ -271,16 +266,22 @@ function Stage({
               <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-extrabold leading-tight">
                 {group.focus.name}
               </h2>
-              {pollView === "bars" ? (
-                <PollBars tally={pollTally(group.topics.map((t) => t.item), r.polls ?? [], group.focus.id)} />
-              ) : (
-                <PollPie tally={pollTally(group.topics.map((t) => t.item), r.polls ?? [], group.focus.id)} />
-              )}
+              {(() => {
+                const tally = pollTally(group.topics.map((t) => t.item), r.polls ?? [], group.focus.id);
+                if (view === "columns") return <PollColumns tally={tally} />;
+                if (view === "pie") return <PollPie tally={tally} hole={false} />;
+                if (view === "donut") return <PollPie tally={tally} />;
+                return <PollBars tally={tally} />;
+              })()}
             </section>
           ) : group.kind === "words" ? (
             <section className="slab rounded-[28px] bg-white p-[clamp(1rem,2vw,2.25rem)]">
               <h2 className="font-display text-center text-[clamp(1.6rem,2.6vw,3rem)] font-extrabold leading-tight">{group.focus.name}</h2>
-              <WordCloud words={wordWeights(r.words ?? [], group.focus.id)} />
+              {view === "list" ? (
+                <WordList words={wordWeights(r.words ?? [], group.focus.id)} />
+              ) : (
+                <WordCloud words={wordWeights(r.words ?? [], group.focus.id)} />
+              )}
             </section>
           ) : view === "heatmap" ? (
             <div className="flex flex-col gap-[clamp(0.75rem,2vh,1.75rem)]">
@@ -313,15 +314,19 @@ function Stage({
                 cells={cells}
                 histograms={histograms}
                 scaleMax={session.scaleMax}
+                onOpen={setDetail}
               />
               <ScoreLegend scaleMax={session.scaleMax} lowLabel={session.lowLabel} highLabel={session.highLabel} />
             </div>
-          ) : view === "matrix" ? (
-            <section className="slab rounded-[28px] bg-white p-[clamp(1rem,1.6vw,1.75rem)]">
-              <PriorityMatrix key={group.focus.id} topics={focusTopics} criteria={criteria} cells={cells} scaleMax={session.scaleMax} />
-            </section>
           ) : (
-            <ExecSummary topics={focusTopics} criteria={criteria} cells={cells} histograms={histograms} scaleMax={session.scaleMax} />
+            <ExecSummary
+              topics={focusTopics}
+              criteria={criteria}
+              cells={cells}
+              histograms={histograms}
+              scaleMax={session.scaleMax}
+              voterCount={voters}
+            />
           )}
           {voters === 0 && (
             <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">
@@ -336,6 +341,21 @@ function Stage({
           </div>
         )}
       </div>
+
+      {group?.kind === "rating" && detail !== null && focusTopics[detail] && (
+        <TopicDistribution
+          topics={focusTopics}
+          current={detail}
+          criteria={criteria}
+          cells={cells}
+          dist={r.dist}
+          scaleMax={session.scaleMax}
+          lowLabel={session.lowLabel}
+          highLabel={session.highLabel}
+          onMove={setDetail}
+          onClose={() => setDetail(null)}
+        />
+      )}
     </div>
   );
 }

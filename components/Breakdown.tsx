@@ -9,19 +9,26 @@ interface Props {
   cells: Map<string, Agg>;
   histograms: Map<string, number[]>;
   scaleMax: number;
+  onOpen: (topicIndex: number) => void;
 }
 
 /** One card per topic: donut of score distribution + mini bars per criterion. */
-export function Breakdown({ topics, criteria, cells, histograms, scaleMax }: Props) {
+export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpen }: Props) {
   const cols = topics.length <= 4 ? 2 : 3;
   return (
     <div className="grid gap-[clamp(0.6rem,1.2vw,1.25rem)]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-      {topics.map(({ item: t, index }) => {
+      {topics.map(({ item: t, index }, i) => {
         const row = criteria.map((c) => cells.get(cellKey(t.id, c.id)));
         const overall = avg(sumAggs(row));
         const counts = histograms.get(t.id) ?? new Array<number>(scaleMax).fill(0);
         return (
-          <article key={t.id} className="slab flex flex-col overflow-hidden rounded-[22px] bg-white p-4">
+          <button
+            type="button"
+            key={t.id}
+            onClick={() => onOpen(i)}
+            aria-label={`Open vote distribution for ${t.name}`}
+            className="slab group flex flex-col overflow-hidden rounded-[22px] bg-white p-4 text-left transition-transform hover:-translate-y-1"
+          >
             <h3 className="flex items-center gap-2 text-[clamp(1rem,1.3vw,1.5rem)] font-extrabold leading-tight">
               <span aria-hidden className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: topicColor(index) }} />
               <span className="line-clamp-2" title={t.name}>
@@ -54,7 +61,10 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax }: Pro
               })}
             </ul>
             </div>
-          </article>
+            <span className="mt-3 self-end rounded-full bg-ink px-3 py-1 text-[clamp(0.75rem,0.9vw,1rem)] font-bold text-white group-hover:bg-violet">
+              See vote distribution
+            </span>
+          </button>
         );
       })}
     </div>

@@ -37,7 +37,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.exec("truncate users, sessions, auth_sessions, login_failures cascade");
+  await db.exec("truncate users, sessions, auth_sessions, login_failures, email_tokens cascade");
 });
 
 describe("password hashing", () => {
@@ -57,7 +57,7 @@ describe("sign up", () => {
   it("creates an account, signs the user in and never stores the plain password", async () => {
     const { res, cookie } = await signUp("  Ada@Example.com ");
     expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({ user: { email: "ada@example.com" } });
+    expect(await res.json()).toEqual({ user: { email: "ada@example.com", emailVerified: false } });
 
     const setCookie = res.headers.get("set-cookie")!;
     expect(setCookie).toMatch(/HttpOnly/i);
@@ -70,7 +70,7 @@ describe("sign up", () => {
     expect(row[0].email).toBe("ada@example.com");
     expect(row[0].password_hash).not.toContain(GOOD_PASSWORD);
 
-    expect(await (await me(cookie)).json()).toEqual({ user: { email: "ada@example.com" } });
+    expect(await (await me(cookie)).json()).toMatchObject({ user: { email: "ada@example.com", guest: false, emailVerified: true } });
   });
 
   it("stores only a hash of the session token", async () => {

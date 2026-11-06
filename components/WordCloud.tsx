@@ -34,3 +34,34 @@ export function WordCloud({ words }: { words: { word: string; n: number; weight:
     </ul>
   );
 }
+
+/** Ranked list: every answer with how many people gave it. */
+export function WordList({ words }: { words: { word: string; n: number; weight: number }[] }) {
+  if (words.length === 0) {
+    return <p className="py-16 text-center text-[clamp(1.2rem,1.8vw,2rem)] font-semibold text-ink-soft">Answers will appear here.</p>;
+  }
+  const max = words[0].n;
+  const shown = words.slice(0, 12);
+  return (
+    <ol className="mt-4 flex flex-col gap-[clamp(0.4rem,1vh,0.8rem)]" aria-label="Answers, most common first">
+      {shown.map((w, i) => (
+        <li key={w.word} className="flex items-center gap-3">
+          <span className="font-display w-[2.5ch] text-right text-[clamp(1rem,1.3vw,1.5rem)] font-extrabold text-ink-soft">{i + 1}</span>
+          <span className="w-[28%] truncate text-[clamp(1.05rem,1.5vw,1.8rem)] font-bold" title={w.word}>
+            {w.word}
+          </span>
+          <span className="relative h-[clamp(1.6rem,3.4vh,2.6rem)] flex-1 overflow-hidden rounded-full border-2 border-ink bg-white">
+            <span
+              className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700"
+              style={{ width: `${(w.n / max) * 100}%`, backgroundColor: TOPIC_COLORS[i % TOPIC_COLORS.length] }}
+            />
+          </span>
+          <span className="font-display w-[4ch] text-right text-[clamp(1.1rem,1.6vw,1.9rem)] font-extrabold tabular-nums">{w.n}</span>
+        </li>
+      ))}
+      {words.length > shown.length && (
+        <li className="text-center text-sm font-semibold text-ink-soft">+ {words.length - shown.length} more answers</li>
+      )}
+    </ol>
+  );
+}

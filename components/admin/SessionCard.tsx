@@ -128,9 +128,16 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
             {s.criterionCount} criteria.
           </p>
         </div>
-        <span className={`rounded-full border-2 border-ink px-3 py-0.5 text-sm font-bold ${s.isOpen ? "bg-mint" : "bg-ink text-white"}`}>
-          {s.isOpen ? "Open" : "Closed"}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {s.expiresAt && (
+            <span className="rounded-full border-2 border-ink bg-sun px-3 py-0.5 text-sm font-bold" title={new Date(s.expiresAt).toLocaleString()}>
+              Deleted in {timeLeft(s.expiresAt)}
+            </span>
+          )}
+          <span className={`rounded-full border-2 border-ink px-3 py-0.5 text-sm font-bold ${s.isOpen ? "bg-mint" : "bg-ink text-white"}`}>
+            {s.isOpen ? "Open" : "Closed"}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
@@ -222,4 +229,13 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
       )}
     </article>
   );
+}
+
+/** "2 days 5 h", "5 h", "under an hour". */
+function timeLeft(iso: string): string {
+  const hours = Math.max(0, Math.floor((Date.parse(iso) - Date.now()) / 3_600_000));
+  if (hours < 1) return "under an hour";
+  const d = Math.floor(hours / 24);
+  const h = hours % 24;
+  return d ? `${d} ${d === 1 ? "day" : "days"}${h ? ` ${h} h` : ""}` : `${h} h`;
 }

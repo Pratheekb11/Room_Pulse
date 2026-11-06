@@ -18,6 +18,31 @@ create table if not exists auth_sessions (
 );
 create index if not exists auth_sessions_user_idx on auth_sessions(user_id);
 
+-- Guest presenters: no email or password until they save the account.
+alter table users add column if not exists is_guest boolean not null default false;
+alter table users alter column email drop not null;
+alter table users alter column password_hash drop not null;
+do $$ begin
+  alter table users add constraint users_guest_check check (
+    (is_guest and email is null and password_hash is null)
+    or (not is_guest and email is not null and password_hash is not null));
+exception when duplicate_object then null; end $$;
+create index if not exists users_guest_created_idx on users(created_at) where is_guest;
+
+-- Email verification (null = not verified yet)
+alter table users add column if not exists email_verified_at timestamptz;
+
+-- Single-use links for email verification and password reset. Only a SHA-256 hash is stored.
+create table if not exists email_tokens (
+  token_hash  text primary key,
+  user_id     uuid not null references users(id) on delete cascade,
+  purpose     text not null check (purpose in ('verify', 'reset')),
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null,
+  used_at     timestamptz
+);
+create index if not exists email_tokens_user_idx on email_tokens(user_id, purpose, created_at);
+
 -- Failed logins per email, for temporary lockout. No IP addresses are stored.
 create table if not exists login_failures (
   email  text not null,
@@ -68,6 +93,9 @@ alter table focus_topics add column if not exists kind text not null default 'ra
 do $$ begin
   alter table focus_topics add constraint focus_topics_kind_check check (kind in ('rating', 'poll', 'words'));
 exception when duplicate_object then null; end $$;
+
+-- Chart the presenter picked for this question (the dashboard opens on it)
+alter table focus_topics add column if not exists chart text;
 
 -- One poll choice per voter per poll
 create table if not exists poll_answers (
@@ -168,3 +196,11 @@ language sql as $$
    where session_id = p_session_id
    group by session_id, topic_id, criterion_id;
 $$;
+
+-- Guest presentations expire 3 days after creation (null = never).
+alter table sessions add column if not exists expires_at timestamptz;
+create index if not exists sessions_expires_idx on sessions(expires_at) where expires_at is not null;
+
+-- Every public lookup goes through this view, so expired presentations behave as if deleted.
+create or replace view live_sessions as
+  select * from sessions where expires_at is null or expires_at > now();

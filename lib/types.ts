@@ -18,6 +18,8 @@ export type QuestionKind = "rating" | "poll" | "words";
 
 export interface FocusItem extends NamedItem {
   kind: QuestionKind;
+  /** Chart the dashboard opens on (see CHARTS in lib/charts.ts). */
+  chart: string;
 }
 
 export interface TopicItem extends NamedItem {
@@ -73,6 +75,8 @@ export interface AdminSessionRow {
   title: string;
   isOpen: boolean;
   createdAt: string;
+  /** Guest presentations are deleted at this time; null = kept. */
+  expiresAt: string | null;
   focusCount: number;
   topicCount: number;
   criterionCount: number;

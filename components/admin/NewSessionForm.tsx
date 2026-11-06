@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CHARTS, defaultChart } from "@/lib/charts";
 import { topicColor } from "@/lib/colors";
 import { MAX_CRITERIA, MAX_FOCUS_TOPICS, MAX_TOPICS_PER_FOCUS, splitLines } from "@/lib/validation";
 
@@ -10,6 +11,7 @@ type Kind = "rating" | "poll" | "words";
 interface FocusDraft {
   key: number;
   kind: Kind;
+  chart: string;
   name: string;
   topicsText: string;
 }
@@ -26,10 +28,10 @@ const PLACEHOLDER: Record<Kind, { name: string; list: string }> = {
   words: { name: "One word for 2027?", list: "" },
 };
 
-const blank = (key: number, kind: Kind = "rating"): FocusDraft => ({ key, kind, name: "", topicsText: "" });
+const blank = (key: number, kind: Kind = "rating"): FocusDraft => ({ key, kind, chart: defaultChart(kind), name: "", topicsText: "" });
 const field = "mt-1 w-full rounded-xl border-2 border-ink bg-white px-3 py-2";
 
-export function NewSessionForm({ call, onCreated }: { call: Call; onCreated: () => Promise<void> }) {
+export function NewSessionForm({ call, onCreated, locked = false }: { call: Call; onCreated: () => Promise<void>; locked?: boolean }) {
   const nextKey = useRef(1);
   const [title, setTitle] = useState("");
   const [scaleMax, setScaleMax] = useState(5);
@@ -80,7 +82,7 @@ export function NewSessionForm({ call, onCreated }: { call: Call; onCreated: () 
           scaleMax,
           lowLabel,
           highLabel,
-          focusTopics: parsed.map((f) => ({ name: f.name, kind: f.kind, topics: f.topics })),
+          focusTopics: parsed.map((f) => ({ name: f.name, kind: f.kind, chart: f.chart, topics: f.topics })),
           criteria,
         }),
       });
@@ -130,7 +132,7 @@ export function NewSessionForm({ call, onCreated }: { call: Call; onCreated: () 
                       type="button"
                       role="radio"
                       aria-checked={f.kind === k.id}
-                      onClick={() => update(f.key, { kind: k.id })}
+                      onClick={() => update(f.key, { kind: k.id, chart: defaultChart(k.id) })}
                       className={`rounded-full border-2 border-ink px-3 py-1 text-sm font-bold ${f.kind === k.id ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
                     >
                       {k.label}
@@ -160,6 +162,28 @@ export function NewSessionForm({ call, onCreated }: { call: Call; onCreated: () 
                       Remove
                     </button>
                   )}
+                </div>
+
+                <div className="mt-3">
+                  <p id={`chart-${f.key}`} className="text-sm font-semibold">
+                    Show results as
+                  </p>
+                  <div role="radiogroup" aria-labelledby={`chart-${f.key}`} className="mt-1 flex flex-wrap gap-1.5">
+                    {CHARTS[f.kind].map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={f.chart === c.id}
+                        onClick={() => update(f.key, { chart: c.id })}
+                        className={`rounded-lg border-2 px-2.5 py-1 text-xs font-bold ${
+                          f.chart === c.id ? "border-violet bg-violet text-white" : "border-ink/30 bg-white hover:border-ink"
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {f.kind !== "words" && (
@@ -250,9 +274,10 @@ export function NewSessionForm({ call, onCreated }: { call: Call; onCreated: () 
         </p>
       )}
 
-      <button type="submit" disabled={busy} className="key font-display mt-5 w-full rounded-xl bg-violet py-3 text-xl font-bold text-white">
+      <button type="submit" disabled={busy || locked} className="key font-display mt-5 w-full rounded-xl bg-violet py-3 text-xl font-bold text-white">
         {busy ? "Creating…" : "Create presentation"}
       </button>
+      {locked && <p className="mt-2 text-center text-sm font-semibold text-ink-soft">Verify your email to create presentations.</p>}
     </form>
   );
 }

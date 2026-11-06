@@ -40,14 +40,45 @@ export function PollBars({ tally }: { tally: PollTally }) {
   );
 }
 
-export function PollPie({ tally }: { tally: PollTally }) {
-  const R = 40;
+/** Vertical columns, one per option. */
+export function PollColumns({ tally }: { tally: PollTally }) {
+  return (
+    <div className="flex h-[clamp(16rem,52vh,36rem)] items-end gap-[clamp(0.5rem,1.6vw,2rem)] px-2" role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
+      {tally.rows.map((r) => {
+        const c = topicColor(r.index);
+        return (
+          <div key={r.id} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
+            <span className="font-display text-[clamp(1.4rem,2.4vw,2.8rem)] font-extrabold tabular-nums leading-none">{r.pct}%</span>
+            <span className="mb-2 text-[clamp(0.8rem,1vw,1.1rem)] font-semibold text-ink-soft">
+              {r.n} {r.n === 1 ? "vote" : "votes"}
+            </span>
+            <div
+              className="w-full max-w-[9rem] rounded-t-2xl border-2 border-b-0 border-ink transition-[height] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
+              style={{ height: `${Math.max(r.pct, r.n ? 2 : 0)}%`, backgroundColor: c }}
+            />
+            <div className="w-full border-t-2 border-ink pt-2 text-center">
+              <span className="font-display mr-1 font-extrabold">{LETTERS[r.index]}</span>
+              <span className="text-[clamp(0.9rem,1.25vw,1.4rem)] font-bold break-words">{r.name}</span>
+              {tally.leader?.id === r.id && <span aria-label="leading"> 👑</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Pie (hole=false) or donut chart of the poll. */
+export function PollPie({ tally, hole = true }: { tally: PollTally; hole?: boolean }) {
+  // A full pie is a thick stroke on a circle whose radius is half the stroke width.
+  const R = hole ? 40 : 25;
+  const W = hole ? 20 : 50;
   let offset = 0;
   return (
     <div className="flex flex-wrap items-center justify-center gap-[clamp(1rem,4vw,5rem)]">
       <div className="relative aspect-square w-[clamp(16rem,32vw,34rem)]">
         <svg viewBox="0 0 100 100" className="h-full w-full" role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
-          <circle cx="50" cy="50" r={R} fill="none" stroke="#ebe7fb" strokeWidth="20" />
+          <circle cx="50" cy="50" r={R} fill="none" stroke="#ebe7fb" strokeWidth={W} />
           {tally.total > 0 &&
             tally.rows.map((r) => {
               if (r.n === 0) return null;
@@ -62,7 +93,7 @@ export function PollPie({ tally }: { tally: PollTally }) {
                   fill="none"
                   pathLength={100}
                   stroke={topicColor(r.index)}
-                  strokeWidth="20"
+                  strokeWidth={W}
                   strokeDasharray={`${seg} ${100 - seg}`}
                   strokeDashoffset={-offset}
                   transform="rotate(-90 50 50)"
@@ -73,10 +104,12 @@ export function PollPie({ tally }: { tally: PollTally }) {
               return el;
             })}
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="font-display text-[clamp(2rem,3.4vw,3.8rem)] font-extrabold leading-none">{tally.total}</span>
-          <span className="text-[clamp(0.85rem,1vw,1.15rem)] font-semibold text-ink-soft">votes</span>
-        </div>
+        {hole && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="font-display text-[clamp(2rem,3.4vw,3.8rem)] font-extrabold leading-none">{tally.total}</span>
+            <span className="text-[clamp(0.85rem,1vw,1.15rem)] font-semibold text-ink-soft">votes</span>
+          </div>
+        )}
       </div>
       <ul className="flex flex-col gap-3">
         {tally.rows.map((r) => (

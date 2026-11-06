@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { defaultChart, isChartFor } from "./charts";
 
 export const codeSchema = z
   .string()
@@ -43,12 +44,15 @@ const focusTopicSchema = z
   .object({
     name: z.string().trim().min(1, "Every focus topic needs a name").max(120),
     kind: z.enum(QUESTION_KINDS).default("rating"),
+    chart: z.string().max(20).optional(),
     topics: listOf(120)
       .pipe(z.array(z.string()).max(MAX_TOPICS_PER_FOCUS, `At most ${MAX_TOPICS_PER_FOCUS} topics or options per focus topic`))
       .default([]),
   })
-  .transform((f) => (f.kind === "words" ? { ...f, topics: [] } : f))
+  .transform((f) => ({ ...f, topics: f.kind === "words" ? [] : f.topics, chart: f.chart ?? defaultChart(f.kind) }))
   .superRefine((f, ctx) => {
+    if (!isChartFor(f.kind, f.chart))
+      ctx.addIssue({ code: "custom", message: `“${f.chart}” isn't a chart for ${f.kind} questions` });
     if (f.kind === "rating" && f.topics.length < 1)
       ctx.addIssue({ code: "custom", message: `Add at least 1 topic to “${f.name}”` });
     if (f.kind === "poll" && f.topics.length < 2)
@@ -88,11 +92,13 @@ export function splitLines(text: string): string[] {
 
 export const emailSchema = z.string().trim().toLowerCase().max(254).pipe(z.email());
 
+// Upper bound stops very long inputs from making hashing expensive.
+export const passwordSchema = z.string().min(10, "Use at least 10 characters").max(128, "Use at most 128 characters");
+
 export const credentialsSchema = z
   .object({
     email: emailSchema,
-    // Upper bound stops very long inputs from making hashing expensive.
-    password: z.string().min(10, "Use at least 10 characters").max(128, "Use at most 128 characters"),
+    password: passwordSchema,
   })
   .refine((v) => v.password.trim().toLowerCase() !== v.email, {
     message: "Password can't be the same as your email",

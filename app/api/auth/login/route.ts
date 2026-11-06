@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     }
     await clearLoginFailures(email);
     const setCookie = await startSession(user.id);
-    return json({ user: { email: user.email } }, 200, { "Cache-Control": "no-store", "Set-Cookie": setCookie });
+    return json({ user: { email: user.email, emailVerified: user.emailVerified } }, 200, { "Cache-Control": "no-store", "Set-Cookie": setCookie });
   } catch (err) {
     logDbError("auth:login", err);
     return unavailable();

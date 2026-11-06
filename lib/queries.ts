@@ -22,13 +22,15 @@ import { generateCode } from "./code";
 export async function getSession(code: string): Promise<SessionPayload | null> {
   const rows = (await sql`
     select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open,
-      coalesce((select json_agg(json_build_object('id', f.id, 'name', f.name, 'kind', f.kind) order by f.position)
+      coalesce((select json_agg(json_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
+                  'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end))
+                  order by f.position)
                 from focus_topics f where f.session_id = s.id), '[]'::json) as focus_topics,
       coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'focusId', t.focus_id) order by t.position)
                 from topics t where t.session_id = s.id), '[]'::json)   as topics,
       coalesce((select json_agg(json_build_object('id', c.id, 'name', c.name) order by c.position)
                 from criteria c where c.session_id = s.id), '[]'::json) as criteria
-    from sessions s
+    from live_sessions s
     where s.code = ${code}
   `) as {
     code: string;
@@ -60,7 +62,7 @@ export async function getSession(code: string): Promise<SessionPayload | null> {
 
 /** `null` when the session does not exist. */
 export async function getSessionIsOpen(code: string): Promise<boolean | null> {
-  const rows = (await sql`select is_open from sessions where code = ${code}`) as { is_open: boolean }[];
+  const rows = (await sql`select is_open from live_sessions where code = ${code}`) as { is_open: boolean }[];
   return rows[0] ? rows[0].is_open : null;
 }
 
@@ -70,7 +72,7 @@ export async function saveVote(v: VoteInput): Promise<VoteOutcome> {
   const rows = await sql`
     insert into votes (session_id, topic_id, criterion_id, voter_id, score)
     select s.id, t.id, c.id, ${v.voterId}::uuid, ${v.score}::int
-    from sessions s
+    from live_sessions s
     join topics   t on t.session_id = s.id and t.id = ${v.topicId}::uuid
     join criteria c on c.session_id = s.id and c.id = ${v.criterionId}::uuid
     left join focus_topics f on f.id = t.focus_id
@@ -121,7 +123,7 @@ export async function getResults(code: string): Promise<ResultsPayload | null> {
                         from word_answers where session_id = s.id
                        group by focus_id, word) w
                where w.rk <= 80), '[]'::json) as words
-    from sessions s
+    from live_sessions s
     where s.code = ${code}
   `) as {
     is_open: boolean;
@@ -140,13 +142,13 @@ export async function getResults(code: string): Promise<ResultsPayload | null> {
 
 export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> {
   const rows = (await sql`
-    select s.code, s.title, s.is_open, s.created_at,
+    select s.code, s.title, s.is_open, s.created_at, s.expires_at,
       (select count(*)::int from focus_topics f where f.session_id = s.id) as focus_count,
       (select count(*)::int from topics t where t.session_id = s.id)   as topic_count,
       (select count(*)::int from criteria c where c.session_id = s.id) as criterion_count,
       coalesce(v.voter_count, 0) as voter_count,
       coalesce(v.total_votes, 0) as total_votes
-    from sessions s
+    from live_sessions s
     left join (
       select session_id, count(distinct voter_id)::int as voter_count, count(*)::int as total_votes
         from (select session_id, voter_id from votes
@@ -161,6 +163,7 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     title: string;
     is_open: boolean;
     created_at: Date | string;
+    expires_at: Date | string | null;
     focus_count: number;
     topic_count: number;
     criterion_count: number;
@@ -172,6 +175,7 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     title: r.title,
     isOpen: r.is_open,
     createdAt: new Date(r.created_at).toISOString(),
+    expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
     focusCount: r.focus_count,
     topicCount: r.topic_count,
     criterionCount: r.criterion_count,
@@ -190,21 +194,22 @@ function isCodeCollision(err: unknown): boolean {
  * retries on code collision. Topic positions are global (focus position × 100 + index)
  * so ordering by topics.position keeps focus topics together.
  */
-export async function createSession(input: CreateSessionInput, ownerId: string): Promise<string> {
+export async function createSession(input: CreateSessionInput, ownerId: string, expiresInDays: number | null = null): Promise<string> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateCode();
     try {
       await sql`
         with s as (
-          insert into sessions (code, title, scale_max, low_label, high_label, owner_id)
-          values (${code}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${ownerId})
+          insert into sessions (code, title, scale_max, low_label, high_label, owner_id, expires_at)
+          values (${code}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${ownerId},
+                  case when ${expiresInDays}::int is null then null else now() + make_interval(days => ${expiresInDays}::int) end)
           returning id
         ), input as (
           select e.val, e.ord - 1 as pos
           from jsonb_array_elements(${JSON.stringify(input.focusTopics)}::jsonb) with ordinality as e(val, ord)
         ), f as (
-          insert into focus_topics (session_id, name, kind, position)
-          select s.id, input.val->>'name', input.val->>'kind', input.pos
+          insert into focus_topics (session_id, name, kind, chart, position)
+          select s.id, input.val->>'name', input.val->>'kind', input.val->>'chart', input.pos
           from s, input
           returning id, position
         ), t as (
@@ -237,21 +242,21 @@ export async function setSessionOpen(code: string, isOpen: boolean): Promise<boo
 
 export async function resetSession(code: string): Promise<void> {
   await sql.transaction([
-    sql`delete from poll_answers where session_id = (select id from sessions where code = ${code})`,
-    sql`delete from word_answers where session_id = (select id from sessions where code = ${code})`,
-    sql`delete from results where session_id = (select id from sessions where code = ${code})`,
-    sql`delete from votes   where session_id = (select id from sessions where code = ${code})`,
+    sql`delete from poll_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from word_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from results where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
   ]);
 }
 
 export async function recalculateSession(code: string): Promise<void> {
-  await sql`select rebuild_results(id) from sessions where code = ${code}`;
+  await sql`select rebuild_results(id) from live_sessions where code = ${code}`;
 }
 
 export async function deleteSession(code: string): Promise<void> {
   await sql.transaction([
-    sql`delete from results where session_id = (select id from sessions where code = ${code})`,
-    sql`delete from votes   where session_id = (select id from sessions where code = ${code})`,
+    sql`delete from results where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from sessions where code = ${code}`,
   ]);
 }
@@ -270,7 +275,7 @@ export async function getSummaryRows(code: string): Promise<SummaryRow[]> {
   const rows = (await sql`
     select coalesce(f.name, '') as focus, t.name as topic, c.name as criterion, t.position as topic_position,
            coalesce(r.vote_count, 0) as n, coalesce(r.score_sum, 0) as sum
-    from sessions s
+    from live_sessions s
     join topics t   on t.session_id = s.id
     left join focus_topics f on f.id = t.focus_id
     join criteria c on c.session_id = s.id
@@ -306,7 +311,7 @@ export interface RawRow {
  */
 export async function getRawRows(code: string): Promise<RawRow[]> {
   const rows = (await sql`
-    with s as (select id from sessions where code = ${code}),
+    with s as (select id from live_sessions where code = ${code}),
     answers as (
       select v.voter_id, v.created_at, v.updated_at,
              coalesce(f.position, -1) as fp, t.position as tp, c.position as cp,
@@ -351,27 +356,28 @@ export async function getRawRows(code: string): Promise<RawRow[]> {
 
 export interface UserRow {
   id: string;
-  email: string;
+  /** null for guest accounts */
+  email: string | null;
 }
 
 /** `null` if the email is already registered. */
-export async function createUser(email: string, passwordHash: string): Promise<UserRow | null> {
+export async function createUser(email: string, passwordHash: string): Promise<(UserRow & { email: string }) | null> {
   const rows = (await sql`
     insert into users (email, password_hash) values (${email}, ${passwordHash})
     on conflict (email) do nothing
     returning id, email
-  `) as UserRow[];
+  `) as (UserRow & { email: string })[];
   return rows[0] ?? null;
 }
 
-export async function findUserByEmail(email: string): Promise<(UserRow & { passwordHash: string }) | null> {
-  const rows = (await sql`select id, email, password_hash from users where email = ${email}`) as {
-    id: string;
-    email: string;
-    password_hash: string;
-  }[];
+export async function findUserByEmail(
+  email: string,
+): Promise<(UserRow & { email: string; passwordHash: string; emailVerified: boolean }) | null> {
+  const rows = (await sql`
+    select id, email, password_hash, email_verified_at is not null as email_verified from users where email = ${email}
+  `) as { id: string; email: string; password_hash: string; email_verified: boolean }[];
   const r = rows[0];
-  return r ? { id: r.id, email: r.email, passwordHash: r.password_hash } : null;
+  return r ? { id: r.id, email: r.email, passwordHash: r.password_hash, emailVerified: r.email_verified } : null;
 }
 
 export async function countRecentLoginFailures(email: string, windowMinutes: number): Promise<number> {
@@ -393,6 +399,10 @@ export async function clearLoginFailures(email: string): Promise<void> {
   await sql`delete from login_failures where email = ${email}`;
 }
 
+export async function extendAuthSessions(userId: string, days: number): Promise<void> {
+  await sql`update auth_sessions set expires_at = now() + make_interval(days => ${days}) where user_id = ${userId} and expires_at > now()`;
+}
+
 export async function insertAuthSession(tokenHash: string, userId: string, days: number): Promise<void> {
   await sql.transaction([
     sql`delete from auth_sessions where user_id = ${userId} and expires_at < now()`,
@@ -401,13 +411,16 @@ export async function insertAuthSession(tokenHash: string, userId: string, days:
   ]);
 }
 
-export async function findUserBySessionHash(tokenHash: string): Promise<UserRow | null> {
+export async function findUserBySessionHash(
+  tokenHash: string,
+): Promise<(UserRow & { emailVerified: boolean; isGuest: boolean }) | null> {
   const rows = (await sql`
-    select u.id, u.email
+    select u.id, u.email, u.email_verified_at is not null as email_verified, u.is_guest
       from auth_sessions a join users u on u.id = a.user_id
      where a.token_hash = ${tokenHash} and a.expires_at > now()
-  `) as UserRow[];
-  return rows[0] ?? null;
+  `) as { id: string; email: string | null; email_verified: boolean; is_guest: boolean }[];
+  const r = rows[0];
+  return r ? { id: r.id, email: r.email, emailVerified: r.email_verified, isGuest: r.is_guest } : null;
 }
 
 export async function deleteAuthSession(tokenHash: string): Promise<void> {
@@ -416,7 +429,7 @@ export async function deleteAuthSession(tokenHash: string): Promise<void> {
 
 /** Open/closed state of a session owned by this user; `null` if missing or not theirs. */
 export async function getOwnedSessionIsOpen(code: string, ownerId: string): Promise<boolean | null> {
-  const rows = (await sql`select is_open from sessions where code = ${code} and owner_id = ${ownerId}`) as {
+  const rows = (await sql`select is_open from live_sessions where code = ${code} and owner_id = ${ownerId}`) as {
     is_open: boolean;
   }[];
   return rows[0] ? rows[0].is_open : null;
@@ -433,7 +446,7 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
     const rows = await sql`
       insert into poll_answers (session_id, focus_id, voter_id, topic_id)
       select s.id, f.id, ${a.voterId}::uuid, t.id
-      from sessions s
+      from live_sessions s
       join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'poll'
       join topics t on t.focus_id = f.id and t.id = ${a.topicId}::uuid
       where s.code = ${a.code} and s.is_open
@@ -452,13 +465,13 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
       sql`
         insert into word_answers (session_id, focus_id, voter_id, slot, word)
         select s.id, f.id, ${a.voterId}::uuid, u.ord, u.word
-        from sessions s
+        from live_sessions s
         join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'words'
         cross join unnest(${a.words}::text[]) with ordinality as u(word, ord)
         where s.code = ${a.code} and s.is_open
         returning 1 as ok`,
       sql`
-        select 1 as ok from sessions s
+        select 1 as ok from live_sessions s
         join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'words'
         where s.code = ${a.code} and s.is_open`,
     ]);
@@ -484,13 +497,13 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
     select * from (
       select f.position as fp, t.position as tp, f.name as focus, t.name as label, 'Poll choice' as kind,
              (select count(*)::int from poll_answers p where p.topic_id = t.id) as n
-        from sessions s
+        from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'poll'
         join topics t on t.focus_id = f.id
        where s.code = ${code}
       union all
       select f.position, -count(*)::int, f.name, w.word, 'Word', count(*)::int
-        from sessions s
+        from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'words'
         join word_answers w on w.focus_id = f.id
        where s.code = ${code}
@@ -499,4 +512,104 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
     order by fp, tp, label
   `) as { focus: string; label: string; kind: "Poll choice" | "Word"; n: number }[];
   return rows.map((r) => ({ focus: r.focus, label: r.label, kind: r.kind, n: r.n }));
+}
+
+// ---------------------------------------------------------------- email links
+
+export type EmailTokenPurpose = "verify" | "reset";
+
+export async function countRecentEmailTokens(userId: string, purpose: EmailTokenPurpose, minutes: number): Promise<number> {
+  const rows = (await sql`
+    select count(*)::int as n from email_tokens
+     where user_id = ${userId} and purpose = ${purpose} and created_at > now() - make_interval(mins => ${minutes})
+  `) as { n: number }[];
+  return rows[0].n;
+}
+
+export async function insertEmailToken(tokenHash: string, userId: string, purpose: EmailTokenPurpose, minutes: number): Promise<void> {
+  await sql.transaction([
+    sql`delete from email_tokens where user_id = ${userId} and expires_at < now() - interval '1 day'`,
+    sql`insert into email_tokens (token_hash, user_id, purpose, expires_at)
+        values (${tokenHash}, ${userId}, ${purpose}, now() + make_interval(mins => ${minutes}))`,
+  ]);
+}
+
+/** Marks a valid, unused, unexpired token as used (atomically). Returns its user, or null. */
+export async function consumeEmailToken(tokenHash: string, purpose: EmailTokenPurpose): Promise<UserRow | null> {
+  const rows = (await sql`
+    update email_tokens t set used_at = now()
+      from users u
+     where t.token_hash = ${tokenHash} and t.purpose = ${purpose}
+       and t.used_at is null and t.expires_at > now() and u.id = t.user_id
+    returning u.id, u.email
+  `) as UserRow[];
+  return rows[0] ?? null;
+}
+
+export async function markEmailVerified(userId: string): Promise<void> {
+  await sql`update users set email_verified_at = coalesce(email_verified_at, now()) where id = ${userId}`;
+}
+
+/**
+ * New password: also verifies the email (the link proved ownership), signs out
+ * every session, cancels other reset links and clears login lockouts.
+ */
+export async function resetPassword(userId: string, email: string, passwordHash: string): Promise<void> {
+  await sql.transaction([
+    sql`update users set password_hash = ${passwordHash}, email_verified_at = coalesce(email_verified_at, now()) where id = ${userId}`,
+    sql`delete from auth_sessions where user_id = ${userId}`,
+    sql`update email_tokens set used_at = now() where user_id = ${userId} and purpose = 'reset' and used_at is null`,
+    sql`delete from login_failures where email = ${email}`,
+  ]);
+}
+
+
+// ---------------------------------------------------------------- guests
+
+/** New guest account, or null when the site-wide hourly cap is reached. */
+export async function createGuestUser(maxPerHour: number): Promise<string | null> {
+  const rows = (await sql`
+    insert into users (is_guest)
+    select true
+     where (select count(*) from users where is_guest and created_at > now() - interval '1 hour') < ${maxPerHour}
+    returning id
+  `) as { id: string }[];
+  return rows[0]?.id ?? null;
+}
+
+export type UpgradeOutcome = "ok" | "email_taken" | "not_guest";
+
+/** Gives a guest account an email and password (keeping its presentations). */
+export async function upgradeGuest(userId: string, email: string, passwordHash: string): Promise<UpgradeOutcome> {
+  try {
+    // Saving the account also keeps its presentations for good.
+    const [rows] = await sql.transaction([
+      sql`update users set email = ${email}, password_hash = ${passwordHash}, is_guest = false
+           where id = ${userId} and is_guest
+          returning 1 as ok`,
+      sql`update sessions set expires_at = null
+           where owner_id = ${userId} and expires_at > now()
+             and exists (select 1 from users where id = ${userId} and not is_guest)`,
+    ]);
+    return rows.length ? "ok" : "not_guest";
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") return "email_taken";
+    throw err;
+  }
+}
+
+export async function countOwnedSessions(ownerId: string): Promise<number> {
+  const rows = (await sql`select count(*)::int as n from live_sessions where owner_id = ${ownerId}`) as { n: number }[];
+  return rows[0].n;
+}
+
+/** Deletes expired guest data: expired presentations (with their votes) and old, signed-out guests. */
+export async function purgeExpiredGuestData(guestDays: number): Promise<void> {
+  await sql.transaction([
+    sql`delete from sessions where expires_at < now()`,
+    sql`delete from auth_sessions where expires_at < now()`,
+    sql`delete from users u
+         where u.is_guest and u.created_at < now() - make_interval(days => ${guestDays})
+           and not exists (select 1 from auth_sessions a where a.user_id = u.id)`,
+  ]);
 }
