@@ -10,7 +10,16 @@ const field = "mt-1 w-full rounded-xl border-2 border-ink px-3 py-2.5 text-lg";
 export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
   const [mode, setMode] = useState<"idle" | "pin" | "return">("idle");
   const [pin, setPin] = useState<string | null>(null);
-  const [noted, setNoted] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function copyPin() {
+    try {
+      await navigator.clipboard.writeText(pin ?? "");
+      setCopied(true);
+    } catch {
+      /* clipboard blocked: the PIN is on screen */
+    }
+  }
   const [code, setCode] = useState("");
   const [enteredPin, setEnteredPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,24 +58,25 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (mode === "pin" && pin) {
     return (
-      <div className="slab mt-6 rounded-[24px] bg-sun p-6 text-center" role="dialog" aria-labelledby="pin-h">
+      // Full-page, so nothing else on the screen competes with the PIN.
+      <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-canvas p-5">
+      <div className="slab w-full max-w-sm rounded-[24px] bg-white p-6 text-center" role="dialog" aria-modal="true" aria-labelledby="pin-h">
         <h2 id="pin-h" className="font-display text-2xl font-extrabold">
-          Your guest PIN
+          Save your guest PIN
         </h2>
-        <p className="font-display mt-2 text-5xl font-extrabold tracking-[0.15em] tabular-nums" aria-label={`PIN ${pin.split("").join(" ")}`}>
-          {formatPin(pin)}
-        </p>
-        <p className="mt-3 text-sm font-semibold">
-          Write it down. It&rsquo;s shown only once. To get back in on any device, choose &ldquo;Return as guest&rdquo; and enter one
-          of your presentation codes with this PIN. Closing the browser signs you out.
-        </p>
-        <label className="mt-4 flex items-center justify-center gap-2 text-sm font-bold">
-          <input type="checkbox" checked={noted} onChange={(e) => setNoted(e.target.checked)} className="h-4 w-4" />
-          I&rsquo;ve noted my PIN
-        </label>
-        <button type="button" disabled={!noted} onClick={onSignedIn} className="key mt-4 w-full rounded-xl bg-violet py-3 text-lg font-bold text-white">
-          Continue
+        <p className="mt-1 text-sm text-ink-soft">You need it to get back in after closing the browser.</p>
+        <div className="mt-4 flex items-center justify-center gap-3 rounded-2xl bg-sun px-4 py-3">
+          <span className="font-display text-[clamp(2rem,9vw,2.5rem)] font-extrabold tracking-[0.12em] whitespace-nowrap tabular-nums" aria-label={`PIN ${pin.split("").join(" ")}`}>
+            {formatPin(pin)}
+          </span>
+          <button type="button" onClick={copyPin} className="rounded-lg border-2 border-ink bg-white px-2.5 py-1 text-sm font-bold">
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+        <button type="button" onClick={onSignedIn} className="key mt-5 w-full rounded-xl bg-violet py-3 text-lg font-bold text-white">
+          I&rsquo;ve saved it
         </button>
+      </div>
       </div>
     );
   }
@@ -75,8 +85,9 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
     return (
       <form onSubmit={comeBack} className="slab mt-6 rounded-[24px] bg-white p-6" noValidate>
         <h2 className="font-display text-2xl font-extrabold">Return as guest</h2>
+        <p className="mt-1 text-sm text-ink-soft">Enter the code of any presentation you made, and your PIN.</p>
         <label className="mt-4 block font-semibold">
-          One of your presentation codes
+          Presentation code
           <input value={code} onChange={(e) => setCode(e.target.value)} autoCapitalize="none" autoComplete="off" maxLength={12} className={`${field} tracking-[0.15em]`} />
         </label>
         <label className="mt-4 block font-semibold">
