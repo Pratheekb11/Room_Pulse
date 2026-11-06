@@ -1,7 +1,7 @@
 "use client";
 
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useClientValue } from "../useClientValue";
 import { dashboardUrl, shortUrl, voterUrl } from "@/lib/site";
 import type { AdminSessionRow } from "@/lib/types";
@@ -50,6 +50,22 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const canvasWrap = useRef<HTMLDivElement>(null);
+  const more = useRef<HTMLDetailsElement>(null);
+
+  // The "More" menu closes when you tap outside it or press Escape.
+  useEffect(() => {
+    const close = (e: Event) => {
+      const d = more.current;
+      if (!d?.open) return;
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !d.contains(e.target as Node)) d.open = false;
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
 
   async function run(kind: Exclude<Pending, null>, fn: () => Promise<void>, done?: string) {
     setPending(kind);
@@ -116,83 +132,91 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
   const created = new Date(s.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   const btn = "key rounded-lg px-3 py-1.5 text-sm font-bold";
 
+  const menuItem = "block w-full rounded-md px-3 py-2 text-left text-sm font-semibold hover:bg-canvas disabled:opacity-40";
+
   return (
-    <article className="slab rounded-xl bg-white p-5" aria-labelledby={`s-${s.code}`}>
+    <article id={`card-${s.code}`} className="slab scroll-mt-6 rounded-xl bg-white p-5" aria-labelledby={`s-${s.code}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 id={`s-${s.code}`} className="font-display text-2xl font-semibold leading-tight break-words">
+          <h3 id={`s-${s.code}`} className="font-display text-2xl leading-tight break-words">
             {s.title}
           </h3>
           <p className="mt-1 text-sm text-ink-soft">
-            Code <span className="font-bold text-ink">{s.code}</span>, made {created}. {s.focusCount} {s.focusCount === 1 ? "question" : "questions"}.
+            {s.focusCount} {s.focusCount === 1 ? "question" : "questions"}. {s.voterCount} {s.voterCount === 1 ? "person has" : "people have"} answered. Made{" "}
+            {created}.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {s.expiresAt && (
-            <span className="rounded-full border border-line-strong bg-sun px-3 py-0.5 text-sm font-bold" title={new Date(s.expiresAt).toLocaleString()}>
+            <span className="rounded-full bg-sun px-3 py-0.5 text-sm font-semibold" title={new Date(s.expiresAt).toLocaleString()}>
               Deleted in {timeLeft(s.expiresAt)}
             </span>
           )}
-          <span className={`rounded-full border border-line-strong px-3 py-0.5 text-sm font-bold ${s.isOpen ? "bg-mint" : "bg-ink text-white"}`}>
-            {s.isOpen ? "Open" : "Closed"}
+          <span className={`rounded-full px-3 py-0.5 text-sm font-semibold ${s.isOpen ? "bg-mint" : "bg-ink text-white"}`}>
+            {s.isOpen ? "Voting open" : "Voting closed"}
           </span>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
-        <div className="flex flex-col items-center gap-2">
-          <div className="rounded-lg border border-line-strong bg-white p-2">
-            {urls && <QRCodeSVG value={urls.voter} size={128} marginSize={0} fgColor="#26251e" title={`QR code for ${urls.voter}`} />}
-          </div>
-          <div ref={canvasWrap} className="hidden" aria-hidden>
-            {urls && <QRCodeCanvas value={urls.voter} size={1024} marginSize={4} fgColor="#26251e" />}
-          </div>
-          <button type="button" onClick={downloadPng} className="text-xs font-bold underline underline-offset-4">
-            Download PNG
-          </button>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-3">
-          {urls && (
-            <>
-              <CopyLink label="Link for your audience" url={urls.voter} />
-              <CopyLink label="Your results screen (keep this link private)" url={urls.dash} newTab />
-            </>
-          )}
-          <p className="font-display text-lg font-bold">
-            {s.voterCount} {s.voterCount === 1 ? "person has" : "people have"} answered
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2.5">
+      <div className="mt-4 flex flex-wrap items-center gap-2.5">
+        {urls && (
+          <a href={urls.dash} target="_blank" rel="noopener noreferrer" className="key rounded-lg bg-primary px-5 py-2.5 font-semibold text-white">
+            Present
+          </a>
+        )}
         <a href={`/admin/edit/${s.code}`} className={`${btn} bg-white`}>
           Edit questions
         </a>
-        <button type="button" onClick={toggle} disabled={pending !== null} className={`${btn} ${s.isOpen ? "bg-sun" : "bg-mint"}`}>
+        <button type="button" onClick={toggle} disabled={pending !== null} className={`${btn} bg-white`}>
           {pending === "toggle" ? "Saving…" : s.isOpen ? "Close voting" : "Reopen voting"}
         </button>
-        <button type="button" onClick={() => exportCsv("summary")} disabled={pending !== null} className={`${btn} bg-white`}>
-          {pending === "summary" ? "Downloading…" : "Download results (CSV)"}
-        </button>
-        <button type="button" onClick={() => exportCsv("raw")} disabled={pending !== null} className={`${btn} bg-white`}>
-          {pending === "raw" ? "Downloading…" : "Download every answer (CSV)"}
-        </button>
-        <button
-          type="button"
-          onClick={recalc}
-          disabled={pending !== null || s.isOpen}
-          title={s.isOpen ? "Close voting first" : "Recounts every total from the saved answers"}
-          className={`${btn} bg-white`}
-        >
-          {pending === "recalc" ? "Recounting…" : "Recount totals"}
-        </button>
-        <button type="button" onClick={() => setDialog("reset")} disabled={pending !== null} className={`${btn} bg-white`}>
-          Clear all answers
-        </button>
-        <button type="button" onClick={() => setDialog("delete")} disabled={pending !== null} className={`${btn} bg-white text-error`}>
-          Delete presentation
-        </button>
+        <details ref={more} className="relative">
+          <summary className={`${btn} cursor-pointer list-none bg-white [&::-webkit-details-marker]:hidden`}>More</summary>
+          {/* Picking an item closes the menu */}
+          <div
+            onClick={() => {
+              if (more.current) more.current.open = false;
+            }}
+            className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-line-strong bg-white p-1 sm:left-0 sm:right-auto"
+          >
+            <button type="button" onClick={() => exportCsv("summary")} disabled={pending !== null} className={menuItem}>
+              {pending === "summary" ? "Downloading…" : "Download results (CSV)"}
+            </button>
+            <button type="button" onClick={() => exportCsv("raw")} disabled={pending !== null} className={menuItem}>
+              {pending === "raw" ? "Downloading…" : "Download every answer (CSV)"}
+            </button>
+            <button type="button" onClick={downloadPng} className={menuItem}>
+              Download QR code (PNG)
+            </button>
+            <button type="button" onClick={recalc} disabled={pending !== null || s.isOpen} className={menuItem}>
+              {pending === "recalc" ? "Recounting…" : "Recount totals"}
+              <span className="block text-xs font-normal text-ink-soft">{s.isOpen ? "Close voting first." : "Rebuilds every total from the saved answers."}</span>
+            </button>
+            <button type="button" onClick={() => setDialog("reset")} disabled={pending !== null} className={menuItem}>
+              Clear all answers
+            </button>
+            <button type="button" onClick={() => setDialog("delete")} disabled={pending !== null} className={`${menuItem} text-error`}>
+              Delete presentation
+            </button>
+          </div>
+        </details>
+      </div>
+
+      <div className="mt-5 grid gap-5 border-t border-line pt-4 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="rounded-lg border border-line-strong bg-white p-2 self-start justify-self-start">
+          {urls && <QRCodeSVG value={urls.voter} size={104} marginSize={0} fgColor="#26251e" title={`QR code for ${urls.voter}`} />}
+        </div>
+        <div ref={canvasWrap} className="hidden" aria-hidden>
+          {urls && <QRCodeCanvas value={urls.voter} size={1024} marginSize={4} fgColor="#26251e" />}
+        </div>
+        <div className="flex min-w-0 flex-col gap-3">
+          {urls && (
+            <>
+              <CopyLink label={`Link for your audience (code ${s.code})`} url={urls.voter} />
+              <CopyLink label="Results screen link (keep it private)" url={urls.dash} newTab />
+            </>
+          )}
+        </div>
       </div>
 
       {error && (

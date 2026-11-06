@@ -90,7 +90,7 @@ function Stage({
   // Index (within the open focus topic) of the topic shown full screen, or null.
   const [detail, setDetail] = useState<number | null>(null);
   const [sort, setSort] = useState<Sort>("order");
-  const [showQr, setShowQr] = useState(true);
+  const [showQr, setShowQr] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const joinUrl = useClientValue(() => voterUrl(code));
   const isOwner = useIsOwner(code);
@@ -183,23 +183,23 @@ function Stage({
             {session.title}
           </h1>
         </div>
-        <div className="flex flex-col items-end gap-3">
-          <div className="flex flex-wrap items-center justify-end gap-2.5">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:gap-2.5">
             <LiveBadge lastOkAt={lastOkAt} />
-            <span className="rounded-full border border-line-strong bg-white px-3.5 py-1 text-lg font-bold tabular-nums">
+            <span className="rounded-full border border-line-strong bg-white px-3 py-1 text-base font-bold tabular-nums sm:px-3.5 sm:text-lg">
               <CountUp value={voters} /> {voters === 1 ? "person" : "people"} voted
             </span>
             <span
-              className={`rounded-full border border-line-strong px-3.5 py-1 text-lg font-bold ${
+              className={`rounded-full border border-line-strong px-3 py-1 text-base font-bold sm:px-3.5 sm:text-lg ${
                 r.isOpen ? "bg-mint text-ink" : "bg-ink text-white"
               }`}
             >
               {r.isOpen ? "Voting open" : "Voting closed"}
             </span>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 text-sm font-semibold">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold sm:justify-end">
             {group && CHARTS[group.kind].length > 1 && (
-              <div role="tablist" aria-label="Chart" className="flex rounded-full border border-line-strong bg-white p-0.5">
+              <div role="tablist" aria-label="Chart" className="flex max-w-full overflow-x-auto rounded-full border border-line-strong bg-white p-0.5">
                 {CHARTS[group.kind].map((c, i) => (
                   <button
                     key={c.id}
@@ -208,7 +208,7 @@ function Stage({
                     aria-selected={view === c.id}
                     title={group.kind === "rating" ? `Shortcut: ${i + 1}` : undefined}
                     onClick={() => setView(c.id)}
-                    className={`rounded-full px-3 py-1 ${view === c.id ? "bg-ink text-white" : "hover:bg-canvas"}`}
+                    className={`shrink-0 rounded-full px-3 py-1 whitespace-nowrap ${view === c.id ? "bg-ink text-white" : "hover:bg-canvas"}`}
                   >
                     {c.id === "summary" ? "Summary" : c.label}
                   </button>
@@ -237,7 +237,7 @@ function Stage({
             >
               {showQr ? "Hide QR" : "Show QR"}
             </button>
-            <button type="button" onClick={toggleFullscreen} className="rounded-full border border-line-strong bg-white px-3 py-1">
+            <button type="button" onClick={toggleFullscreen} className="hidden rounded-full border border-line-strong bg-white px-3 py-1 sm:inline-block">
               {isFullscreen ? "Exit full screen" : "Full screen"}
             </button>
             {isOwner && (
@@ -249,7 +249,7 @@ function Stage({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-[clamp(0.75rem,1.6vw,2rem)]">
+      <div className="flex min-h-0 flex-1 flex-col gap-[clamp(0.75rem,1.6vw,2rem)] lg:flex-row">
         <main className="min-w-0 flex-1">
           {!single && (
             <nav aria-label="Questions" className="mb-[clamp(0.6rem,1.4vh,1.25rem)] flex flex-wrap items-center gap-2">
@@ -368,7 +368,7 @@ function Stage({
         </main>
 
         {showQr && joinUrl && (
-          <div className="w-[clamp(15rem,22vw,22rem)] shrink-0">
+          <div className="mx-auto w-full max-w-sm shrink-0 lg:mx-0 lg:w-[clamp(15rem,22vw,22rem)] lg:max-w-none">
             <QrPanel url={joinUrl} code={code} />
           </div>
         )}

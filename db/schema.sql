@@ -215,3 +215,8 @@ create or replace view live_sessions as
 
 -- Guests get back in with a 6-digit PIN plus one of their presentation codes (salted scrypt hash).
 alter table users add column if not exists guest_pin_hash text;
+
+-- Guests get back in on any device with one long guest code (only its SHA-256 hash is stored).
+-- Replaces the older PIN + presentation code sign-in.
+alter table users add column if not exists guest_code_hash text;
+create unique index if not exists users_guest_code_idx on users(guest_code_hash) where guest_code_hash is not null;

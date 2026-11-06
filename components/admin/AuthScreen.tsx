@@ -53,10 +53,15 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
     <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
       <Logo />
       <div className="mx-auto my-auto w-full max-w-sm">
-        <h1 className="font-display text-center text-4xl font-semibold leading-tight tracking-tight">
-          {mode === "login" ? "Welcome back" : "Make your first presentation"}
-        </h1>
-        <form onSubmit={submit} className="slab mt-6 rounded-xl bg-white p-6" noValidate>
+        <h1 className="font-display text-center text-4xl leading-tight tracking-tight">Make a presentation</h1>
+        <p className="mt-2 text-center text-ink-soft">Takes about two minutes.</p>
+
+        <GuestOptions onSignedIn={onSignedIn} />
+
+        <p className="mt-6 flex items-center gap-3 text-sm text-ink-soft before:h-px before:flex-1 before:bg-line-strong after:h-px after:flex-1 after:bg-line-strong">
+          or use an account
+        </p>
+        <form onSubmit={submit} className="slab mt-4 rounded-xl bg-white p-6" noValidate>
           <div role="tablist" aria-label="Account" className="flex rounded-full border border-line-strong p-0.5">
             {tab("login", "Log in")}
             {tab("signup", "Sign up")}
@@ -120,13 +125,12 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
           <button
             type="submit"
             disabled={busy || !email || !password || tooShort}
-            className="key font-display mt-5 w-full rounded-lg bg-primary py-3 text-xl font-bold text-white"
+            className="key mt-5 w-full rounded-lg bg-ink py-3 text-lg font-semibold text-white disabled:opacity-40"
           >
             {busy ? "One moment…" : mode === "login" ? "Log in" : "Create account"}
           </button>
+          <p className="mt-3 text-center text-xs text-ink-soft">An account keeps your presentations for good.</p>
         </form>
-
-        <GuestOptions onSignedIn={onSignedIn} />
       </div>
     </main>
   );

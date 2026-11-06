@@ -6,10 +6,14 @@ export const GUEST_PRESENTATION_LIMIT = 3;
 export const GUEST_DAYS = 3;
 /** A guest sign-in (cookie) lasts at most this long server-side; it also ends when the browser closes. */
 export const GUEST_SESSION_HOURS = 12;
-/** Wrong PINs allowed per guest per hour before PIN sign-in is locked. */
-export const GUEST_PIN_ATTEMPTS_PER_HOUR = 5;
 /** New guest accounts allowed per hour across the whole site (abuse brake; no IPs are stored). */
 export const GUEST_ACCOUNTS_PER_HOUR = 200;
+
+/**
+ * Wrong guest codes allowed site-wide per 10 minutes before guest sign-in pauses.
+ * With 31^8 possible codes this keeps guessing any guest's code far out of reach.
+ */
+export const GUEST_CODE_FAILURES_PER_10_MIN = 100;
 
 /** True when emails can actually be sent (or captured in tests / printed in development). */
 export function emailEnabled(): boolean {

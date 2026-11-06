@@ -1,6 +1,6 @@
 # LiveRate
 
-Anonymous, near-real-time audience voting for live sessions. Presenters sign up with email and password and build a presentation of up to 10 **focus topics**. Each focus topic is one question:
+Anonymous, near-real-time audience voting for live sessions. Presenters start straight away as a guest (no sign-up; they get an 8-character **guest code** like `K7QM-3XPA` to get back in on any device, and guest presentations are deleted after 3 days) or sign up with email and password. A presentation has up to 10 **questions**. Each question is one of:
 
 - **Rate topics:** up to 10 topics, each scored on your criteria (e.g. Impact, Feasibility).
 - **Poll:** pick one of 2–10 options.

@@ -1,40 +1,32 @@
-import { forbiddenOrigin, isSameOrigin, startGuestSession } from "@/lib/auth";
+import { forbiddenOrigin, hashToken, isSameOrigin, startGuestSession } from "@/lib/auth";
+import { normalizeGuestCode } from "@/lib/code";
 import { json, logDbError, readJson, unavailable } from "@/lib/http";
-import { dummyHash, verifyPassword } from "@/lib/password";
-import { GUEST_PIN_ATTEMPTS_PER_HOUR, GUEST_SESSION_HOURS } from "@/lib/policy";
-import { clearLoginFailures, countRecentLoginFailures, findGuestByPresentationCode, recordLoginFailure } from "@/lib/queries";
-import { normalizeCode } from "@/lib/code";
+import { GUEST_CODE_FAILURES_PER_10_MIN, GUEST_DAYS, GUEST_SESSION_HOURS } from "@/lib/policy";
+import { countRecentLoginFailures, findGuestByCodeHash, recordLoginFailure } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-// Same answer for an unknown code, a non-guest presentation and a wrong PIN.
-const invalid = () => json({ error: "invalid_guest_pin" }, 401);
+// Same answer for a malformed, unknown, saved or expired code.
+const invalid = () => json({ error: "invalid_guest_code" }, 401);
 
-/** Guest sign-in on any device: one of the guest's presentation codes + their PIN. */
+// Failures are counted site-wide (there's no account to key them on, and no IPs are stored).
+const FAILURE_KEY = "guest-code";
+
+/** Guest sign-in on any device with just the guest code. */
 export async function POST(req: Request) {
   if (!isSameOrigin(req)) return forbiddenOrigin();
-  const body = (await readJson(req)) as { code?: unknown; pin?: unknown } | undefined;
-  const code = typeof body?.code === "string" ? normalizeCode(body.code) : "";
-  const pin = typeof body?.pin === "string" ? body.pin.trim() : "";
-  if (!/^[a-z0-9]{4,12}$/.test(code) || !/^\d{6}$/.test(pin)) return invalid();
-
+  const body = (await readJson(req)) as { guestCode?: unknown } | undefined;
+  const code = typeof body?.guestCode === "string" ? normalizeGuestCode(body.guestCode) : null;
   try {
-    const guest = await findGuestByPresentationCode(code);
-    if (!guest) {
-      await verifyPassword(pin, await dummyHash()); // same work either way, so timing reveals nothing
+    if ((await countRecentLoginFailures(FAILURE_KEY, 10)) >= GUEST_CODE_FAILURES_PER_10_MIN) {
+      return json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store", "Retry-After": "600" });
+    }
+    const id = code ? await findGuestByCodeHash(hashToken(code), GUEST_DAYS) : null;
+    if (!id) {
+      await recordLoginFailure(FAILURE_KEY);
       return invalid();
     }
-    // Lockout per guest (keyed by account id; no IPs stored).
-    const key = `guest:${guest.id}`;
-    if ((await countRecentLoginFailures(key, 60)) >= GUEST_PIN_ATTEMPTS_PER_HOUR) {
-      return json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store", "Retry-After": "3600" });
-    }
-    if (!(await verifyPassword(pin, guest.pinHash))) {
-      await recordLoginFailure(key);
-      return invalid();
-    }
-    await clearLoginFailures(key);
-    const setCookie = await startGuestSession(guest.id, GUEST_SESSION_HOURS);
+    const setCookie = await startGuestSession(id, GUEST_SESSION_HOURS);
     return json({ user: { email: null, guest: true, emailVerified: false } }, 200, {
       "Cache-Control": "no-store",
       "Set-Cookie": setCookie,

@@ -10,7 +10,7 @@ import { PresentationForm } from "./PresentationForm";
 import { SessionCard } from "./SessionCard";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { inputClass } from "../auth/AuthShell";
-import { formatPin, readGuestPin, rememberGuestPin } from "./guestPin";
+import { readGuestCode, rememberGuestCode } from "./guestCode";
 import { useClientValue } from "../useClientValue";
 
 type Account = { email: string | null; guest: boolean; emailVerified: boolean; verificationRequired: boolean };
@@ -39,7 +39,7 @@ export function AdminApp() {
   const signOut = useCallback(async () => {
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
-      rememberGuestPin(null);
+      rememberGuestCode(null);
     } catch {
       /* the cookie is cleared server-side when reachable; show the sign-in screen regardless */
     }
@@ -81,6 +81,8 @@ function Console({
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [sessions, setSessions] = useState<AdminSessionRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The form shows by itself until there's a presentation; after that it opens on request.
+  const [formOpen, setFormOpen] = useState(false);
 
   const call = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -138,7 +140,7 @@ function Console({
       {confirmLeave && (
         <ConfirmDialog
           title="Log out of the guest account?"
-          body="To get back in later, you need your guest PIN and the code of one of your presentations. Your presentations keep working while you're logged out."
+          body="To get back in later, on any device, you need your guest code. Your presentations keep working while you're logged out."
           confirmLabel="Log out anyway"
           danger
           onConfirm={() => {
@@ -149,34 +151,50 @@ function Console({
         />
       )}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
-        <PresentationForm call={call} mode={{ kind: "create" }} onDone={refresh} locked={mustVerify} />
+      {sessions === null && !error && <p className="mt-8 text-ink-soft">Loading your presentations…</p>}
+      {error && (
+        <p role="alert" className="mt-6 rounded-lg border border-line-strong bg-sun px-4 py-2 font-semibold">
+          {error}
+        </p>
+      )}
 
-        <section aria-labelledby="sessions-h">
-          <div className="flex items-baseline justify-between">
-            <h2 id="sessions-h" className="font-display text-3xl font-semibold">
+      {sessions !== null && (sessions.length === 0 || formOpen) && (
+        <div className="mx-auto mt-8 max-w-2xl">
+          {sessions.length === 0 && (
+            <p className="mb-4 text-ink-soft">Write your questions below. When you&rsquo;re done you&rsquo;ll get a QR code to show your audience.</p>
+          )}
+          <PresentationForm
+            call={call}
+            mode={{ kind: "create" }}
+            onCancel={sessions.length ? () => setFormOpen(false) : undefined}
+            onDone={async (code) => {
+              await refresh();
+              setFormOpen(false);
+              // Take the presenter straight to what they just made.
+              requestAnimationFrame(() => document.getElementById(`card-${code}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            }}
+            locked={mustVerify}
+          />
+        </div>
+      )}
+
+      {sessions !== null && sessions.length > 0 && !formOpen && (
+        <section aria-labelledby="sessions-h" className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="sessions-h" className="font-display text-3xl">
               Your presentations
             </h2>
-            <button type="button" onClick={() => void refresh()} className="text-sm font-bold underline underline-offset-4">
-              Refresh
+            <button type="button" onClick={() => setFormOpen(true)} disabled={mustVerify} className="key rounded-lg bg-ink px-4 py-2.5 font-semibold text-white">
+              + New presentation
             </button>
           </div>
-          {error && (
-            <p role="alert" className="mt-3 rounded-lg border border-line-strong bg-sun px-4 py-2 font-semibold">
-              {error}
-            </p>
-          )}
-          {sessions === null && !error && <p className="mt-4 text-ink-soft">Loading…</p>}
-          {sessions?.length === 0 && (
-            <p className="mt-4 rounded-xl border border-dashed border-line-strong p-6 text-ink-soft">
-              You have no presentations yet. Fill in the form to make your first one. It will show up here with its QR code and links.
-            </p>
-          )}
-          <div className="mt-4 flex flex-col gap-6">
-            {sessions?.map((s) => <SessionCard key={s.code} session={s} call={call} onChanged={refresh} />)}
+          <div className="mt-4 grid gap-6 xl:grid-cols-2">
+            {sessions.map((s) => (
+              <SessionCard key={s.code} session={s} call={call} onChanged={refresh} />
+            ))}
           </div>
         </section>
-      </div>
+      )}
     </div>
   );
 }
@@ -232,7 +250,7 @@ function VerifyBanner({ email, onVerified }: { email: string; onVerified: () => 
 
 /** Guest accounts: explains the 3-day limit and lets the presenter save the account. */
 function GuestBanner({ onSaved }: { onSaved: () => void }) {
-  const pin = useClientValue(readGuestPin);
+  const guestCode = useClientValue(readGuestCode);
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -245,7 +263,7 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
     setError(null);
     try {
       await apiFetch("/api/auth/upgrade", { method: "POST", body: JSON.stringify({ email, password }) });
-      rememberGuestPin(null);
+      rememberGuestCode(null);
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -255,22 +273,28 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div role="status" className="slab mt-6 rounded-xl bg-sun px-5 py-4">
+    <div role="status" className="mt-6 rounded-xl bg-sun px-5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-display text-xl font-semibold">You&rsquo;re using a guest account</p>
-          <p className="text-sm font-medium">
-            Everything saves as people answer. Each presentation is deleted 3 days after you make it, and you can have up to 3.
-            Closing the browser logs you out. To get back in, use your PIN and a presentation code. Save your account to keep everything for good.
+        <div className="text-sm">
+          <p>
+            <strong>Guest account.</strong> Presentations are deleted after 3 days.
+            {guestCode && (
+              <>
+                {" "}
+                Your guest code is <strong className="font-mono whitespace-nowrap">{guestCode}</strong>.
+              </>
+            )}
           </p>
-          {pin && (
-            <p className="mt-1 text-sm font-bold">
-              Your PIN: <span className="font-display tracking-[0.15em]">{formatPin(pin)}</span>
+          <details className="mt-0.5">
+            <summary className="cursor-pointer text-ink-soft underline underline-offset-4">What does this mean?</summary>
+            <p className="mt-1 max-w-2xl text-ink-soft">
+              You can have up to 3 presentations, and each is deleted 3 days after you make it. Closing the browser logs you out; to get back in,
+              choose &ldquo;Have a guest code?&rdquo; and type your guest code, on this or any other device. Save your account to keep everything.
             </p>
-          )}
+          </details>
         </div>
         {!open && (
-          <button type="button" onClick={() => setOpen(true)} className="key rounded-lg bg-white px-4 py-2 font-bold">
+          <button type="button" onClick={() => setOpen(true)} className="key rounded-lg bg-white px-4 py-2 text-sm font-semibold">
             Save my account
           </button>
         )}

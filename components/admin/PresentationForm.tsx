@@ -58,14 +58,14 @@ export const KINDS: { id: Kind; label: string; hint: string }[] = [
 
 const EXAMPLES: Record<Kind, { name: string; list: string[] }> = {
   rating: {
-    name: "Which project should we do first?",
+    name: "Which project first?",
     list: ["New website", "Mobile app", "Better onboarding"],
   },
   poll: {
     name: "Where should the next offsite be?",
     list: ["Lisbon", "Kyoto", "Cape Town"],
   },
-  words: { name: "Describe this year in one word", list: [] },
+  words: { name: "One word for this year?", list: [] },
 };
 
 const LIST_COPY: Record<
@@ -363,7 +363,7 @@ export function PresentationForm({
     <>
       <form
         onSubmit={submit}
-        className="slab h-fit min-w-0 rounded-xl bg-white p-5 sm:p-6"
+        className="slab h-fit min-w-0 rounded-xl bg-white p-4 sm:p-6"
         noValidate
       >
         <h2 className="font-display text-3xl font-semibold">
@@ -405,7 +405,7 @@ export function PresentationForm({
               return (
                 <li
                   key={f.key}
-                  className="rounded-xl border border-line-strong p-4 pl-6"
+                  className="rounded-xl border border-line-strong p-3 pl-5 sm:p-4 sm:pl-6"
                   style={{ boxShadow: `inset 6px 0 0 ${topicColor(i)}` }}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -647,7 +647,7 @@ export function PresentationForm({
           </p>
         )}
 
-        <div className="mt-5 flex gap-3">
+        <div className="sticky bottom-0 z-10 -mx-4 mt-5 flex gap-3 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
           {onCancel && (
             <button
               type="button"

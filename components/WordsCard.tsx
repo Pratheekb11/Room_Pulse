@@ -53,7 +53,7 @@ export function WordsCard({ question, color, value, status, disabled, finished, 
             onChange={(e) => setDraft(e.target.value)}
             maxLength={40}
             disabled={disabled || full}
-            placeholder={full ? "That's 3, nice!" : "Type a word or short phrase"}
+            placeholder={full ? "That's 3, nice!" : "Type a word"}
             autoComplete="off"
             className="min-w-0 flex-1 rounded-xl border border-line-strong px-4 py-3 text-lg font-semibold"
           />

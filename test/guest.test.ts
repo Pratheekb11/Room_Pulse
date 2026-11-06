@@ -257,68 +257,87 @@ describe("one guest can't reach another guest's presentations", () => {
 
 import * as guestReturnRoute from "@/app/api/auth/guest-return/route";
 
-describe("guest PIN", () => {
-  async function guestWithPin() {
+describe("guest code", () => {
+  async function newGuest() {
     const res = await post(guestRoute.POST, "/api/auth/guest", {});
-    const body = (await res.json()) as { pin: string };
-    const cookie = cookieFrom(res)!;
-    const { code } = (await (await create(cookie, "Mine")).json()) as { code: string };
-    return { pin: body.pin, cookie, code };
+    const body = (await res.json()) as { guestCode: string };
+    return { guestCode: body.guestCode, cookie: cookieFrom(res)! };
   }
-  const back = (code: string, pin: string) => post(guestReturnRoute.POST, "/api/auth/guest-return", { code, pin });
+  const back = (guestCode: string, headers: Record<string, string> = {}) =>
+    post(guestReturnRoute.POST, "/api/auth/guest-return", { guestCode }, headers);
 
-  it("gives a 6-digit PIN once and stores only a hash", async () => {
-    const { pin } = await guestWithPin();
-    expect(pin).toMatch(/^\d{6}$/);
-    const row = (await db.query<{ guest_pin_hash: string }>("select guest_pin_hash from users")).rows[0];
-    expect(row.guest_pin_hash).toMatch(/^scrypt\$/);
-    expect(row.guest_pin_hash).not.toContain(pin);
+  it("gives each guest one short code, shown once, and stores only a hash", async () => {
+    const a = await newGuest();
+    const b = await newGuest();
+    expect(a.guestCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(a.guestCode).not.toMatch(/[01OIL]/);
+    expect(a.guestCode).not.toBe(b.guestCode);
+    const rows = (await db.query<{ guest_code_hash: string }>("select guest_code_hash from users where is_guest")).rows;
+    expect(rows).toHaveLength(2);
+    for (const r of rows) {
+      expect(r.guest_code_hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(r.guest_code_hash.toUpperCase()).not.toContain(a.guestCode.replace(/-/g, ""));
+    }
   });
 
-  it("lets the guest back in on another device with a presentation code and the PIN", async () => {
-    const { pin, code } = await guestWithPin();
-    const res = await back(code.toUpperCase(), pin);
-    expect(res.status).toBe(200);
-    expect(await list(cookieFrom(res)!)).toEqual(["Mine"]);
+  it("signs the guest in on another device with just the code, typed any way", async () => {
+    const { guestCode, cookie } = await newGuest();
+    await create(cookie, "Mine");
+    for (const typed of [guestCode, guestCode.toLowerCase(), guestCode.replace(/-/g, ""), ` ${guestCode.replace(/-/g, " ")} `]) {
+      const res = await back(typed);
+      expect(res.status, typed).toBe(200);
+      expect(await list(cookieFrom(res)!)).toEqual(["Mine"]);
+    }
   });
 
-  it("answers the same for a wrong PIN, an unknown code and a non-guest presentation", async () => {
-    const { pin, code } = await guestWithPin();
-    const member = (await signUp("member@example.com")).cookie!;
-    const { code: memberCode } = (await (await create(member, "Member's")).json()) as { code: string };
-    const wrongPin = await back(code, pin === "000000" ? "111111" : "000000");
-    const unknown = await back("zzzzzz", pin);
-    const notGuest = await back(memberCode, pin);
-    for (const r of [wrongPin, unknown, notGuest]) {
+  it("works before the guest has made any presentation", async () => {
+    const { guestCode } = await newGuest();
+    expect((await back(guestCode)).status).toBe(200);
+  });
+
+  it("answers the same for a wrong code and for nonsense", async () => {
+    await newGuest();
+    const wrong = await back("ABCD-EFGH");
+    const junk = await back("hello");
+    for (const r of [wrong, junk]) {
       expect(r.status).toBe(401);
       expect(cookieFrom(r)).toBeNull();
     }
-    const bodies = await Promise.all([wrongPin.json(), unknown.json(), notGuest.json()]);
-    expect(bodies[0]).toEqual(bodies[1]);
-    expect(bodies[1]).toEqual(bodies[2]);
+    expect(await wrong.json()).toEqual(await junk.json());
   });
 
-  it("locks the guest for an hour after 5 wrong PINs", async () => {
-    const { pin, code } = await guestWithPin();
-    const wrong = pin === "000000" ? "111111" : "000000";
-    for (let i = 0; i < 5; i++) expect((await back(code, wrong)).status).toBe(401);
-    expect((await back(code, pin)).status).toBe(429);
-    await db.exec("update login_failures set at = now() - interval '61 minutes'");
-    expect((await back(code, pin)).status).toBe(200);
+  it("stops working once the account is saved", async () => {
+    const g = await newGuest();
+    await post(upgradeRoute.POST, "/api/auth/upgrade", { email: "b@example.com", password: "a long passphrase" }, { cookie: g.cookie });
+    expect((await back(g.guestCode)).status).toBe(401);
   });
 
-  it("stops working once the presentations expire or the account is saved", async () => {
-    const a = await guestWithPin();
-    await db.exec(`update sessions set expires_at = now() - interval '1 second' where code = '${a.code}'`);
-    expect((await back(a.code, a.pin)).status).toBe(401);
-
-    const b = await guestWithPin();
-    await post(upgradeRoute.POST, "/api/auth/upgrade", { email: "b@example.com", password: "a long passphrase" }, { cookie: b.cookie });
-    expect((await back(b.code, b.pin)).status).toBe(401);
+  it("stops working once the guest's presentations are gone and the 3 days are up", async () => {
+    const g = await newGuest();
+    await create(g.cookie, "Old");
+    await db.exec("update sessions set expires_at = now() - interval '1 second'");
+    await db.exec("update users set created_at = now() - interval '4 days' where is_guest");
+    expect((await back(g.guestCode)).status).toBe(401);
   });
 
-  it("rejects malformed input and other sites", async () => {
-    expect((await post(guestReturnRoute.POST, "/api/auth/guest-return", { code: "abc234", pin: "12ab56" })).status).toBe(401);
-    expect((await post(guestReturnRoute.POST, "/api/auth/guest-return", { code: "abc234", pin: "123456" }, { origin: "https://evil.example" })).status).toBe(403);
+  it("keeps working while a presentation is still live, even after 3 days", async () => {
+    const g = await newGuest();
+    await create(g.cookie, "Late");
+    await db.exec("update users set created_at = now() - interval '4 days' where is_guest");
+    expect((await back(g.guestCode)).status).toBe(200);
+  });
+
+  it("refuses other sites", async () => {
+    const { guestCode } = await newGuest();
+    expect((await back(guestCode, { origin: "https://evil.example" })).status).toBe(403);
+  });
+
+  it("slows everyone down after many wrong codes, so codes can't be guessed", async () => {
+    const { guestCode } = await newGuest();
+    for (let i = 0; i < 100; i++) await back(`ZZZZ-${String(i).padStart(4, "2").replace(/[01]/g, "2")}`);
+    expect((await back("ZZZZ-ZZZZ")).status).toBe(429);
+    expect((await back(guestCode)).status).toBe(429);
+    await db.exec("update login_failures set at = now() - interval '11 minutes'");
+    expect((await back(guestCode)).status).toBe(200);
   });
 });

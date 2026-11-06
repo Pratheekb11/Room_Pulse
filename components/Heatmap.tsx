@@ -26,7 +26,7 @@ function Cell({ agg, scaleMax, flashKey, strong }: { agg: Agg; scaleMax: number;
         <span className="font-display text-[clamp(1.4rem,2.3vw,2.6rem)] font-semibold leading-none tabular-nums">
           <CountUp value={value} format={(v) => v.toFixed(1)} />
         </span>
-        {agg.n > 0 && <span className="mt-1 text-[clamp(0.75rem,0.85vw,1rem)] font-semibold opacity-80">n={agg.n}</span>}
+        {agg.n > 0 && <span className="mt-1 text-[clamp(0.75rem,0.85vw,1rem)] font-semibold opacity-80">{agg.n} {agg.n === 1 ? "vote" : "votes"}</span>}
       </div>
     </td>
   );
@@ -36,7 +36,7 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
   const empty: Agg = { n: 0, sum: 0 };
   return (
     <div className="overflow-x-auto">
-      <table className="w-full table-fixed border-separate border-spacing-0">
+      <table className="w-full min-w-[30rem] table-fixed border-separate border-spacing-0">
         <caption className="sr-only">Average score for each item on each measure</caption>
         <thead>
           <tr>
@@ -51,7 +51,7 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
               </th>
             ))}
             <th scope="col" className="px-1 pb-2 text-center align-bottom text-[clamp(0.9rem,1.15vw,1.35rem)] font-semibold">
-              Overall
+              Average
             </th>
           </tr>
         </thead>
@@ -78,7 +78,7 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
         <tfoot>
           <tr>
             <th scope="row" className="pr-3 pt-1 text-left text-[clamp(1rem,1.3vw,1.55rem)] font-semibold">
-              Average
+              All items
             </th>
             {criteria.map((c) => (
               <Cell

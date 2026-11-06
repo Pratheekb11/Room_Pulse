@@ -47,7 +47,7 @@ export default function Home() {
 
       <main className="mx-auto max-w-[1200px] px-5 sm:px-8">
         <section className="stagger grid gap-12 pt-14 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
-          <div>
+          <div className="min-w-0">
             <h1 className="font-display text-[clamp(2.5rem,5.6vw,4rem)] leading-[1.04] text-ink">
               Ask the room.
               <br />
@@ -59,7 +59,9 @@ export default function Home() {
             <JoinForm />
             <p className="mt-3 text-sm text-muted">Joining someone else&rsquo;s presentation? Type the code shown on their screen.</p>
           </div>
-          <LiveDemo />
+          <div className="min-w-0">
+            <LiveDemo />
+          </div>
         </section>
 
         <section className="border-t border-line py-20" aria-labelledby="how-h">

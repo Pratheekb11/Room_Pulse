@@ -594,10 +594,10 @@ export async function resetPassword(userId: string, email: string, passwordHash:
 // ---------------------------------------------------------------- guests
 
 /** New guest account, or null when the site-wide hourly cap is reached. */
-export async function createGuestUser(maxPerHour: number, pinHash: string): Promise<string | null> {
+export async function createGuestUser(maxPerHour: number, codeHash: string): Promise<string | null> {
   const rows = (await sql`
-    insert into users (is_guest, guest_pin_hash)
-    select true, ${pinHash}
+    insert into users (is_guest, guest_code_hash)
+    select true, ${codeHash}
      where (select count(*) from users where is_guest and created_at > now() - interval '1 hour') < ${maxPerHour}
     returning id
   `) as { id: string }[];
@@ -611,7 +611,7 @@ export async function upgradeGuest(userId: string, email: string, passwordHash: 
   try {
     // Saving the account also keeps its presentations for good.
     const [rows] = await sql.transaction([
-      sql`update users set email = ${email}, password_hash = ${passwordHash}, is_guest = false, guest_pin_hash = null
+      sql`update users set email = ${email}, password_hash = ${passwordHash}, is_guest = false, guest_pin_hash = null, guest_code_hash = null
            where id = ${userId} and is_guest
           returning 1 as ok`,
       sql`update sessions set expires_at = null
@@ -641,14 +641,18 @@ export async function purgeExpiredGuestData(guestDays: number): Promise<void> {
   ]);
 }
 
-/** The guest who owns a live presentation with this code (for PIN sign-in), or null. */
-export async function findGuestByPresentationCode(code: string): Promise<{ id: string; pinHash: string } | null> {
+/**
+ * The guest account for a guest code's hash, while it's still in use: made in the last
+ * `guestDays` days, or still owning a live presentation. Null otherwise.
+ */
+export async function findGuestByCodeHash(codeHash: string, guestDays: number): Promise<string | null> {
   const rows = (await sql`
-    select u.id, u.guest_pin_hash
-      from live_sessions s join users u on u.id = s.owner_id
-     where s.code = ${code} and u.is_guest and u.guest_pin_hash is not null
-  `) as { id: string; guest_pin_hash: string }[];
-  return rows[0] ? { id: rows[0].id, pinHash: rows[0].guest_pin_hash } : null;
+    select u.id from users u
+     where u.guest_code_hash = ${codeHash} and u.is_guest
+       and (u.created_at > now() - make_interval(days => ${guestDays}::int)
+            or exists (select 1 from live_sessions s where s.owner_id = u.id))
+  `) as { id: string }[];
+  return rows[0]?.id ?? null;
 }
 
 // ---------------------------------------------------------------- editing

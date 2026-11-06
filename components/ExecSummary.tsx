@@ -61,8 +61,8 @@ export function ExecSummary({ topics, criteria, cells, histograms, scaleMax, vot
         </section>
         <section className="grid grid-cols-2 gap-[clamp(0.75rem,1.4vw,1.5rem)]">
           {[
-            { label: "People", value: voterCount },
-            { label: "Ratings", value: ratings },
+            { label: "People answered", value: voterCount },
+            { label: "Scores given", value: ratings },
           ].map((s) => (
             <div key={s.label} className="rounded-xl border border-line-strong bg-white p-[clamp(0.75rem,1.2vw,1.4rem)]">
               <p className="font-display text-[clamp(1.8rem,2.6vw,3rem)] font-semibold leading-none tabular-nums">{s.value}</p>
