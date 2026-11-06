@@ -101,3 +101,12 @@ body {
   }
   .confetti-piece { display: none; }
 }
+
+@keyframes slide-in-right {
+  from { transform: translateX(28px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-28px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}

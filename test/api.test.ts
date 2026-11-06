@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import type { PGlite } from "@electric-sql/pglite";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { failNextFetches, startTestDb, truncateAll } from "./neon-pglite";
+import { ORIGIN, signUp } from "./auth-helpers";
 
 import * as sessionRoute from "@/app/api/session/[code]/route";
 import * as statusRoute from "@/app/api/session/[code]/status/route";
@@ -14,7 +15,7 @@ import * as recalcRoute from "@/app/api/admin/sessions/[code]/recalculate/route"
 import * as exportRoute from "@/app/api/admin/sessions/[code]/export/route";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
 
-const PASSWORD = "correct horse";
+let cookie = "";
 const CHECK_SQL = readFileSync(new URL("../db/check.sql", import.meta.url), "utf8");
 
 let db: PGlite;
@@ -22,7 +23,7 @@ let db: PGlite;
 const ctx = (code: string) => ({ params: Promise.resolve({ code }) });
 const admin = (init: RequestInit = {}) => ({
   ...init,
-  headers: { "x-admin-key": PASSWORD, "content-type": "application/json", ...(init.headers ?? {}) },
+  headers: { cookie, origin: ORIGIN, "content-type": "application/json", ...(init.headers ?? {}) },
 });
 const url = (path: string) => `http://localhost${path}`;
 
@@ -32,7 +33,7 @@ async function createSession(body: Record<string, unknown>) {
 }
 
 async function demo(topics = ["A", "B"], criteria = ["Impact", "Feasibility"], scaleMax = 5) {
-  const res = await createSession({ title: "Demo", scaleMax, topics, criteria });
+  const res = await createSession({ title: "Demo", scaleMax, focusTopics: [{ name: "Focus", topics }], criteria });
   expect(res.status).toBe(201);
   const { code } = (await res.json()) as { code: string };
   const info = (await (await sessionRoute.GET(new Request(url(`/api/session/${code}`)), ctx(code))).json()) as SessionPayload;
@@ -52,35 +53,29 @@ const voter = () => crypto.randomUUID();
 
 beforeAll(async () => {
   db = await startTestDb();
-  process.env.ADMIN_PASSWORD = PASSWORD;
+  cookie = (await signUp("presenter@example.com")).cookie!;
 });
 
 beforeEach(async () => {
   await truncateAll(db);
 });
 
-describe("admin auth", () => {
-  it("rejects requests without the right x-admin-key", async () => {
+describe("presenter auth", () => {
+  it("rejects requests without a signed-in user", async () => {
     expect((await adminSessions.GET(new Request(url("/api/admin/sessions")))).status).toBe(401);
-    const wrong = new Request(url("/api/admin/sessions"), { headers: { "x-admin-key": "nope" } });
-    expect((await adminSessions.GET(wrong)).status).toBe(401);
-  });
-
-  it("rejects everything when ADMIN_PASSWORD is not configured", async () => {
-    delete process.env.ADMIN_PASSWORD;
-    try {
-      expect((await adminSessions.GET(new Request(url("/api/admin/sessions"), admin()))).status).toBe(401);
-    } finally {
-      process.env.ADMIN_PASSWORD = PASSWORD;
-    }
+    const forged = new Request(url("/api/admin/sessions"), { headers: { cookie: "lr_session=nope" } });
+    expect((await adminSessions.GET(forged)).status).toBe(401);
   });
 });
 
 describe("POST /api/admin/sessions", () => {
-  it("creates a session with trimmed, de-duplicated topics and criteria in order", async () => {
+  it("creates focus topics with their topics, trimmed and de-duplicated, in order", async () => {
     const res = await createSession({
       title: "  Demo  ",
-      topics: [" Alpha ", "", "Beta", "alpha", "Gamma"],
+      focusTopics: [
+        { name: " Growth ", topics: [" Alpha ", "", "Beta", "alpha", "Gamma"] },
+        { name: "Platform", topics: ["Alpha", "Delta"] }, // same topic name in another focus is fine
+      ],
       criteria: ["Impact", "  ", "Feasibility"],
     });
     expect(res.status).toBe(201);
@@ -89,19 +84,37 @@ describe("POST /api/admin/sessions", () => {
 
     const info = (await (await sessionRoute.GET(new Request(url("/x")), ctx(code))).json()) as SessionPayload;
     expect(info.session).toEqual({ code, title: "Demo", scaleMax: 5, lowLabel: "Low", highLabel: "High", isOpen: true });
-    expect(info.topics.map((t) => t.name)).toEqual(["Alpha", "Beta", "Gamma"]);
+    expect(info.focusTopics.map((f) => f.name)).toEqual(["Growth", "Platform"]);
+    const [growth, platform] = info.focusTopics;
+    expect(info.topics.map((t) => [t.name, t.focusId])).toEqual([
+      ["Alpha", growth.id],
+      ["Beta", growth.id],
+      ["Gamma", growth.id],
+      ["Alpha", platform.id],
+      ["Delta", platform.id],
+    ]);
     expect(info.criteria.map((c) => c.name)).toEqual(["Impact", "Feasibility"]);
   });
 
-  it("validates topic and criterion counts and scale", async () => {
-    expect((await createSession({ title: "x", topics: [], criteria: ["a"] })).status).toBe(400);
-    expect((await createSession({ title: "x", topics: ["a"], criteria: [] })).status).toBe(400);
-    const many = Array.from({ length: 51 }, (_, i) => `t${i}`);
-    expect((await createSession({ title: "x", topics: many, criteria: ["a"] })).status).toBe(400);
-    const crit = Array.from({ length: 11 }, (_, i) => `c${i}`);
-    expect((await createSession({ title: "x", topics: ["a"], criteria: crit })).status).toBe(400);
-    expect((await createSession({ title: "x", scaleMax: 11, topics: ["a"], criteria: ["b"] })).status).toBe(400);
-    expect((await createSession({ title: "", topics: ["a"], criteria: ["b"] })).status).toBe(400);
+  it("allows 1–10 focus topics with 1–10 topics each, and up to 10 criteria", async () => {
+    const focus = (n: number, topics = 1) =>
+      Array.from({ length: n }, (_, i) => ({ name: `F${i}`, topics: Array.from({ length: topics }, (_, j) => `t${j}`) }));
+    const ok = await createSession({ title: "x", focusTopics: focus(10, 10), criteria: ["a"] });
+    expect(ok.status).toBe(201);
+
+    const bad: Record<string, unknown>[] = [
+      { title: "x", focusTopics: [], criteria: ["a"] },
+      { title: "x", focusTopics: focus(11), criteria: ["a"] },
+      { title: "x", focusTopics: focus(1, 11), criteria: ["a"] },
+      { title: "x", focusTopics: [{ name: "F", topics: ["", " "] }], criteria: ["a"] },
+      { title: "x", focusTopics: [{ name: " ", topics: ["a"] }], criteria: ["a"] },
+      { title: "x", focusTopics: [{ name: "Same", topics: ["a"] }, { name: "same", topics: ["b"] }], criteria: ["a"] },
+      { title: "x", focusTopics: focus(1), criteria: [] },
+      { title: "x", focusTopics: focus(1), criteria: Array.from({ length: 11 }, (_, i) => `c${i}`) },
+      { title: "x", scaleMax: 11, focusTopics: focus(1), criteria: ["b"] },
+      { title: "", focusTopics: focus(1), criteria: ["b"] },
+    ];
+    for (const body of bad) expect((await createSession(body)).status, JSON.stringify(body).slice(0, 80)).toBe(400);
   });
 
   it("lists sessions newest first with counts", async () => {
@@ -110,10 +123,10 @@ describe("POST /api/admin/sessions", () => {
     const b = await demo(["A", "B", "C"], ["X", "Y"]);
     await vote({ code: b.code, topicId: b.info.topics[0].id, criterionId: b.info.criteria[0].id, voterId: voter(), score: 3 });
     const body = (await (await adminSessions.GET(new Request(url("/x"), admin()))).json()) as {
-      sessions: { code: string; topicCount: number; criterionCount: number; voterCount: number; totalVotes: number }[];
+      sessions: { code: string; focusCount: number; topicCount: number; criterionCount: number; voterCount: number; totalVotes: number }[];
     };
     expect(body.sessions.map((s) => s.code)).toEqual([b.code, a.code]);
-    expect(body.sessions[0]).toMatchObject({ topicCount: 3, criterionCount: 2, voterCount: 1, totalVotes: 1 });
+    expect(body.sessions[0]).toMatchObject({ focusCount: 1, topicCount: 3, criterionCount: 2, voterCount: 1, totalVotes: 1 });
     expect(body.sessions[1]).toMatchObject({ voterCount: 0, totalVotes: 0 });
     const age = Date.now() - Date.parse((body.sessions[0] as unknown as { createdAt: string }).createdAt);
     expect(age).toBeGreaterThanOrEqual(0);
@@ -321,13 +334,13 @@ describe("admin actions", () => {
     expect([...buf.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // UTF-8 BOM
     const lines = new TextDecoder().decode(buf.slice(3)).trim().split("\r\n");
     expect(lines).toEqual([
-      "Topic,Criterion,Average,Votes",
-      "A,Impact,4.50,2",
-      "A,Feasibility,2.00,1",
-      "A,Overall,3.67,3",
-      "B,Impact,1.00,1",
-      "B,Feasibility,,0",
-      "B,Overall,1.00,1",
+      "Focus topic,Topic,Criterion,Average,Votes",
+      "Focus,A,Impact,4.50,2",
+      "Focus,A,Feasibility,2.00,1",
+      "Focus,A,Overall,3.67,3",
+      "Focus,B,Impact,1.00,1",
+      "Focus,B,Feasibility,,0",
+      "Focus,B,Overall,1.00,1",
     ]);
   });
 
@@ -335,14 +348,14 @@ describe("admin actions", () => {
     const { code } = await seeded();
     const text = await (await exportRoute.GET(new Request(url("/x?type=raw"), admin()), ctx(code))).text();
     const rows = text.replace(/^﻿/, "").trim().split("\r\n").map((l) => l.split(","));
-    expect(rows[0]).toEqual(["Respondent", "Topic", "Criterion", "Score", "UpdatedAt"]);
-    expect(rows.slice(1).map((r) => r.slice(0, 4))).toEqual([
-      ["R1", "A", "Impact", "4"],
-      ["R1", "A", "Feasibility", "2"],
-      ["R2", "A", "Impact", "5"],
-      ["R2", "B", "Impact", "1"],
+    expect(rows[0]).toEqual(["Respondent", "Focus topic", "Topic", "Criterion", "Score", "UpdatedAt"]);
+    expect(rows.slice(1).map((r) => r.slice(0, 5))).toEqual([
+      ["R1", "Focus", "A", "Impact", "4"],
+      ["R1", "Focus", "A", "Feasibility", "2"],
+      ["R2", "Focus", "A", "Impact", "5"],
+      ["R2", "Focus", "B", "Impact", "1"],
     ]);
-    for (const r of rows.slice(1)) expect(Math.abs(Date.now() - Date.parse(r[4]))).toBeLessThan(60_000);
+    for (const r of rows.slice(1)) expect(Math.abs(Date.now() - Date.parse(r[5]))).toBeLessThan(60_000);
   });
 
   it("rejects an unknown export type", async () => {

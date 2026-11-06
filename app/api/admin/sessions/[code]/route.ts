@@ -1,21 +1,20 @@
-import { isAdmin, unauthorized } from "@/lib/admin-auth";
 import { deleteSession, setSessionOpen } from "@/lib/queries";
-import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
-import { codeSchema, patchSessionSchema } from "@/lib/validation";
+import { badRequest, json, logDbError, readJson, unavailable } from "@/lib/http";
+import { requireOwnedSession } from "@/lib/owned";
+import { patchSessionSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = RouteContext<"/api/admin/sessions/[code]">;
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  if (!isAdmin(req)) return unauthorized();
-  const code = codeSchema.safeParse((await ctx.params).code);
-  const body = patchSessionSchema.safeParse(await readJson(req));
-  if (!code.success) return notFound();
-  if (!body.success) return badRequest();
   try {
-    const found = await setSessionOpen(code.data, body.data.isOpen);
-    return found ? json({ ok: true, isOpen: body.data.isOpen }) : notFound();
+    const s = await requireOwnedSession(req, (await ctx.params).code);
+    if (s instanceof Response) return s;
+    const body = patchSessionSchema.safeParse(await readJson(req));
+    if (!body.success) return badRequest();
+    await setSessionOpen(s.code, body.data.isOpen);
+    return json({ ok: true, isOpen: body.data.isOpen });
   } catch (err) {
     logDbError("admin:patch", err);
     return unavailable();
@@ -23,11 +22,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {
-  if (!isAdmin(req)) return unauthorized();
-  const code = codeSchema.safeParse((await ctx.params).code);
-  if (!code.success) return notFound();
   try {
-    await deleteSession(code.data);
+    const s = await requireOwnedSession(req, (await ctx.params).code);
+    if (s instanceof Response) return s;
+    await deleteSession(s.code);
     return json({ ok: true });
   } catch (err) {
     logDbError("admin:delete", err);

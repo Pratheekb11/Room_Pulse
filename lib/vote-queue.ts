@@ -10,17 +10,25 @@ const DEBOUNCE_MS = 300;
 const RETRY_BASE_MS = 3000;
 const RETRY_MAX_MS = 15000;
 
-export interface VoteQueueOptions {
+export interface VoteQueueOptions<T> {
   code: string;
   voterId: string;
-  initialPending: Record<string, number>;
+  initialPending: Record<string, T>;
+  /** Defaults to /api/vote with key "topicId:criterionId" and a numeric score. */
+  endpoint?: string;
+  toBody?: (key: string, value: T) => Record<string, unknown>;
   onStatus: (key: string, status: SaveStatus) => void;
   onClosed: () => void;
-  persistPending: (pending: Record<string, number>) => void;
+  persistPending: (pending: Record<string, T>) => void;
 }
 
-export class VoteQueue {
-  private pending: Map<string, number>;
+const ratingBody = (key: string, score: unknown) => {
+  const [topicId, criterionId] = key.split(":");
+  return { topicId, criterionId, score };
+};
+
+export class VoteQueue<T = number> {
+  private pending: Map<string, T>;
   private inflight = new Set<string>();
   private debounces = new Map<string, Timer>();
   private retryTimer: Timer | null = null;
@@ -28,7 +36,7 @@ export class VoteQueue {
   private running = false;
   private paused = false;
 
-  constructor(private readonly o: VoteQueueOptions) {
+  constructor(private readonly o: VoteQueueOptions<T>) {
     this.pending = new Map(Object.entries(o.initialPending));
   }
 
@@ -54,7 +62,7 @@ export class VoteQueue {
   }
 
   /** Record a tap. Saves after a short debounce. */
-  set(key: string, score: number): void {
+  set(key: string, score: T): void {
     this.pending.set(key, score);
     this.persist();
     this.o.onStatus(key, this.paused ? "closed" : "saving");
@@ -104,13 +112,13 @@ export class VoteQueue {
     }
   }
 
-  private async post(key: string, score: number): Promise<Outcome> {
-    const [topicId, criterionId] = key.split(":");
+  private async post(key: string, value: T): Promise<Outcome> {
+    const extra = (this.o.toBody ?? ratingBody)(key, value);
     try {
-      const res = await fetch("/api/vote", {
+      const res = await fetch(this.o.endpoint ?? "/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: this.o.code, topicId, criterionId, voterId: this.o.voterId, score }),
+        body: JSON.stringify({ code: this.o.code, voterId: this.o.voterId, ...extra }),
         cache: "no-store",
         signal: AbortSignal.timeout(12000),
       });

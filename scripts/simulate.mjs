@@ -36,12 +36,18 @@ export async function simulate(opts) {
     log = console.log,
   } = opts;
   const base = baseUrl.replace(/\/+$/, "");
-  const stats = { requests: 0, failures: 0, retries: 0, changed: 0, elapsedMs: 0 };
+  const stats = { requests: 0, failures: 0, retries: 0, changed: 0, pollsSent: 0, wordsSent: 0, elapsedMs: 0 };
   const started = Date.now();
 
   const res = await doFetch(`${base}/api/session/${encodeURIComponent(code)}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Could not load session ${code}: HTTP ${res.status}`);
-  const { session, topics, criteria } = await res.json();
+  const { session, topics: allTopics, criteria, focusTopics = [] } = await res.json();
+  const kindOf = new Map(focusTopics.map((f) => [f.id, f.kind ?? "rating"]));
+  // Rating topics get scores; polls get one choice; word clouds get 1–3 words.
+  const topics = allTopics.filter((t) => !t.focusId || kindOf.get(t.focusId) === "rating");
+  const polls = focusTopics.filter((f) => f.kind === "poll").map((f) => ({ ...f, options: allTopics.filter((t) => t.focusId === f.id) }));
+  const clouds = focusTopics.filter((f) => f.kind === "words");
+  const WORDS = ["speed", "trust", "focus", "growth", "customers", "quality", "simplicity", "bold", "ai", "teamwork"];
   const max = session.scaleMax;
   if (!session.isOpen) throw new Error("Session is closed: reopen voting in /admin first.");
 
@@ -50,13 +56,13 @@ export async function simulate(opts) {
   const critBias = new Map(criteria.map((c) => [c.id, rand(-0.6, 0.6)]));
   const scoreFor = (t, c) => Math.round(clamp(topicMean.get(t.id) + critBias.get(c.id) + noise(), 1, max));
 
-  async function post(body) {
+  async function post(body, path = "/api/vote") {
     let delay = retryBaseMs;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       stats.requests++;
       let status = 0;
       try {
-        const r = await doFetch(`${base}/api/vote`, {
+        const r = await doFetch(`${base}${path}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -85,7 +91,19 @@ export async function simulate(opts) {
         await sleep(rand(minDelayMs, maxDelayMs));
       }
     }
-    if (Math.random() < 0.2 || stats.changed === 0) {
+    for (const p of polls) {
+      // Earlier options are a bit more popular, so the chart isn't flat.
+      const i = Math.min(p.options.length - 1, Math.floor(Math.random() ** 1.6 * p.options.length));
+      if (await post({ code, voterId, kind: "poll", focusId: p.id, topicId: p.options[i].id }, "/api/answer")) stats.pollsSent++;
+      await sleep(rand(minDelayMs, maxDelayMs));
+    }
+    for (const c of clouds) {
+      const n = 1 + Math.floor(Math.random() * 3);
+      const picks = [...new Set(Array.from({ length: n }, () => WORDS[Math.floor(Math.random() ** 1.8 * WORDS.length)]))];
+      if (await post({ code, voterId, kind: "words", focusId: c.id, words: picks }, "/api/answer")) stats.wordsSent += picks.length;
+      await sleep(rand(minDelayMs, maxDelayMs));
+    }
+    if (topics.length && criteria.length && (Math.random() < 0.2 || stats.changed === 0)) {
       // ~20% change one rating (and at least one voter always does, to exercise updates).
       stats.changed++;
       const t = topics[Math.floor(Math.random() * topics.length)];
@@ -124,6 +142,7 @@ async function main() {
   console.log(`  Failures: ${s.failures}`);
   console.log(`  Retries:  ${s.retries}`);
   console.log(`  Changed:  ${s.changed} voters changed a rating`);
+  console.log(`  Polls:    ${s.pollsSent} poll answers, ${s.wordsSent} words`);
   console.log(`  Elapsed:  ${(s.elapsedMs / 1000).toFixed(1)} s`);
   if (s.failures > 0) process.exitCode = 1;
 }

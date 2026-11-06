@@ -14,9 +14,21 @@ export interface NamedItem {
   name: string;
 }
 
+export type QuestionKind = "rating" | "poll" | "words";
+
+export interface FocusItem extends NamedItem {
+  kind: QuestionKind;
+}
+
+export interface TopicItem extends NamedItem {
+  /** null only for sessions created before focus topics existed */
+  focusId: string | null;
+}
+
 export interface SessionPayload {
   session: SessionInfo;
-  topics: NamedItem[];
+  focusTopics: FocusItem[];
+  topics: TopicItem[];
   criteria: NamedItem[];
 }
 
@@ -35,11 +47,25 @@ export interface ScoreBucket {
   n: number;
 }
 
+export interface PollCount {
+  focusId: string;
+  topicId: string;
+  n: number;
+}
+
+export interface WordCount {
+  focusId: string;
+  word: string;
+  n: number;
+}
+
 export interface ResultsPayload {
   isOpen: boolean;
   voterCount: number;
   cells: ResultCell[];
   dist: ScoreBucket[];
+  polls: PollCount[];
+  words: WordCount[];
 }
 
 export interface AdminSessionRow {
@@ -47,6 +73,7 @@ export interface AdminSessionRow {
   title: string;
   isOpen: boolean;
   createdAt: string;
+  focusCount: number;
   topicCount: number;
   criterionCount: number;
   voterCount: number;

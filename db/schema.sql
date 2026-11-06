@@ -1,6 +1,30 @@
 -- LiveRate schema (run once)
 create extension if not exists pgcrypto;
 
+-- Presenter accounts. Passwords are stored only as salted scrypt hashes.
+create table if not exists users (
+  id             uuid primary key default gen_random_uuid(),
+  email          text not null unique check (email = lower(email) and length(email) between 3 and 254),
+  password_hash  text not null check (password_hash like 'scrypt$%'),
+  created_at     timestamptz not null default now()
+);
+
+-- Signed-in browser sessions. Only a SHA-256 hash of the cookie token is stored.
+create table if not exists auth_sessions (
+  token_hash  text primary key,
+  user_id     uuid not null references users(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null
+);
+create index if not exists auth_sessions_user_idx on auth_sessions(user_id);
+
+-- Failed logins per email, for temporary lockout. No IP addresses are stored.
+create table if not exists login_failures (
+  email  text not null,
+  at     timestamptz not null default now()
+);
+create index if not exists login_failures_email_idx on login_failures(email, at);
+
 create table if not exists sessions (
   id          uuid primary key default gen_random_uuid(),
   code        text not null unique,              -- short public code used in URLs
@@ -26,6 +50,49 @@ create table if not exists criteria (
   position    int  not null
 );
 
+-- Focus topics group the topics of a presentation (up to 10 per presentation).
+create table if not exists focus_topics (
+  id          uuid primary key default gen_random_uuid(),
+  session_id  uuid not null references sessions(id) on delete cascade,
+  name        text not null,
+  position    int  not null
+);
+create index if not exists focus_topics_session_idx on focus_topics(session_id, position);
+
+-- null = topic created before focus topics existed
+alter table topics add column if not exists focus_id uuid references focus_topics(id) on delete cascade;
+
+-- Question type of each focus topic:
+--   rating = topics rated on every criterion, poll = pick one topic (option), words = word cloud
+alter table focus_topics add column if not exists kind text not null default 'rating';
+do $$ begin
+  alter table focus_topics add constraint focus_topics_kind_check check (kind in ('rating', 'poll', 'words'));
+exception when duplicate_object then null; end $$;
+
+-- One poll choice per voter per poll
+create table if not exists poll_answers (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  topic_id    uuid not null references topics(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  primary key (focus_id, voter_id)
+);
+create index if not exists poll_answers_session_idx on poll_answers(session_id, voter_id);
+
+-- Up to 3 words per voter per word cloud (stored lower-case)
+create table if not exists word_answers (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  slot        int  not null check (slot between 1 and 3),
+  word        text not null check (length(word) between 1 and 40),
+  created_at  timestamptz not null default now(),
+  primary key (focus_id, voter_id, slot)
+);
+create index if not exists word_answers_session_idx on word_answers(session_id, voter_id);
+
 -- One row per voter per topic x criterion
 create table if not exists votes (
   session_id    uuid not null references sessions(id) on delete cascade,
@@ -47,6 +114,10 @@ create table if not exists results (
   score_sum     int  not null default 0,
   primary key (session_id, topic_id, criterion_id)
 );
+
+-- Each session belongs to the account that created it (null = created before accounts existed).
+alter table sessions add column if not exists owner_id uuid references users(id) on delete cascade;
+create index if not exists sessions_owner_idx on sessions(owner_id, created_at desc);
 
 create index if not exists topics_session_idx      on topics(session_id, position);
 create index if not exists criteria_session_idx    on criteria(session_id, position);

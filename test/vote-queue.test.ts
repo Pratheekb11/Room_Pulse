@@ -182,3 +182,38 @@ describe("VoteQueue", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("VoteQueue with a custom endpoint (polls and word clouds)", () => {
+  it("posts the body built for each value to the given endpoint, latest value wins", async () => {
+    const seen: { url: string; body: unknown }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: { body: string }) => {
+        seen.push({ url, body: JSON.parse(init.body) });
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const statuses: Record<string, SaveStatus> = {};
+    const q = new VoteQueue<string[]>({
+      code: "abc234",
+      voterId: "00000000-0000-4000-8000-000000000000",
+      initialPending: {},
+      endpoint: "/api/answer",
+      toBody: (key, words) => ({ kind: "words", focusId: key, words }),
+      onStatus: (k, s) => (statuses[k] = s),
+      onClosed: () => {},
+      persistPending: () => {},
+    });
+    q.start();
+    q.set("f1", ["a"]);
+    q.set("f1", ["a", "b"]);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(seen).toEqual([
+      {
+        url: "/api/answer",
+        body: { code: "abc234", voterId: "00000000-0000-4000-8000-000000000000", kind: "words", focusId: "f1", words: ["a", "b"] },
+      },
+    ]);
+    expect(statuses.f1).toBe("saved");
+  });
+});

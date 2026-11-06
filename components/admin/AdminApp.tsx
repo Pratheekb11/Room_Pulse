@@ -3,102 +3,61 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdminSessionRow } from "@/lib/types";
 import { Logo } from "../Logo";
-import { Shapes } from "../Shapes";
-import { useClientValue } from "../useClientValue";
-import { adminFetch, readAdminKey, UnauthorizedError, writeAdminKey } from "./api";
+import { LoadingScreen } from "../StatusScreens";
+import { apiFetch, UnauthorizedError } from "./api";
+import { AuthScreen } from "./AuthScreen";
 import { NewSessionForm } from "./NewSessionForm";
 import { SessionCard } from "./SessionCard";
 
-export function AdminApp() {
-  // undefined = not read from sessionStorage yet (avoids a hydration mismatch)
-  const stored = useClientValue(readAdminKey);
-  const [override, setKey] = useState<string | null | undefined>(undefined);
-  const key = override !== undefined ? override : stored;
+type Auth = { kind: "checking" } | { kind: "signed_out" } | { kind: "signed_in"; email: string };
 
-  const logout = useCallback(() => {
-    writeAdminKey(null);
-    setKey(null);
+export function AdminApp() {
+  const [auth, setAuth] = useState<Auth>({ kind: "checking" });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.ok) setAuth({ kind: "signed_in", email: ((await res.json()) as { user: { email: string } }).user.email });
+        else setAuth({ kind: "signed_out" });
+      })
+      .catch(() => !cancelled && setAuth({ kind: "signed_out" }));
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (key === undefined) return null;
-  if (!key)
-    return (
-      <PasswordScreen
-        onUnlock={(k) => {
-          writeAdminKey(k);
-          setKey(k);
-        }}
-      />
-    );
-  return <Console adminKey={key} onLogout={logout} />;
-}
-
-function PasswordScreen({ onUnlock }: { onUnlock: (key: string) => void }) {
-  const [value, setValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!value) return;
-    setBusy(true);
-    setError(null);
+  const signOut = useCallback(async () => {
     try {
-      await adminFetch(value, "/api/admin/sessions");
-      onUnlock(value);
-    } catch (err) {
-      setError(err instanceof UnauthorizedError ? "That password didn't work." : (err as Error).message);
-    } finally {
-      setBusy(false);
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* the cookie is cleared server-side when reachable; show the sign-in screen regardless */
     }
-  }
+    setAuth({ kind: "signed_out" });
+  }, []);
 
-  return (
-    <main className="relative isolate flex min-h-dvh flex-col overflow-hidden px-5 py-5">
-      <Shapes variant="quiet" />
-      <Logo />
-      <form onSubmit={submit} className="slab mx-auto my-auto w-full max-w-sm rounded-[24px] bg-white p-7">
-        <h1 className="font-display text-3xl font-extrabold">Presenter console</h1>
-        <label htmlFor="pw" className="mt-5 block font-semibold">
-          Admin password
-        </label>
-        <input
-          id="pw"
-          type="password"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          autoComplete="current-password"
-          className="mt-1 w-full rounded-xl border-2 border-ink px-3 py-2.5 text-lg"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? "pw-error" : undefined}
-        />
-        {error && (
-          <p id="pw-error" role="alert" className="mt-2 text-sm font-semibold text-[#c2193f]">
-            {error}
-          </p>
-        )}
-        <button type="submit" disabled={busy || !value} className="key mt-5 w-full rounded-xl bg-violet py-3 text-lg font-bold text-white">
-          {busy ? "Checking…" : "Unlock"}
-        </button>
-      </form>
-    </main>
-  );
+  const expired = useCallback(() => setAuth({ kind: "signed_out" }), []);
+
+  if (auth.kind === "checking") return <LoadingScreen label="Checking your sign-in" />;
+  if (auth.kind === "signed_out") return <AuthScreen onSignedIn={(email) => setAuth({ kind: "signed_in", email })} />;
+  return <Console email={auth.email} onSignOut={signOut} onExpired={expired} />;
 }
 
-function Console({ adminKey, onLogout }: { adminKey: string; onLogout: () => void }) {
+function Console({ email, onSignOut, onExpired }: { email: string; onSignOut: () => void; onExpired: () => void }) {
   const [sessions, setSessions] = useState<AdminSessionRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const call = useCallback(
     async (path: string, init?: RequestInit) => {
       try {
-        return await adminFetch(adminKey, path, init);
+        return await apiFetch(path, init);
       } catch (err) {
-        if (err instanceof UnauthorizedError) onLogout();
+        if (err instanceof UnauthorizedError) onExpired();
         throw err;
       }
     },
-    [adminKey, onLogout],
+    [onExpired],
   );
 
   const refresh = useCallback(async () => {
@@ -121,21 +80,24 @@ function Console({ adminKey, onLogout }: { adminKey: string; onLogout: () => voi
   }, [refresh]);
 
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-20 pt-5">
-      <header className="flex items-center justify-between gap-4">
+    <div className="mx-auto max-w-7xl px-5 pb-20 pt-5">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <Logo />
-        <button type="button" onClick={onLogout} className="rounded-full border-2 border-ink bg-white px-4 py-1.5 text-sm font-bold">
-          Lock
-        </button>
+        <div className="flex items-center gap-3 text-sm">
+          <span className="hidden font-semibold text-ink-soft sm:inline">{email}</span>
+          <button type="button" onClick={onSignOut} className="rounded-full border-2 border-ink bg-white px-4 py-1.5 font-bold">
+            Log out
+          </button>
+        </div>
       </header>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
         <NewSessionForm call={call} onCreated={refresh} />
 
         <section aria-labelledby="sessions-h">
           <div className="flex items-baseline justify-between">
             <h2 id="sessions-h" className="font-display text-3xl font-extrabold">
-              Your sessions
+              Your presentations
             </h2>
             <button type="button" onClick={() => void refresh()} className="text-sm font-bold underline underline-offset-4">
               Refresh
@@ -146,10 +108,10 @@ function Console({ adminKey, onLogout }: { adminKey: string; onLogout: () => voi
               {error}
             </p>
           )}
-          {sessions === null && !error && <p className="mt-4 text-ink-soft">Loading sessions…</p>}
+          {sessions === null && !error && <p className="mt-4 text-ink-soft">Loading…</p>}
           {sessions?.length === 0 && (
             <p className="mt-4 rounded-2xl border-2 border-dashed border-ink/30 p-6 text-ink-soft">
-              No sessions yet. Create one with the form and it shows up here with its links and QR code.
+              Nothing here yet. Build a presentation with the form; it appears here with its links and QR code.
             </p>
           )}
           <div className="mt-4 flex flex-col gap-6">

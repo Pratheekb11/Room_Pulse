@@ -33,6 +33,11 @@ interface Props {
   onRate: (score: number) => void;
 }
 
+const FACES = ["😖", "🙁", "😐", "🙂", "🤩"];
+/** Emoji for a score, spread across the scale (only shown on scales up to 7). */
+export const faceFor = (score: number, scaleMax: number) =>
+  FACES[Math.round(((score - 1) / Math.max(1, scaleMax - 1)) * (FACES.length - 1))];
+
 export function RatingRow(p: Props) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const scores = Array.from({ length: p.scaleMax }, (_, i) => i + 1);
@@ -40,6 +45,7 @@ export function RatingRow(p: Props) {
   const fg = readableOn(p.color);
   const labelId = `${p.topicName}-${p.criterionName}`.replace(/\W+/g, "-");
   const focusIndex = p.value ? p.value - 1 : 0;
+  const faces = p.scaleMax <= 7;
 
   function onKeyDown(e: React.KeyboardEvent, index: number) {
     let next = index;
@@ -86,12 +92,19 @@ export function RatingRow(p: Props) {
               disabled={p.disabled}
               onClick={() => p.onRate(score)}
               onKeyDown={(e) => onKeyDown(e, i)}
-              className={`key font-display flex h-12 min-h-11 min-w-11 items-center justify-center rounded-xl text-xl font-bold ${
-                selected ? "animate-pop translate-y-[3px] shadow-[var(--shadow-key-down)]" : "bg-white"
-              } ${p.value && !selected ? "text-ink/55" : ""}`}
+              className={`key font-display flex min-h-11 min-w-11 flex-col items-center justify-center rounded-2xl font-bold ${
+                faces ? "h-[4.25rem] gap-0.5" : "h-12 text-xl"
+              } ${selected ? "animate-pop translate-y-[3px] shadow-[var(--shadow-key-down)]" : "bg-white"} ${
+                p.value && !selected ? "opacity-60" : ""
+              }`}
               style={selected ? { backgroundColor: p.color, color: fg } : undefined}
             >
-              {score}
+              {faces && (
+                <span aria-hidden className={`text-[1.7rem] leading-none ${selected ? "" : "grayscale-[35%]"}`}>
+                  {faceFor(score, p.scaleMax)}
+                </span>
+              )}
+              <span className={faces ? "text-sm leading-none" : ""}>{score}</span>
             </button>
           );
         })}

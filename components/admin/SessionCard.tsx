@@ -124,7 +124,7 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
             {s.title}
           </h3>
           <p className="mt-1 text-sm text-ink-soft">
-            Code <span className="font-bold text-ink">{s.code}</span>, created {created}. {s.topicCount} topics ×{" "}
+            Code <span className="font-bold text-ink">{s.code}</span>, created {created}. {s.focusCount} focus {s.focusCount === 1 ? "topic" : "topics"}, {s.topicCount} topics ×{" "}
             {s.criterionCount} criteria.
           </p>
         </div>

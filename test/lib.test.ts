@@ -88,7 +88,7 @@ describe("validation", () => {
   });
 
   it("applies defaults", () => {
-    const r = createSessionSchema.parse({ title: "t", topics: ["a"], criteria: ["b"] });
+    const r = createSessionSchema.parse({ title: "t", focusTopics: [{ name: "f", topics: ["a"] }], criteria: ["b"] });
     expect(r).toMatchObject({ scaleMax: 5, lowLabel: "Low", highLabel: "High" });
   });
 });

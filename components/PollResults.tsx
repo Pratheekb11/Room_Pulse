@@ -1,0 +1,92 @@
+import { readableOn, topicColor } from "@/lib/colors";
+import type { PollTally } from "@/lib/answers";
+
+const LETTERS = "ABCDEFGHIJ";
+
+export function PollBars({ tally }: { tally: PollTally }) {
+  return (
+    <ol className="flex flex-col gap-[clamp(0.6rem,1.6vh,1.2rem)]" aria-label="Poll results">
+      {tally.rows.map((r) => {
+        const c = topicColor(r.index);
+        const lead = tally.leader?.id === r.id;
+        return (
+          <li key={r.id} className="flex items-center gap-3">
+            <span
+              className="font-display flex h-[clamp(2.4rem,4.6vh,3.4rem)] w-[clamp(2.4rem,4.6vh,3.4rem)] shrink-0 items-center justify-center rounded-xl border-2 border-ink text-[clamp(1.1rem,1.5vw,1.7rem)] font-extrabold"
+              style={{ backgroundColor: c, color: readableOn(c) }}
+              aria-hidden
+            >
+              {LETTERS[r.index]}
+            </span>
+            <span className="w-[26%] shrink-0 text-[clamp(1.05rem,1.5vw,1.8rem)] font-bold leading-tight break-words">
+              {r.name} {lead && <span aria-label="leading">👑</span>}
+            </span>
+            <span className="relative h-[clamp(2.4rem,5vh,3.8rem)] flex-1 overflow-hidden rounded-full border-2 border-ink bg-white">
+              <span
+                className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
+                style={{ width: `${r.pct}%`, backgroundColor: c }}
+              />
+            </span>
+            <span className="font-display w-[4ch] shrink-0 text-right text-[clamp(1.4rem,2.2vw,2.6rem)] font-extrabold tabular-nums">
+              {r.pct}%
+            </span>
+            <span className="w-[8ch] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold whitespace-nowrap text-ink-soft">
+              {r.n} {r.n === 1 ? "vote" : "votes"}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function PollPie({ tally }: { tally: PollTally }) {
+  const R = 40;
+  let offset = 0;
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-[clamp(1rem,4vw,5rem)]">
+      <div className="relative aspect-square w-[clamp(16rem,32vw,34rem)]">
+        <svg viewBox="0 0 100 100" className="h-full w-full" role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
+          <circle cx="50" cy="50" r={R} fill="none" stroke="#ebe7fb" strokeWidth="20" />
+          {tally.total > 0 &&
+            tally.rows.map((r) => {
+              if (r.n === 0) return null;
+              const pct = (r.n / tally.total) * 100;
+              const seg = Math.max(0, pct - (tally.rows.filter((x) => x.n > 0).length > 1 ? 0.6 : 0));
+              const el = (
+                <circle
+                  key={r.id}
+                  cx="50"
+                  cy="50"
+                  r={R}
+                  fill="none"
+                  pathLength={100}
+                  stroke={topicColor(r.index)}
+                  strokeWidth="20"
+                  strokeDasharray={`${seg} ${100 - seg}`}
+                  strokeDashoffset={-offset}
+                  transform="rotate(-90 50 50)"
+                  className="transition-[stroke-dasharray,stroke-dashoffset] duration-700 ease-out"
+                />
+              );
+              offset += pct;
+              return el;
+            })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="font-display text-[clamp(2rem,3.4vw,3.8rem)] font-extrabold leading-none">{tally.total}</span>
+          <span className="text-[clamp(0.85rem,1vw,1.15rem)] font-semibold text-ink-soft">votes</span>
+        </div>
+      </div>
+      <ul className="flex flex-col gap-3">
+        {tally.rows.map((r) => (
+          <li key={r.id} className="flex items-center gap-3 text-[clamp(1rem,1.4vw,1.6rem)] font-bold">
+            <span aria-hidden className="h-6 w-6 shrink-0 rounded-md border-2 border-ink" style={{ backgroundColor: topicColor(r.index) }} />
+            <span className="max-w-[18ch] break-words">{r.name}</span>
+            <span className="font-display ml-auto pl-6 font-extrabold tabular-nums">{r.pct}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

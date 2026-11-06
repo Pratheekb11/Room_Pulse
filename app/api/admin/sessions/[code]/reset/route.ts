@@ -1,16 +1,14 @@
-import { isAdmin, unauthorized } from "@/lib/admin-auth";
 import { resetSession } from "@/lib/queries";
-import { json, logDbError, notFound, unavailable } from "@/lib/http";
-import { codeSchema } from "@/lib/validation";
+import { json, logDbError, unavailable } from "@/lib/http";
+import { requireOwnedSession } from "@/lib/owned";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request, ctx: RouteContext<"/api/admin/sessions/[code]/reset">) {
-  if (!isAdmin(req)) return unauthorized();
-  const code = codeSchema.safeParse((await ctx.params).code);
-  if (!code.success) return notFound();
   try {
-    await resetSession(code.data);
+    const s = await requireOwnedSession(req, (await ctx.params).code);
+    if (s instanceof Response) return s;
+    await resetSession(s.code);
     return json({ ok: true });
   } catch (err) {
     logDbError("admin:reset", err);

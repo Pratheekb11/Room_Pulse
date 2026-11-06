@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import type { PGlite } from "@electric-sql/pglite";
 import { beforeAll, describe, expect, it } from "vitest";
 import { startTestDb } from "./neon-pglite";
+import { ORIGIN, signUp } from "./auth-helpers";
 import * as sessionRoute from "@/app/api/session/[code]/route";
 import * as voteRoute from "@/app/api/vote/route";
+import * as answerRoute from "@/app/api/answer/route";
 import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as adminSessions from "@/app/api/admin/sessions/route";
 import type { ResultsPayload } from "@/lib/types";
@@ -20,9 +22,9 @@ function inProcessFetch() {
     const req = new Request(u, init);
     const m = u.pathname.match(/^\/api\/session\/([^/]+)$/);
     if (m) return sessionRoute.GET(req, { params: Promise.resolve({ code: m[1] }) });
-    if (u.pathname === "/api/vote") {
+    if (u.pathname === "/api/vote" || u.pathname === "/api/answer") {
       if (++n % 7 === 0) return new Response('{"error":"unavailable"}', { status: 503 });
-      return voteRoute.POST(req);
+      return u.pathname === "/api/vote" ? voteRoute.POST(req) : answerRoute.POST(req);
     }
     return new Response("not found", { status: 404 });
   };
@@ -30,16 +32,20 @@ function inProcessFetch() {
 
 beforeAll(async () => {
   db = await startTestDb();
-  process.env.ADMIN_PASSWORD = "pw";
 });
 
 describe("scripts/simulate.mjs", () => {
   it("rates every cell for every fake voter, retries 503s, and totals stay exact", async () => {
     const res = await adminSessions.POST(
-      new Request("http://x/api/admin/sessions", {
+      new Request(`${ORIGIN}/api/admin/sessions`, {
         method: "POST",
-        headers: { "x-admin-key": "pw", "content-type": "application/json" },
-        body: JSON.stringify({ title: "Sim", topics: ["A", "B", "C"], criteria: ["X", "Y"] }),
+        headers: { cookie: (await signUp("sim@example.com")).cookie!, origin: ORIGIN, "content-type": "application/json" },
+        body: JSON.stringify({ title: "Sim", focusTopics: [
+          { name: "One", topics: ["A", "B"] },
+          { name: "Two", topics: ["C"] },
+          { name: "Lunch?", kind: "poll", topics: ["Pizza", "Sushi"] },
+          { name: "One word", kind: "words" },
+        ], criteria: ["X", "Y"] }),
       }),
     );
     const { code } = (await res.json()) as { code: string };
@@ -69,5 +75,10 @@ describe("scripts/simulate.mjs", () => {
     expect(results.cells).toHaveLength(6);
     for (const c of results.cells) expect(c.n).toBe(12);
     expect((await db.query(CHECK_SQL)).rows).toEqual([]);
+
+    // Every poll and word answer arrived: one poll choice per voter, all words counted.
+    expect(results.polls.reduce((t, p) => t + p.n, 0)).toBe(12);
+    expect(results.words.reduce((t, w) => t + w.n, 0)).toBe(summary.wordsSent);
+    expect(summary.wordsSent).toBeGreaterThanOrEqual(12);
   });
 });
