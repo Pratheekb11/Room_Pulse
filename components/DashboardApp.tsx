@@ -89,6 +89,17 @@ function Stage({
   const view = group
     ? (viewByFocus[group.focus.id] ?? (urlView && isChartFor(group.kind, urlView) ? urlView : group.chart))
     : "";
+  // Keep the place in the URL so a refresh comes back to the same focus topic and chart.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (focusIndex === null || single) params.delete("focus");
+    else params.set("focus", String(focusIndex + 1));
+    if (view) params.set("view", view);
+    else params.delete("view");
+    const qs = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }, [focusIndex, view, single]);
+
   const groupId = group?.focus.id;
   const groupKind = group?.kind;
   const setView = useCallback(

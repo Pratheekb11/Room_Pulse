@@ -4,6 +4,10 @@ import "server-only";
 export const GUEST_PRESENTATION_LIMIT = 3;
 /** Guest sign-ins and guest presentations last this long. */
 export const GUEST_DAYS = 3;
+/** A guest sign-in (cookie) lasts at most this long server-side; it also ends when the browser closes. */
+export const GUEST_SESSION_HOURS = 12;
+/** Wrong PINs allowed per guest per hour before PIN sign-in is locked. */
+export const GUEST_PIN_ATTEMPTS_PER_HOUR = 5;
 /** New guest accounts allowed per hour across the whole site (abuse brake; no IPs are stored). */
 export const GUEST_ACCOUNTS_PER_HOUR = 200;
 

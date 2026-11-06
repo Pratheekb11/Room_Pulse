@@ -403,11 +403,11 @@ export async function extendAuthSessions(userId: string, days: number): Promise<
   await sql`update auth_sessions set expires_at = now() + make_interval(days => ${days}) where user_id = ${userId} and expires_at > now()`;
 }
 
-export async function insertAuthSession(tokenHash: string, userId: string, days: number): Promise<void> {
+export async function insertAuthSession(tokenHash: string, userId: string, minutes: number): Promise<void> {
   await sql.transaction([
     sql`delete from auth_sessions where user_id = ${userId} and expires_at < now()`,
     sql`insert into auth_sessions (token_hash, user_id, expires_at)
-        values (${tokenHash}, ${userId}, now() + make_interval(days => ${days}))`,
+        values (${tokenHash}, ${userId}, now() + make_interval(mins => ${minutes}))`,
   ]);
 }
 
@@ -567,10 +567,10 @@ export async function resetPassword(userId: string, email: string, passwordHash:
 // ---------------------------------------------------------------- guests
 
 /** New guest account, or null when the site-wide hourly cap is reached. */
-export async function createGuestUser(maxPerHour: number): Promise<string | null> {
+export async function createGuestUser(maxPerHour: number, pinHash: string): Promise<string | null> {
   const rows = (await sql`
-    insert into users (is_guest)
-    select true
+    insert into users (is_guest, guest_pin_hash)
+    select true, ${pinHash}
      where (select count(*) from users where is_guest and created_at > now() - interval '1 hour') < ${maxPerHour}
     returning id
   `) as { id: string }[];
@@ -584,7 +584,7 @@ export async function upgradeGuest(userId: string, email: string, passwordHash: 
   try {
     // Saving the account also keeps its presentations for good.
     const [rows] = await sql.transaction([
-      sql`update users set email = ${email}, password_hash = ${passwordHash}, is_guest = false
+      sql`update users set email = ${email}, password_hash = ${passwordHash}, is_guest = false, guest_pin_hash = null
            where id = ${userId} and is_guest
           returning 1 as ok`,
       sql`update sessions set expires_at = null
@@ -612,4 +612,14 @@ export async function purgeExpiredGuestData(guestDays: number): Promise<void> {
          where u.is_guest and u.created_at < now() - make_interval(days => ${guestDays})
            and not exists (select 1 from auth_sessions a where a.user_id = u.id)`,
   ]);
+}
+
+/** The guest who owns a live presentation with this code (for PIN sign-in), or null. */
+export async function findGuestByPresentationCode(code: string): Promise<{ id: string; pinHash: string } | null> {
+  const rows = (await sql`
+    select u.id, u.guest_pin_hash
+      from live_sessions s join users u on u.id = s.owner_id
+     where s.code = ${code} and u.is_guest and u.guest_pin_hash is not null
+  `) as { id: string; guest_pin_hash: string }[];
+  return rows[0] ? { id: rows[0].id, pinHash: rows[0].guest_pin_hash } : null;
 }

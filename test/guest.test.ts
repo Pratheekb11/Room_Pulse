@@ -151,11 +151,11 @@ describe("guest 3-day limit", () => {
     return { cookie, code };
   }
 
-  it("guest sign-in lasts 3 days", async () => {
+  it("guest sign-in ends when the browser closes, and after 12 hours at most", async () => {
     const res = await post(guestRoute.POST, "/api/auth/guest", {});
-    expect(res.headers.get("set-cookie")).toMatch(/Max-Age=259200\b/);
-    const row = (await db.query<{ days: number }>("select round(extract(epoch from expires_at - now()) / 86400)::int as days from auth_sessions")).rows;
-    expect(row[0].days).toBe(3);
+    expect(res.headers.get("set-cookie")).not.toMatch(/Max-Age|Expires/i);
+    const row = (await db.query<{ hours: number }>("select round(extract(epoch from expires_at - now()) / 3600)::int as hours from auth_sessions")).rows;
+    expect(row[0].hours).toBe(12);
   });
 
   it("stores votes in real time and shows an expiry date to the owner", async () => {
@@ -216,5 +216,109 @@ describe("guest 3-day limit", () => {
     const ttl = (await db.query<{ days: number }>("select round(extract(epoch from expires_at - now()) / 86400)::int as days from auth_sessions")).rows;
     expect(ttl[0].days).toBe(30);
     expect((await sessionRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).status).toBe(200);
+  });
+});
+
+import * as adminSession from "@/app/api/admin/sessions/[code]/route";
+import * as resetRoute from "@/app/api/admin/sessions/[code]/reset/route";
+import * as exportRoute from "@/app/api/admin/sessions/[code]/export/route";
+
+describe("one guest can't reach another guest's presentations", () => {
+  it("returns 404 for every presenter action on someone else's guest presentation", async () => {
+    const owner = await guest();
+    const other = await guest();
+    const { code } = (await (await create(owner, "Private")).json()) as { code: string };
+    const ctx = { params: Promise.resolve({ code }) };
+    const as = (cookie: string, init: RequestInit = {}) => ({
+      ...init,
+      headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
+    });
+
+    expect(await list(other)).toEqual([]);
+    expect((await adminSession.PATCH(new Request(`${ORIGIN}/x`, as(other, { method: "PATCH", body: '{"isOpen":false}' })), ctx)).status).toBe(404);
+    expect((await resetRoute.POST(new Request(`${ORIGIN}/x`, as(other, { method: "POST" })), ctx)).status).toBe(404);
+    expect((await exportRoute.GET(new Request(`${ORIGIN}/x?type=raw`, as(other)), ctx)).status).toBe(404);
+    expect((await adminSession.DELETE(new Request(`${ORIGIN}/x`, as(other, { method: "DELETE" })), ctx)).status).toBe(404);
+    // A guest can't take over another guest by "saving" with the owner's cookie missing
+    expect((await post(upgradeRoute.POST, "/api/auth/upgrade", { email: "x@example.com", password: "a long passphrase" }, { cookie: other })).status).toBe(200);
+    expect(await list(other)).toEqual([]);
+
+    expect(await list(owner)).toEqual(["Private"]);
+  });
+
+  it("each guest gets a different, unguessable sign-in token", async () => {
+    const a = await guest();
+    const b = await guest();
+    expect(a).not.toEqual(b);
+    expect(decodeURIComponent(a.split("=")[1]).length).toBeGreaterThanOrEqual(43);
+  });
+});
+
+
+import * as guestReturnRoute from "@/app/api/auth/guest-return/route";
+
+describe("guest PIN", () => {
+  async function guestWithPin() {
+    const res = await post(guestRoute.POST, "/api/auth/guest", {});
+    const body = (await res.json()) as { pin: string };
+    const cookie = cookieFrom(res)!;
+    const { code } = (await (await create(cookie, "Mine")).json()) as { code: string };
+    return { pin: body.pin, cookie, code };
+  }
+  const back = (code: string, pin: string) => post(guestReturnRoute.POST, "/api/auth/guest-return", { code, pin });
+
+  it("gives a 6-digit PIN once and stores only a hash", async () => {
+    const { pin } = await guestWithPin();
+    expect(pin).toMatch(/^\d{6}$/);
+    const row = (await db.query<{ guest_pin_hash: string }>("select guest_pin_hash from users")).rows[0];
+    expect(row.guest_pin_hash).toMatch(/^scrypt\$/);
+    expect(row.guest_pin_hash).not.toContain(pin);
+  });
+
+  it("lets the guest back in on another device with a presentation code and the PIN", async () => {
+    const { pin, code } = await guestWithPin();
+    const res = await back(code.toUpperCase(), pin);
+    expect(res.status).toBe(200);
+    expect(await list(cookieFrom(res)!)).toEqual(["Mine"]);
+  });
+
+  it("answers the same for a wrong PIN, an unknown code and a non-guest presentation", async () => {
+    const { pin, code } = await guestWithPin();
+    const member = (await signUp("member@example.com")).cookie!;
+    const { code: memberCode } = (await (await create(member, "Member's")).json()) as { code: string };
+    const wrongPin = await back(code, pin === "000000" ? "111111" : "000000");
+    const unknown = await back("zzzzzz", pin);
+    const notGuest = await back(memberCode, pin);
+    for (const r of [wrongPin, unknown, notGuest]) {
+      expect(r.status).toBe(401);
+      expect(cookieFrom(r)).toBeNull();
+    }
+    const bodies = await Promise.all([wrongPin.json(), unknown.json(), notGuest.json()]);
+    expect(bodies[0]).toEqual(bodies[1]);
+    expect(bodies[1]).toEqual(bodies[2]);
+  });
+
+  it("locks the guest for an hour after 5 wrong PINs", async () => {
+    const { pin, code } = await guestWithPin();
+    const wrong = pin === "000000" ? "111111" : "000000";
+    for (let i = 0; i < 5; i++) expect((await back(code, wrong)).status).toBe(401);
+    expect((await back(code, pin)).status).toBe(429);
+    await db.exec("update login_failures set at = now() - interval '61 minutes'");
+    expect((await back(code, pin)).status).toBe(200);
+  });
+
+  it("stops working once the presentations expire or the account is saved", async () => {
+    const a = await guestWithPin();
+    await db.exec(`update sessions set expires_at = now() - interval '1 second' where code = '${a.code}'`);
+    expect((await back(a.code, a.pin)).status).toBe(401);
+
+    const b = await guestWithPin();
+    await post(upgradeRoute.POST, "/api/auth/upgrade", { email: "b@example.com", password: "a long passphrase" }, { cookie: b.cookie });
+    expect((await back(b.code, b.pin)).status).toBe(401);
+  });
+
+  it("rejects malformed input and other sites", async () => {
+    expect((await post(guestReturnRoute.POST, "/api/auth/guest-return", { code: "abc234", pin: "12ab56" })).status).toBe(401);
+    expect((await post(guestReturnRoute.POST, "/api/auth/guest-return", { code: "abc234", pin: "123456" }, { origin: "https://evil.example" })).status).toBe(403);
   });
 });

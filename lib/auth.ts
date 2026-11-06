@@ -25,8 +25,10 @@ function readToken(req: Request): string | null {
   return null;
 }
 
-function cookie(value: string, maxAge: number): string {
-  const attrs = [`${cookieName()}=${value}`, "Path=/", "HttpOnly", "SameSite=Lax", `Max-Age=${maxAge}`];
+/** maxAge null = browser-session cookie (gone when the browser closes). */
+function cookie(value: string, maxAge: number | null): string {
+  const attrs = [`${cookieName()}=${value}`, "Path=/", "HttpOnly", "SameSite=Lax"];
+  if (maxAge !== null) attrs.push(`Max-Age=${maxAge}`);
   if (secure()) attrs.push("Secure");
   return attrs.join("; ");
 }
@@ -34,8 +36,18 @@ function cookie(value: string, maxAge: number): string {
 /** Starts a signed-in session; returns the Set-Cookie header value. */
 export async function startSession(userId: string, days = SESSION_DAYS): Promise<string> {
   const token = randomBytes(32).toString("base64url"); // 256 bits
-  await insertAuthSession(hashToken(token), userId, days);
+  await insertAuthSession(hashToken(token), userId, days * 24 * 60);
   return cookie(token, days * 24 * 60 * 60);
+}
+
+/**
+ * Guest sign-in: a browser-session cookie (ends when the browser closes, so the
+ * next person on a shared computer starts fresh) that the server also ends after `hours`.
+ */
+export async function startGuestSession(userId: string, hours: number): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  await insertAuthSession(hashToken(token), userId, hours * 60);
+  return cookie(token, null);
 }
 
 /** Extends this user's sessions to `days` and re-issues the current cookie with the new lifetime. */

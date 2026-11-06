@@ -16,6 +16,7 @@ const MESSAGES: Record<string, string> = {
   too_many_attempts: "Too many failed attempts. Wait 15 minutes, then try again.",
   email_taken: "An account with this email already exists. Log in instead.",
   invalid_link: "This link has expired or was already used.",
+  invalid_guest_pin: "That code and PIN don't match a guest account.",
   guest_limit: "Guest accounts can run 3 presentations. Save your account to create more.",
   guest_busy: "Guest mode is busy right now. Try again in a few minutes, or sign up.",
   verify_email: "Verify your email to create presentations.",

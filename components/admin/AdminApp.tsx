@@ -10,6 +10,8 @@ import { NewSessionForm } from "./NewSessionForm";
 import { SessionCard } from "./SessionCard";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { inputClass } from "../auth/AuthShell";
+import { formatPin, readGuestPin, rememberGuestPin } from "./guestPin";
+import { useClientValue } from "../useClientValue";
 
 type Account = { email: string | null; guest: boolean; emailVerified: boolean; verificationRequired: boolean };
 type Auth = { kind: "checking" } | { kind: "signed_out" } | ({ kind: "signed_in" } & Account);
@@ -37,6 +39,7 @@ export function AdminApp() {
   const signOut = useCallback(async () => {
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
+      rememberGuestPin(null);
     } catch {
       /* the cookie is cleared server-side when reachable; show the sign-in screen regardless */
     }
@@ -135,7 +138,7 @@ function Console({
       {confirmLeave && (
         <ConfirmDialog
           title="Log out of the guest account?"
-          body="Guest accounts have no password, so you won't be able to log back in. Your presentations keep running until they expire. Save your account first to keep access."
+          body="To get back in later, you'll need your guest PIN and one of your presentation codes. Your presentations keep running until they expire."
           confirmLabel="Log out anyway"
           danger
           onConfirm={() => {
@@ -229,6 +232,7 @@ function VerifyBanner({ email, onVerified }: { email: string; onVerified: () => 
 
 /** Guest accounts: explains the 3-day limit and lets the presenter save the account. */
 function GuestBanner({ onSaved }: { onSaved: () => void }) {
+  const pin = useClientValue(readGuestPin);
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -241,6 +245,7 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
     setError(null);
     try {
       await apiFetch("/api/auth/upgrade", { method: "POST", body: JSON.stringify({ email, password }) });
+      rememberGuestPin(null);
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -256,8 +261,13 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
           <p className="font-display text-xl font-extrabold">You&rsquo;re using a guest account</p>
           <p className="text-sm font-medium">
             Votes and results save live, and stay available for 3 days after you create each presentation. Then they&rsquo;re deleted.
-            Guests can run up to 3 presentations.
+            Guests can run up to 3 presentations. Closing the browser signs you out; come back with your PIN and a presentation code.
           </p>
+          {pin && (
+            <p className="mt-1 text-sm font-bold">
+              Your PIN: <span className="font-display tracking-[0.15em]">{formatPin(pin)}</span>
+            </p>
+          )}
         </div>
         {!open && (
           <button type="button" onClick={() => setOpen(true)} className="key rounded-xl bg-white px-4 py-2 font-bold">

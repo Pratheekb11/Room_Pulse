@@ -204,3 +204,6 @@ create index if not exists sessions_expires_idx on sessions(expires_at) where ex
 -- Every public lookup goes through this view, so expired presentations behave as if deleted.
 create or replace view live_sessions as
   select * from sessions where expires_at is null or expires_at > now();
+
+-- Guests get back in with a 6-digit PIN plus one of their presentation codes (salted scrypt hash).
+alter table users add column if not exists guest_pin_hash text;

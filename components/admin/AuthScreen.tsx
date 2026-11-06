@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Logo } from "../Logo";
 import { Shapes } from "../Shapes";
 import { apiFetch } from "./api";
+import { GuestOptions } from "./GuestOptions";
 
 type Mode = "login" | "signup";
 
@@ -127,28 +128,7 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
           </button>
         </form>
 
-        <div className="mt-5 text-center">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setError(null);
-              try {
-                await apiFetch("/api/auth/guest", { method: "POST" });
-                onSignedIn();
-              } catch (err) {
-                setError((err as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="rounded-full border-2 border-ink bg-white px-5 py-2 font-bold hover:bg-canvas"
-          >
-            Continue as guest
-          </button>
-          <p className="mt-2 text-sm text-ink-soft">No sign-up. Results are kept for 3 days.</p>
-        </div>
+        <GuestOptions onSignedIn={onSignedIn} />
       </div>
     </main>
   );

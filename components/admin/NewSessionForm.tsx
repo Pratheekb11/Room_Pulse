@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CHARTS, defaultChart } from "@/lib/charts";
 import { topicColor } from "@/lib/colors";
 import { MAX_CRITERIA, MAX_FOCUS_TOPICS, MAX_TOPICS_PER_FOCUS, splitLines } from "@/lib/validation";
@@ -31,14 +31,47 @@ const PLACEHOLDER: Record<Kind, { name: string; list: string }> = {
 const blank = (key: number, kind: Kind = "rating"): FocusDraft => ({ key, kind, chart: defaultChart(kind), name: "", topicsText: "" });
 const field = "mt-1 w-full rounded-xl border-2 border-ink bg-white px-3 py-2";
 
+// Unsaved form survives a refresh (sessionStorage: kept for this browser session only,
+// so it isn't left behind on a shared computer).
+const DRAFT_KEY = "liverate:draft";
+
+interface Draft {
+  title: string;
+  scaleMax: number;
+  lowLabel: string;
+  highLabel: string;
+  focus: FocusDraft[];
+  criteriaText: string;
+}
+
+function readDraft(): Draft | null {
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY);
+    const d = raw ? (JSON.parse(raw) as Draft) : null;
+    return d && Array.isArray(d.focus) && d.focus.length ? d : null;
+  } catch {
+    return null;
+  }
+}
+
 export function NewSessionForm({ call, onCreated, locked = false }: { call: Call; onCreated: () => Promise<void>; locked?: boolean }) {
-  const nextKey = useRef(1);
-  const [title, setTitle] = useState("");
-  const [scaleMax, setScaleMax] = useState(5);
-  const [lowLabel, setLowLabel] = useState("Low");
-  const [highLabel, setHighLabel] = useState("High");
-  const [focus, setFocus] = useState<FocusDraft[]>([blank(0)]);
-  const [criteriaText, setCriteriaText] = useState("Impact\nEffectiveness\nFeasibility");
+  // Rendered only in the browser (after the sign-in check), so reading storage here is safe.
+  const [initial] = useState(readDraft);
+  const nextKey = useRef(initial ? Math.max(...initial.focus.map((f) => f.key)) + 1 : 1);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [scaleMax, setScaleMax] = useState(initial?.scaleMax ?? 5);
+  const [lowLabel, setLowLabel] = useState(initial?.lowLabel ?? "Low");
+  const [highLabel, setHighLabel] = useState(initial?.highLabel ?? "High");
+  const [focus, setFocus] = useState<FocusDraft[]>(initial?.focus ?? [blank(0)]);
+  const [criteriaText, setCriteriaText] = useState(initial?.criteriaText ?? "Impact\nEffectiveness\nFeasibility");
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title, scaleMax, lowLabel, highLabel, focus, criteriaText }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [title, scaleMax, lowLabel, highLabel, focus, criteriaText]);
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
