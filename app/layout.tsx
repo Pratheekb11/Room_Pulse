@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { connection } from "next/server";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
@@ -30,6 +31,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             Pratheek B
           </a>
         </footer>
+        <Analytics />
       </body>
     </html>
   );
