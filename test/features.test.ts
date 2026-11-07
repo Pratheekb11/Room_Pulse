@@ -34,11 +34,20 @@ describe("what you can do: the feature list on the create page", () => {
   });
 });
 
-describe("the walkthrough lives on the create page", () => {
-  it("is on the create page (sign-in and builder), not the home page", () => {
-    expect(readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8")).not.toContain("<HowToDemo");
-    expect(readFileSync(new URL("../components/admin/BuilderSide.tsx", import.meta.url), "utf8")).toContain("<HowToDemo");
-    expect(readFileSync(new URL("../components/admin/AdminApp.tsx", import.meta.url), "utf8")).toContain("<BuilderSide");
-    expect(readFileSync(new URL("../components/admin/AuthScreen.tsx", import.meta.url), "utf8")).toContain("<BuilderSide");
+describe("where the walkthrough and the feature list show", () => {
+  const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+
+  it("the feature list is home page material: on the home page, not on the create pages", () => {
+    expect(read("app/page.tsx")).toContain("<FeatureList");
+    for (const f of ["components/admin/AdminApp.tsx", "components/admin/AuthScreen.tsx", "components/admin/PresentationForm.tsx"]) {
+      expect(read(f), f).not.toMatch(/<FeatureList|<BuilderSide|productFeatures/);
+    }
+  });
+
+  it("the walkthrough never plays by itself on a page: it opens from a 'See how it works' / 'Show me how' button", () => {
+    for (const f of ["app/page.tsx", "components/admin/AdminApp.tsx", "components/admin/AuthScreen.tsx"]) expect(read(f), f).not.toContain("<HowToDemo");
+    expect(read("app/page.tsx")).toContain("<HowToButton");
+    expect(read("components/admin/AuthScreen.tsx")).toContain("<HowToButton");
+    expect(read("components/admin/PresentationForm.tsx")).toContain("Show me how");
   });
 });

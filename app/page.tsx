@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { JoinForm } from "@/components/JoinForm";
+import { FeatureList } from "@/components/FeatureList";
+import { HowToButton } from "@/components/HowToButton";
 import { LiveDemo } from "@/components/LiveDemo";
+import { aiAvailable } from "@/lib/ai";
 import { Logo } from "@/components/Logo";
 import { WarmUp } from "@/components/WarmUp";
 import { KIND_INFO } from "@/lib/kinds";
@@ -59,6 +62,9 @@ export default function Home() {
                 ))}
               </ul>
               <p className="mt-2 text-xs text-muted">Start as a guest in one tap. Save an account later if you want to keep your presentations.</p>
+              <p className="mt-3 text-sm">
+                <HowToButton label="▶ See how it works" />
+              </p>
             </div>
 
             <div className="mt-8 max-w-md">
@@ -87,6 +93,13 @@ export default function Home() {
               </li>
             ))}
           </ol>
+        </section>
+
+        <section className="border-t border-line py-20" aria-labelledby="features-h">
+          <h2 id="features-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
+            What you can do
+          </h2>
+          <FeatureList ai={aiAvailable()} />
         </section>
 
         <section className="border-t border-line py-20" aria-labelledby="types-h">

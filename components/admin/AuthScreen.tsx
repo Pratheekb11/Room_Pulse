@@ -1,6 +1,6 @@
 "use client";
 
-import { BuilderSide } from "./BuilderSide";
+import { HowToButton } from "../HowToButton";
 import Link from "next/link";
 import { useState } from "react";
 import { Logo } from "../Logo";
@@ -9,7 +9,7 @@ import { GuestOptions } from "./GuestOptions";
 
 type Mode = "login" | "signup";
 
-export function AuthScreen({ onSignedIn, siteAi = false }: { onSignedIn: () => void; siteAi?: boolean }) {
+export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,10 +55,13 @@ export function AuthScreen({ onSignedIn, siteAi = false }: { onSignedIn: () => v
   return (
     <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
       <Logo />
-      <div className="mx-auto my-auto grid w-full max-w-sm gap-12 lg:max-w-6xl lg:grid-cols-[24rem_minmax(0,1fr)] lg:items-start lg:gap-16 lg:pt-6">
-      <div className="min-w-0">
+      <div className="mx-auto my-auto w-full max-w-sm">
         <h1 className="font-display text-center text-4xl leading-tight tracking-tight">{returning ? "Welcome back" : "Make a presentation"}</h1>
-        {!returning && <p className="mt-2 text-center text-ink-soft">Takes about two minutes.</p>}
+        {!returning && (
+          <p className="mt-2 text-center text-ink-soft">
+            Takes about two minutes. <HowToButton label="Need help? See how it works" />
+          </p>
+        )}
 
         <GuestOptions onSignedIn={onSignedIn} returning={returning} onReturningChange={setReturning} />
         {!returning && (
@@ -139,12 +142,6 @@ export function AuthScreen({ onSignedIn, siteAi = false }: { onSignedIn: () => v
         </form>
           </>
         )}
-      </div>
-      {!returning && (
-        <aside className="min-w-0">
-          <BuilderSide ai={siteAi} />
-        </aside>
-      )}
       </div>
     </main>
   );

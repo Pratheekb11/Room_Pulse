@@ -229,7 +229,7 @@ function Builder({ state, goal, kindPicked, typing }: { state: DemoState; goal: 
               >
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: topicColor(n) }} />
                 <span className={`truncate ${typing === "items" ? "demo-rise" : ""}`} style={{ animationDelay: `${n * 160}ms` }}>
-                  {it || <span className="text-muted-soft">Option {n + 1}</span>}
+                  {it || <span className="text-muted-soft">{state.kind === "rating" ? "Item" : "Option"} {n + 1}</span>}
                 </span>
                 {state.kind === "quiz" && it && state.correct === it && <span className="ml-auto text-xs font-bold text-success">✓ Right answer</span>}
               </li>

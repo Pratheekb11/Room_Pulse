@@ -1,3 +1,5 @@
+import { PRESETS } from "./presets";
+
 /**
  * Pure helpers behind the one-field-per-row list editor (poll options, things to rate, rating scales).
  * They work on plain strings or on rows that remember which saved item they are (`id`), so editing
@@ -113,4 +115,16 @@ export function descriptionsOf(rows: Row[]): Record<string, string> {
     if (name && d) out[name] = d;
   }
   return out;
+}
+
+/**
+ * Rows to keep when a question switches to `kind`: a shortcut's ready-made answers (e.g. Yes / No / Not sure)
+ * don't make sense as items to score, so Score items starts empty again; anything typed is kept.
+ * Always at least `minRows` rows.
+ */
+export function rowsForKind(rows: Row[], kind: string, minRows: number): Row[] {
+  const names = filledItems(rows).map((n) => n.toLowerCase());
+  const fromShortcut = PRESETS.some((p) => p.options.length === names.length && p.options.every((o, i) => o.toLowerCase() === names[i]));
+  const kept = kind === "rating" && fromShortcut ? [] : rows;
+  return kept.length >= minRows ? kept : [...kept, ...Array.from({ length: minRows - kept.length }, () => ({ name: "" }))];
 }

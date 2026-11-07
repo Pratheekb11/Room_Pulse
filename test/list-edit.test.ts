@@ -125,3 +125,18 @@ describe("item descriptions in the list editor", () => {
     expect(setAt([{ name: "A", description: "d" }], 0, "AB")).toEqual([{ name: "AB", description: "d" }]);
   });
 });
+
+describe("switching a question's type", () => {
+  it("drops a shortcut's ready-made options (Yes / No / Not sure) when switching to Score items: back to empty Item 1, Item 2", async () => {
+    const { rowsForKind } = await import("@/lib/list-edit");
+    expect(rowsForKind([{ name: "Yes" }, { name: "No" }, { name: "Not sure" }], "rating", 2)).toEqual([{ name: "" }, { name: "" }]);
+  });
+  it("keeps options the presenter typed", async () => {
+    const { rowsForKind } = await import("@/lib/list-edit");
+    expect(rowsForKind([{ name: "Pizza" }, { name: "Sushi" }], "rating", 2)).toEqual([{ name: "Pizza" }, { name: "Sushi" }]);
+  });
+  it("tops up to the rows a type needs", async () => {
+    const { rowsForKind } = await import("@/lib/list-edit");
+    expect(rowsForKind([{ name: "" }], "poll", 2)).toEqual([{ name: "" }, { name: "" }]);
+  });
+});

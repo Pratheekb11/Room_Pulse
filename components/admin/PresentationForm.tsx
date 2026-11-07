@@ -20,6 +20,7 @@ import {
   filledItems,
   filledRows,
   descriptionsOf,
+  rowsForKind,
   rowsFrom,
   type Row,
 } from "@/lib/list-edit";
@@ -106,8 +107,9 @@ const QUIZ_TIMES = [10, 15, 20, 30, 45, 60, 90, 120];
 
 /** Questions that need 2 options start with two rows; scored questions with one. */
 const needsTwo = (kind: Kind) => kind === "poll" || kind === "multi" || kind === "rank" || kind === "quiz";
+// Score items starts with Item 1 and Item 2 too, so it's clear you can list several
 const startRows = (kind: Kind): Row[] =>
-  needsTwo(kind) ? [{ name: "" }, { name: "" }] : [{ name: "" }];
+  needsTwo(kind) || kind === "rating" ? [{ name: "" }, { name: "" }] : [{ name: "" }];
 const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
   key,
   kind,
@@ -874,11 +876,8 @@ export function PresentationForm({
                               update(f.key, {
                                 kind: k.id,
                                 chart: defaultChart(k.id),
-                                // these need 2 options: give them a second empty row when switching
-                                items:
-                                  needsTwo(k.id) && f.items.length < 2
-                                    ? [...f.items, { name: "" }]
-                                    : f.items,
+                                // a shortcut's Yes / No / Not sure doesn't carry into Score items; at least 2 rows to fill
+                                items: rowsForKind(f.items, k.id, startRows(k.id).length),
                               })
                             }
                             className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold ${f.kind === k.id ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
