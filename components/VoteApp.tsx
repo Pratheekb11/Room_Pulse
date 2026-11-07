@@ -17,6 +17,7 @@ import { MultiCard } from "./vote/MultiCard";
 import { NumberCard } from "./vote/NumberCard";
 import { RankCard } from "./vote/RankCard";
 import { TextCard } from "./vote/TextCard";
+import { QaCard } from "./vote/QaCard";
 import { useSession } from "./useSession";
 
 export function VoteApp({ code }: { code: string }) {
@@ -76,6 +77,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           return typeof v === "number" && v >= (g.min ?? 0) && v <= (g.max ?? 100);
         case "text":
           return typeof v === "string" && v.length > 0;
+        case "qa":
+          return false; // Q&A keeps its own state (QaCard)
         default:
           return Array.isArray(v) && v.length <= 3 && v.every((w) => typeof w === "string");
       }
@@ -98,6 +101,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   // Word clouds count as done at 3 answers, or when the voter says "that's all".
   const finishedKey = `liverate:finished:${code}`;
   const [finished, setFinished] = useState<string[]>(() => readJSON<string[]>(finishedKey, []));
+  // Still on the ballot although everything is done: following the live Q&A.
+  const [reviewing, setReviewing] = useState(false);
   const [isOpen, setIsOpen] = useState(session.isOpen);
 
   const onStatus = useCallback(
@@ -218,6 +223,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         case "multi":
           // done once the limit is reached, or when the voter says they're done
           return Array.isArray(v) && v.length > 0 && (v.length >= (g.maxPicks ?? g.topics.length) || finished.includes(g.focus.id));
+        case "qa":
+          // done once they ask, upvote or skip
+          return finished.includes(g.focus.id);
         default:
           return Array.isArray(v) && (v.length >= 3 || (v.length > 0 && finished.includes(g.focus.id)));
       }
@@ -341,6 +349,25 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     [groups, steps, stepDone, ratings, answers, finished, finishedKey, goTo],
   );
 
+  /**
+   * Q&A: the voter asked, upvoted (stay = true: keep showing the live list even if that was the
+   * last step) or skipped (stay = false: on to the thank-you screen if everything is done).
+   */
+  const onTookPart = useCallback(
+    (gi: number, stay: boolean) => {
+      const focusId = groups[gi].focus.id;
+      if (stay) setReviewing(true);
+      if (finished.includes(focusId)) return;
+      reward();
+      const next = [...finished, focusId];
+      setFinished(next);
+      writeJSON(finishedKey, next);
+    },
+    [groups, finished, finishedKey, reward],
+  );
+
+  const qaStep = steps.findIndex((s) => s.kind === "qa");
+
   // Confetti only when the voter finishes during this visit, not on reload.
   const wasComplete = useRef(complete);
   const [celebrate, setCelebrate] = useState(false);
@@ -358,7 +385,22 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const here = steps[current];
   const group = here ? groups[here.gi] : null;
 
-  if (complete) return <ThankYou title={session.title} statuses={statuses} celebrate={celebrate} />;
+  if (complete && !reviewing)
+    return (
+      <ThankYou
+        title={session.title}
+        statuses={statuses}
+        celebrate={celebrate}
+        onSeeQuestions={
+          qaStep === -1
+            ? undefined
+            : () => {
+                setReviewing(true);
+                goTo(qaStep);
+              }
+        }
+      />
+    );
 
   return (
     <div className="min-h-dvh pb-16">
@@ -547,6 +589,18 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   disabled={!isOpen}
                   onSend={(text) => onAnswer(here.gi, text)}
                 />
+              ) : here.kind === "qa" ? (
+                <QaCard
+                  code={code}
+                  voterId={voterId}
+                  focusId={group.focus.id}
+                  question={group.focus.name}
+                  color={topicColor(here.gi)}
+                  disabled={!isOpen}
+                  done={finished.includes(group.focus.id)}
+                  onTookPart={() => onTookPart(here.gi, true)}
+                  onSkip={() => onTookPart(here.gi, false)}
+                />
               ) : (
                 <WordsCard
                   question={group.focus.name}
@@ -611,7 +665,18 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
 }
 
 /** Shown once every question is answered: the ballot closes; saving status stays honest. */
-function ThankYou({ title, statuses, celebrate }: { title: string; statuses: Record<string, SaveStatus>; celebrate: boolean }) {
+function ThankYou({
+  title,
+  statuses,
+  celebrate,
+  onSeeQuestions,
+}: {
+  title: string;
+  statuses: Record<string, SaveStatus>;
+  celebrate: boolean;
+  /** Set when the presentation has a Q&A: people come back to vote on new questions. */
+  onSeeQuestions?: () => void;
+}) {
   const values = Object.values(statuses);
   const saving = values.some((s) => s === "saving" || s === "retrying");
   const closed = values.some((s) => s === "closed");
@@ -636,8 +701,18 @@ function ThankYou({ title, statuses, celebrate }: { title: string; statuses: Rec
       </svg>
       <h1 className="font-display animate-rise mt-8 text-[clamp(2.5rem,12vw,4rem)] leading-none text-ink [animation-delay:200ms]">Thank you.</h1>
       <p className="animate-rise mt-4 max-w-xs text-[17px] leading-relaxed text-ink-soft [animation-delay:320ms]">
-        Your answers to <span className="text-ink">{title}</span> are in. You can close this page.
+        Your answers to <span className="text-ink">{title}</span> are in.{" "}
+        {onSeeQuestions ? "New questions keep coming in, so check back to vote on them." : "You can close this page."}
       </p>
+      {onSeeQuestions && (
+        <button
+          type="button"
+          onClick={onSeeQuestions}
+          className="key animate-rise mt-6 rounded-xl bg-primary px-6 py-3 font-bold text-white [animation-delay:420ms]"
+        >
+          See the room&apos;s questions
+        </button>
+      )}
       <p role="status" aria-live="polite" className="font-mono animate-fade mt-8 text-xs text-muted [animation-delay:600ms]">
         {closed ? (
           <span className="text-error">Voting closed before your last answer was saved.</span>

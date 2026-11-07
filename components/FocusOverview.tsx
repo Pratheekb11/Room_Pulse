@@ -1,7 +1,7 @@
 import { scaleColor, topicColor, topicInk } from "@/lib/colors";
 import { summarizeFocus, type FocusGroup } from "@/lib/focus";
 import { avg, cellKey, fmt1, sumAggs, type Agg } from "@/lib/stats";
-import { formatNumber, numberStats, pollTally, rankTally, wordWeights } from "@/lib/answers";
+import { formatNumber, numberStats, pollTally, qaOrder, rankTally, wordWeights } from "@/lib/answers";
 import { kindLabel } from "@/lib/kinds";
 import type { NamedItem, ResultsPayload } from "@/lib/types";
 
@@ -57,10 +57,12 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
           const stats = g.kind === "number" ? numberStats(results.numbers, g.focus.id, g.min ?? 0, g.max ?? 100) : null;
           const texts = g.kind === "text" ? results.texts.filter((t) => t.focusId === g.focus.id) : [];
           const cloud = g.kind === "words" ? wordWeights(words, g.focus.id) : [];
+          const asked = g.kind === "qa" ? qaOrder(results.questions, g.focus.id, "top") : [];
           const count =
             g.kind === "poll" && tally ? plural(tally.total, "vote", "votes")
             : g.kind === "words" ? plural(cloud.reduce((s, w) => s + w.n, 0), "answer", "answers")
             : g.kind === "text" ? plural(texts.length, "answer", "answers")
+            : g.kind === "qa" ? plural(asked.length, "question", "questions")
             : plural(people, "person", "people");
           return (
             <button
@@ -91,6 +93,19 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
                     </li>
                   ))}
                   {texts.length === 0 && <li className="text-ink-soft">No answers yet</li>}
+                </ul>
+              )}
+              {g.kind === "qa" && (
+                <ul className="mt-4 flex flex-col gap-1.5">
+                  {asked.slice(0, 3).map((q) => (
+                    <li key={q.id} className="flex items-center gap-2 rounded-lg bg-canvas px-2.5 py-1.5 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold">
+                      <span className="shrink-0 tabular-nums text-primary">▲ {q.votes}</span>
+                      <span className="truncate" title={q.text}>
+                        {q.text}
+                      </span>
+                    </li>
+                  ))}
+                  {asked.length === 0 && <li className="text-ink-soft">No questions yet</li>}
                 </ul>
               )}
               {g.kind === "words" && (

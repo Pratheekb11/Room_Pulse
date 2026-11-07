@@ -1,4 +1,4 @@
-import type { NamedItem, NumberCount, PollCount, RankCount, WordCount } from "./types";
+import type { NamedItem, NumberCount, PollCount, PublicQaItem, RankCount, WordCount } from "./types";
 
 export interface PollTally {
   total: number;
@@ -117,4 +117,56 @@ const numberFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }
 /** "1,234.5"; up to 2 decimals. A dash when there's no value. */
 export function formatNumber(v: number | null | undefined): string {
   return v === null || v === undefined || !Number.isFinite(v) ? "–" : numberFormat.format(v);
+}
+
+/**
+ * Audience questions for one Q&A question, in the order the presenter's screen shows them:
+ * "top" = most votes first (newer first on a tie), "new" = newest first.
+ * Answered ones always go last; hidden ones are left out unless asked for.
+ */
+export function qaOrder<T extends { focusId: string; votes: number; answered: boolean; at: string; hidden?: boolean }>(
+  items: T[],
+  focusId: string,
+  mode: "top" | "new",
+  opts: { includeHidden?: boolean } = {},
+): T[] {
+  const newer = (a: T, b: T) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+  return items
+    .filter((q) => q.focusId === focusId && (opts.includeHidden || !q.hidden))
+    .sort((a, b) => Number(a.answered) - Number(b.answered) || (mode === "top" ? b.votes - a.votes : 0) || newer(a, b));
+}
+
+/** What a voter's phone remembers about one Q&A question. */
+export interface QaLocal {
+  /** Questions this voter sent, kept so they show before the (cached) list catches up. */
+  asked: { id: string; text: string; at: string }[];
+  /** Questions this voter upvoted. */
+  voted: string[];
+  /** Upvote changes not yet in the server count: the count when the change was made, and +1/-1. */
+  adjust: Record<string, { base: number; delta: number }>;
+}
+
+const JUST_SENT_MS = 60_000;
+
+/** The list a voter sees: server questions plus their own just-sent ones, their votes counted, most votes first. */
+export function qaVoterView(
+  server: PublicQaItem[],
+  focusId: string,
+  local: QaLocal,
+  now: number,
+): (PublicQaItem & { mine: boolean; voted: boolean })[] {
+  const mine = new Set(local.asked.map((q) => q.id));
+  const voted = new Set(local.voted);
+  const listed = server.filter((q) => q.focusId === focusId);
+  const seen = new Set(listed.map((q) => q.id));
+  const pending = local.asked
+    .filter((q) => !seen.has(q.id) && now - Date.parse(q.at) < JUST_SENT_MS)
+    .map((q) => ({ ...q, focusId, votes: 0, answered: false }));
+  const items = [...listed, ...pending].map((q) => {
+    const adj = local.adjust[q.id];
+    // the server count still equals the count when the voter changed their vote: add their change
+    const votes = adj && q.votes === adj.base ? Math.max(0, q.votes + adj.delta) : q.votes;
+    return { ...q, votes, mine: mine.has(q.id), voted: voted.has(q.id) };
+  });
+  return qaOrder(items, focusId, "top");
 }

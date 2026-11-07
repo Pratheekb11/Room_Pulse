@@ -281,3 +281,32 @@ create table if not exists number_answers (
   primary key (focus_id, voter_id)
 );
 create index if not exists number_answers_session_idx on number_answers(session_id, voter_id);
+
+-- Audience Q&A: voters send in questions (up to 3 each) and upvote other people's.
+-- The owner can hide a question or mark it answered.
+alter table focus_topics drop constraint if exists focus_topics_kind_check;
+alter table focus_topics add constraint focus_topics_kind_check
+  check (kind in ('rating', 'poll', 'words', 'multi', 'text', 'rank', 'number', 'qa'));
+
+create table if not exists qa_questions (
+  id          uuid primary key default gen_random_uuid(),
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  body        text not null check (length(body) between 1 and 280),
+  hidden      boolean not null default false,
+  answered    boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists qa_questions_session_idx on qa_questions(session_id, voter_id);
+create index if not exists qa_questions_focus_idx on qa_questions(focus_id, created_at desc);
+
+create table if not exists qa_votes (
+  question_id uuid not null references qa_questions(id) on delete cascade,
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  created_at  timestamptz not null default now(),
+  primary key (question_id, voter_id)
+);
+create index if not exists qa_votes_session_idx on qa_votes(session_id, voter_id);

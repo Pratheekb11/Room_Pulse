@@ -8,6 +8,8 @@ Anonymous, near-real-time audience voting for live sessions. Presenters start st
 - **Put in order:** tap 2–10 options in order of preference. Results show the average place and how many people put each option in each place.
 - **Number:** answer with a number in the presenter's range, with an optional unit. Results show a spread chart, the average and the middle value.
 - **Open answer:** one short answer (up to 280 characters) per person, shown as a wall of cards or one at a time.
+- **Audience Q&A:** people send in questions (up to 3 each) and upvote the ones they want answered. The list re-sorts live; the presenter can mark a question answered or hide it.
+- **Yes / No / Not sure:** a one-tap shortcut in the builder that makes a Pick one question with those options.
 - **Word cloud:** up to 3 words or short phrases per person.
 
 The audience scans a QR code and answers on their phones: one screen at a time, with emoji rating keys, levels and points. Every tap saves instantly, and the dashboard on the big screen updates about every 1.5 s.
@@ -70,6 +72,7 @@ npm test
 - `test/email-auth.test.ts` covers email verification and password reset: single use, expiry, rate limits, no account discovery, sign-out on reset, and links that can't be redirected via the Host header.
 - `test/auth.test.ts` covers sign-up, log-in, log-out, password hashing, lockout, cross-site blocking and per-account separation.
 - `test/questions.test.ts` covers polls and word clouds: validation, changing answers, closed sessions, reset and exports.
+- `test/qa.test.ts` covers audience Q&A: asking, the 3-question limit, upvotes, owner-only hiding and marking answered, closed sessions, exports and reset.
 - `test/question-types.test.ts` covers pick several, open answer, ranking and number questions: settings, validation, replacing answers, closed sessions, reset, people counts, exports and editing.
 - `test/api.test.ts` runs every API route against real Postgres (PGlite) through the real Neon driver. It covers validation, 403/404/503 handling, overwrite-not-double-count, concurrent voters, reset/recalculate/delete, CSV exports, and checks that no voter id ever leaks. After the load tests, `db/check.sql` must return zero rows.
 - `test/vote-queue.test.ts` covers the phone's save queue: 300 ms debounce per cell, latest value wins, retry with back-off from 3 s up to 15 s, flush on `online`, and pending ratings kept while voting is closed.

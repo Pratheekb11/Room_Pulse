@@ -8,6 +8,8 @@ import type {
   ScoreBucket,
   FocusItem,
   PollCount,
+  PublicQaItem,
+  QaItem,
   NumberCount,
   RankCount,
   RespondentCount,
@@ -16,7 +18,8 @@ import type {
   TopicItem,
   WordCount,
 } from "./types";
-import type { AnswerInput, CreateSessionInput, EditSessionInput, VoteInput } from "./validation";
+import type { AnswerInput, CreateSessionInput, EditSessionInput, QaAction, VoteInput } from "./validation";
+import { MAX_QA_PER_VOTER } from "./validation";
 import { generateCode, generateDashboardKey } from "./code";
 
 // All SQL lives here. Every statement is a parameterised tagged template.
@@ -126,7 +129,9 @@ export async function getResults(
           union select voter_id from choice_answers where session_id = s.id
           union select voter_id from text_answers where session_id = s.id
           union select voter_id from rank_answers where session_id = s.id
-          union select voter_id from number_answers where session_id = s.id) u) as voter_count,
+          union select voter_id from number_answers where session_id = s.id
+          union select voter_id from qa_questions where session_id = s.id
+          union select voter_id from qa_votes where session_id = s.id) u) as voter_count,
       coalesce((select json_agg(json_build_object(
                   'topicId', r.topic_id, 'criterionId', r.criterion_id,
                   'n', r.vote_count, 'sum', r.score_sum))
@@ -170,8 +175,18 @@ export async function getResults(
                         from (select focus_id, voter_id from choice_answers where session_id = s.id
                               union all select focus_id, voter_id from text_answers where session_id = s.id
                               union all select focus_id, voter_id from rank_answers where session_id = s.id
-                              union all select focus_id, voter_id from number_answers where session_id = s.id) a
-                       group by focus_id) x), '[]'::json) as respondents
+                              union all select focus_id, voter_id from number_answers where session_id = s.id
+                              union all select focus_id, voter_id from qa_questions where session_id = s.id
+                              union all select focus_id, voter_id from qa_votes where session_id = s.id) a
+                       group by focus_id) x), '[]'::json) as respondents,
+      coalesce((select json_agg(json_build_object('id', x.id, 'focusId', x.focus_id, 'text', x.body, 'votes', x.votes,
+                                                  'answered', x.answered, 'hidden', x.hidden, 'at', x.created_at)
+                                order by x.created_at desc)
+                from (select q.id, q.focus_id, q.body, q.answered, q.hidden, q.created_at,
+                             (select count(*)::int from qa_votes v where v.question_id = q.id) as votes,
+                             row_number() over (partition by q.focus_id order by q.created_at desc) as rk
+                        from qa_questions q where q.session_id = s.id) x
+               where x.rk <= 200), '[]'::json) as questions
     from live_sessions s
     where s.code = ${code}
       and (s.dashboard_key = ${key}::text or s.owner_id = ${owner}::uuid)
@@ -187,6 +202,7 @@ export async function getResults(
     numbers: (Omit<NumberCount, "value"> & { value: number | string })[];
     texts: TextAnswer[];
     respondents: RespondentCount[];
+    questions: QaItem[];
   }[];
   const r = rows[0];
   if (!r) return null;
@@ -201,6 +217,7 @@ export async function getResults(
     numbers: r.numbers.map((x) => ({ ...x, value: Number(x.value) })),
     texts: r.texts.map((t) => ({ ...t, at: new Date(t.at).toISOString() })),
     respondents: r.respondents,
+    questions: r.questions.map((q) => ({ ...q, at: new Date(q.at).toISOString() })),
     revision: r.revision,
   };
 }
@@ -224,7 +241,9 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
               union all select session_id, voter_id from choice_answers
               union all select session_id, voter_id from text_answers
               union all select session_id, voter_id from rank_answers
-              union all select session_id, voter_id from number_answers) a
+              union all select session_id, voter_id from number_answers
+              union all select session_id, voter_id from qa_questions
+              union all select session_id, voter_id from qa_votes) a
        group by session_id
     ) v on v.session_id = s.id
     where s.owner_id = ${ownerId}
@@ -328,6 +347,7 @@ export async function resetSession(code: string): Promise<void> {
     sql`delete from text_answers where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from rank_answers where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from number_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from qa_questions where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from results where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
   ]);
@@ -444,6 +464,19 @@ export async function getRawRows(code: string): Promise<RawRow[]> {
         from number_answers x
         join s on x.session_id = s.id
         join focus_topics f on f.id = x.focus_id
+      union all
+      select q.voter_id, q.created_at, q.created_at, f.position, 0, 0,
+             f.name, q.body, 'Asked', ''
+        from qa_questions q
+        join s on q.session_id = s.id
+        join focus_topics f on f.id = q.focus_id
+      union all
+      select v.voter_id, v.created_at, v.created_at, f.position, 1, 0,
+             f.name, q.body, 'Upvoted', ''
+        from qa_votes v
+        join s on v.session_id = s.id
+        join qa_questions q on q.id = v.question_id
+        join focus_topics f on f.id = v.focus_id
     ),
     firsts as (select voter_id, min(created_at) as first_at from answers group by voter_id),
     numbered as (select voter_id, row_number() over (order by first_at, voter_id) as rn from firsts)
@@ -654,10 +687,101 @@ async function saveOptionList(kind: "multi" | "rank", code: string, focusId: str
   return allowed.length > 0 && inserted.length === ids.length;
 }
 
+// ---------------------------------------------------------------- audience Q&A
+
+export type QaOutcome = { outcome: "ok"; id?: string } | { outcome: "not_found" | "closed" | "invalid" | "limit" };
+
+/** Sends in an audience question (up to MAX_QA_PER_VOTER per person) or adds/takes back an upvote. */
+export async function saveQaAction(code: string, a: QaAction): Promise<QaOutcome> {
+  if (a.action === "ask") {
+    const rows = (await sql`
+      insert into qa_questions (session_id, focus_id, voter_id, body)
+      select s.id, f.id, ${a.voterId}::uuid, ${a.text}
+      from live_sessions s
+      join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'qa'
+      where s.code = ${code} and s.is_open
+        and (select count(*) from qa_questions q where q.focus_id = f.id and q.voter_id = ${a.voterId}::uuid) < ${MAX_QA_PER_VOTER}
+      returning id
+    `) as { id: string }[];
+    if (rows[0]) return { outcome: "ok", id: rows[0].id };
+    const why = await qaFailure(code);
+    if (why) return { outcome: why };
+    const [f] = (await sql`
+      select (select count(*)::int from qa_questions q where q.focus_id = f.id and q.voter_id = ${a.voterId}::uuid) as n
+      from live_sessions s join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'qa'
+      where s.code = ${code}
+    `) as { n: number }[];
+    return { outcome: f && f.n >= MAX_QA_PER_VOTER ? "limit" : "invalid" };
+  }
+
+  // Votes: a visible question in this Q&A, while voting is open, not the voter's own.
+  const valid = sql`
+    select q.id, q.session_id, q.focus_id
+      from qa_questions q
+      join live_sessions s on s.id = q.session_id and s.code = ${code} and s.is_open
+     where q.id = ${a.questionId}::uuid and q.focus_id = ${a.focusId}::uuid
+       and not q.hidden and q.voter_id <> ${a.voterId}::uuid`;
+  const change = a.up
+    ? sql`insert into qa_votes (question_id, session_id, focus_id, voter_id)
+          select v.id, v.session_id, v.focus_id, ${a.voterId}::uuid from (${valid}) v
+          on conflict do nothing`
+    : sql`delete from qa_votes where question_id = ${a.questionId}::uuid and voter_id = ${a.voterId}::uuid and exists (${valid})`;
+  const [, allowed] = await sql.transaction([change, valid]);
+  if (allowed.length > 0) return { outcome: "ok" };
+  return { outcome: (await qaFailure(code)) ?? "invalid" };
+}
+
+async function qaFailure(code: string): Promise<"not_found" | "closed" | null> {
+  const isOpen = await getSessionIsOpen(code);
+  if (isOpen === null) return "not_found";
+  return isOpen ? null : "closed";
+}
+
+/** Questions voters can see (not hidden), newest first, up to 200 per Q&A; null if there's no such presentation. */
+export async function listPublicQa(code: string): Promise<PublicQaItem[] | null> {
+  const rows = (await sql`
+    select s.id is not null as found,
+      coalesce((select json_agg(json_build_object('id', x.id, 'focusId', x.focus_id, 'text', x.body, 'votes', x.votes,
+                                                  'answered', x.answered, 'at', x.created_at)
+                                order by x.created_at desc)
+                from (select q.id, q.focus_id, q.body, q.answered, q.created_at,
+                             (select count(*)::int from qa_votes v where v.question_id = q.id) as votes,
+                             row_number() over (partition by q.focus_id order by q.created_at desc) as rk
+                        from qa_questions q where q.session_id = s.id and not q.hidden) x
+               where x.rk <= 200), '[]'::json) as questions
+    from live_sessions s where s.code = ${code}
+  `) as { found: boolean; questions: PublicQaItem[] }[];
+  if (!rows[0]) return null;
+  return rows[0].questions.map((q) => ({ ...q, at: new Date(q.at).toISOString() }));
+}
+
+/** Owner moderation. The caller checks ownership; this only touches questions in that presentation. */
+export async function moderateQuestion(code: string, id: string, change: { hidden?: boolean; answered?: boolean }): Promise<boolean> {
+  const rows = await sql`
+    update qa_questions q
+       set hidden = coalesce(${change.hidden ?? null}::boolean, q.hidden),
+           answered = coalesce(${change.answered ?? null}::boolean, q.answered)
+      from live_sessions s
+     where s.id = q.session_id and s.code = ${code} and q.id = ${id}::uuid
+    returning 1 as ok
+  `;
+  return rows.length > 0;
+}
+
 export interface ChoiceSummaryRow {
   focus: string;
   label: string;
-  kind: "Poll choice" | "Word" | "Picked" | "Average place" | "Average" | "Middle value" | "Answer";
+  kind:
+    | "Poll choice"
+    | "Word"
+    | "Picked"
+    | "Average place"
+    | "Average"
+    | "Middle value"
+    | "Answer"
+    | "Audience question"
+    | "Answered question"
+    | "Hidden question";
   average: number | null;
   n: number;
 }
@@ -703,6 +827,15 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'text'
         join text_answers a on a.focus_id = f.id
+       where s.code = ${code}
+      union all
+      select f.position, -x.votes::float8 + case when q.hidden then 1e9 when q.answered then 1e6 else 0 end, f.name, q.body,
+             case when q.hidden then 'Hidden question' when q.answered then 'Answered question' else 'Audience question' end,
+             null, x.votes
+        from live_sessions s
+        join focus_topics f on f.session_id = s.id and f.kind = 'qa'
+        join qa_questions q on q.focus_id = f.id
+        cross join lateral (select count(*)::int as votes from qa_votes v where v.question_id = q.id) x
        where s.code = ${code}
     ) x
     order by fp, tp, label
@@ -852,7 +985,9 @@ export async function getAnswerCounts(code: string, ownerId: string): Promise<{ 
         select focus_id, voter_id from choice_answers where session_id = (select id from s)
         union all select focus_id, voter_id from rank_answers where session_id = (select id from s)
         union all select focus_id, voter_id from text_answers where session_id = (select id from s)
-        union all select focus_id, voter_id from number_answers where session_id = (select id from s)) a
+        union all select focus_id, voter_id from number_answers where session_id = (select id from s)
+        union all select focus_id, voter_id from qa_questions where session_id = (select id from s)
+        union all select focus_id, voter_id from qa_votes where session_id = (select id from s)) a
       group by focus_id
     )
     select (select count(*) from s)::int as found,

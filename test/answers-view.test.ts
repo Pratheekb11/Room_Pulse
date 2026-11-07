@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { pollTally, wordWeights } from "@/lib/answers";
+import { pollTally, qaOrder, qaVoterView, wordWeights } from "@/lib/answers";
+import { PRESETS, matchingPreset } from "@/lib/presets";
 
 describe("pollTally", () => {
   const options = [
@@ -152,5 +153,82 @@ describe("formatNumber", () => {
     expect(formatNumber(1234.5)).toBe("1,234.5");
     expect(formatNumber(2 / 3)).toBe("0.67");
     expect(formatNumber(null)).toBe("–");
+  });
+});
+
+describe("qaOrder", () => {
+  const q = (id: string, votes: number, at: string, extra: { answered?: boolean; hidden?: boolean; focusId?: string } = {}) => ({
+    id,
+    focusId: extra.focusId ?? "f",
+    text: id,
+    votes,
+    answered: extra.answered ?? false,
+    hidden: extra.hidden ?? false,
+    at,
+  });
+  const items = [
+    q("old-popular", 5, "2026-01-01T10:00:00Z"),
+    q("new-quiet", 1, "2026-01-01T10:05:00Z"),
+    q("tie-newer", 5, "2026-01-01T10:03:00Z"),
+    q("answered", 9, "2026-01-01T10:01:00Z", { answered: true }),
+    q("hidden", 99, "2026-01-01T10:02:00Z", { hidden: true }),
+    q("elsewhere", 50, "2026-01-01T10:02:00Z", { focusId: "g" }),
+  ];
+
+  it("puts the most votes first (newer wins a tie), answered last, and leaves hidden ones out", () => {
+    expect(qaOrder(items, "f", "top").map((x) => x.id)).toEqual(["tie-newer", "old-popular", "new-quiet", "answered"]);
+  });
+
+  it("can sort newest first, still with answered last", () => {
+    expect(qaOrder(items, "f", "new").map((x) => x.id)).toEqual(["new-quiet", "tie-newer", "old-popular", "answered"]);
+  });
+
+  it("can include hidden ones for the owner's list", () => {
+    expect(qaOrder(items, "f", "top", { includeHidden: true }).map((x) => x.id)).toContain("hidden");
+  });
+});
+
+describe("question presets", () => {
+  it("Yes / No / Not sure is a Pick one question with those 3 options", () => {
+    const yesNo = PRESETS.find((p) => p.id === "yes-no");
+    expect(yesNo).toMatchObject({ label: "Yes / No / Not sure", kind: "poll", options: ["Yes", "No", "Not sure"] });
+  });
+
+  it("recognises a question that still matches a preset, ignoring blank rows", () => {
+    expect(matchingPreset("poll", ["Yes", "No", "Not sure"])?.id).toBe("yes-no");
+    expect(matchingPreset("poll", ["Yes", "No", "Not sure", ""])?.id).toBe("yes-no");
+    expect(matchingPreset("poll", ["Yes", "No"])).toBeNull();
+    expect(matchingPreset("multi", ["Yes", "No", "Not sure"])).toBeNull();
+  });
+});
+
+describe("qaVoterView", () => {
+  const server = [
+    { id: "a", focusId: "f", text: "A?", votes: 3, answered: false, at: "2026-01-01T10:00:00Z" },
+    { id: "b", focusId: "f", text: "B?", votes: 1, answered: false, at: "2026-01-01T10:01:00Z" },
+    { id: "x", focusId: "g", text: "X?", votes: 9, answered: false, at: "2026-01-01T10:01:00Z" },
+  ];
+  const now = Date.parse("2026-01-01T10:02:00Z");
+  const empty = { asked: [], voted: [], adjust: {} };
+
+  it("marks the voter's own questions and votes, sorted by votes, other Q&As left out", () => {
+    const v = qaVoterView(server, "f", { ...empty, asked: [{ id: "b", text: "B?", at: "2026-01-01T10:01:00Z" }], voted: ["a"] }, now);
+    expect(v.map((q) => [q.id, q.votes, q.mine, q.voted])).toEqual([
+      ["a", 3, false, true],
+      ["b", 1, true, false],
+    ]);
+  });
+
+  it("shows a just-sent question before the server list catches up, then stops after a minute", () => {
+    const asked = [{ id: "new", text: "Fresh?", at: "2026-01-01T10:01:50Z" }];
+    expect(qaVoterView(server, "f", { ...empty, asked }, now).find((q) => q.id === "new")).toMatchObject({ votes: 0, mine: true });
+    expect(qaVoterView(server, "f", { ...empty, asked }, now + 61_000).find((q) => q.id === "new")).toBeUndefined();
+  });
+
+  it("adds the voter's own change to a stale count until the server count moves", () => {
+    const local = { asked: [], voted: ["b"], adjust: { b: { base: 1, delta: 1 } } };
+    expect(qaVoterView(server, "f", local, now).find((q) => q.id === "b")?.votes).toBe(2);
+    const moved = server.map((q) => (q.id === "b" ? { ...q, votes: 2 } : q));
+    expect(qaVoterView(moved, "f", local, now).find((q) => q.id === "b")?.votes).toBe(2);
   });
 });

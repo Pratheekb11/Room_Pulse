@@ -34,6 +34,10 @@ export const CHARTS = {
     { id: "histogram", label: "Spread" },
     { id: "summary", label: "Big numbers" },
   ],
+  qa: [
+    { id: "top", label: "Most votes" },
+    { id: "new", label: "Newest" },
+  ],
 } as const satisfies Record<QuestionKind, readonly { id: string; label: string }[]>;
 
 export type ChartId<K extends QuestionKind = QuestionKind> = (typeof CHARTS)[K][number]["id"];

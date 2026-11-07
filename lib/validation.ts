@@ -38,7 +38,7 @@ export const MAX_FOCUS_TOPICS = 10;
 export const MAX_TOPICS_PER_FOCUS = 10;
 export const MAX_CRITERIA = 10;
 
-export const QUESTION_KINDS = ["rating", "poll", "words", "multi", "text", "rank", "number"] as const;
+export const QUESTION_KINDS = ["rating", "poll", "words", "multi", "text", "rank", "number", "qa"] as const;
 type Kind = (typeof QUESTION_KINDS)[number];
 
 /** Question types whose answers are picked from a list of options (topics). */
@@ -258,3 +258,22 @@ export const answerSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 export type AnswerInput = z.infer<typeof answerSchema>;
+
+/** Audience Q&A: questions each voter may send per Q&A question. */
+export const MAX_QA_PER_VOTER = 3;
+const tidyText = z
+  .string()
+  .max(MAX_TEXT_ANSWER * 4)
+  .transform((t) => t.trim().replace(/\s+/g, " "))
+  .pipe(z.string().min(1, "Empty question").max(MAX_TEXT_ANSWER, `Keep it under ${MAX_TEXT_ANSWER} characters`));
+
+export const qaActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("ask"), focusId: z.uuid(), voterId: z.uuid(), text: tidyText }),
+  z.object({ action: z.literal("vote"), focusId: z.uuid(), voterId: z.uuid(), questionId: z.uuid(), up: z.boolean() }),
+]);
+export type QaAction = z.infer<typeof qaActionSchema>;
+
+/** Owner moderation: hide/unhide and mark answered/not answered (at least one). */
+export const qaModerateSchema = z
+  .object({ id: z.uuid(), hidden: z.boolean().optional(), answered: z.boolean().optional() })
+  .refine((m) => m.hidden !== undefined || m.answered !== undefined, "Nothing to change");

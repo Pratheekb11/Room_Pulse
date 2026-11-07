@@ -8,6 +8,7 @@ export const KIND_INFO: { id: QuestionKind; label: string; hint: string }[] = [
   { id: "rank", label: "Put in order", hint: "People put the options in order, best first." },
   { id: "number", label: "Number", hint: "People answer with a number, like a guess or an estimate." },
   { id: "text", label: "Open answer", hint: "People write a short answer in their own words." },
+  { id: "qa", label: "Audience Q&A", hint: "People send in questions and vote for the ones they want answered." },
   { id: "words", label: "Word cloud", hint: "People type up to 3 words. Popular words show bigger." },
 ];
 

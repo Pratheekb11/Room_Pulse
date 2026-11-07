@@ -16,6 +16,7 @@ import { numberStats, pollTally, rankTally, wordWeights } from "@/lib/answers";
 import { RankList, RankPlaces } from "./results/RankResults";
 import { NumberHistogram, NumberSummary } from "./results/NumberResults";
 import { TextSpotlight, TextWall } from "./results/TextResults";
+import { QaList } from "./results/QaResults";
 import { PollBars, PollColumns, PollPie } from "./PollResults";
 import { WordCloud, WordList } from "./WordCloud";
 import { CHARTS, isChartFor } from "@/lib/charts";
@@ -72,6 +73,7 @@ const EMPTY: ResultsPayload = {
   numbers: [],
   texts: [],
   respondents: [],
+  questions: [],
   revision: 0,
 };
 
@@ -363,6 +365,10 @@ function Stage({
                   <NumberHistogram stats={stats} min={min} max={max} unit={group.unit} />
                 );
               })()}
+            </ResultCard>
+          ) : group.kind === "qa" ? (
+            <ResultCard title={group.focus.name}>
+              <QaList code={code} items={r.questions} focusId={group.focus.id} mode={view === "new" ? "new" : "top"} owner={isOwner} />
             </ResultCard>
           ) : group.kind === "text" ? (
             <ResultCard title={group.focus.name}>

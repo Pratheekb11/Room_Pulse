@@ -11,6 +11,7 @@ import {
   MAX_TOPICS_PER_FOCUS,
 } from "@/lib/validation";
 import { KIND_INFO } from "@/lib/kinds";
+import { PRESETS, matchingPreset } from "@/lib/presets";
 import {
   duplicateIndexes,
   filledItems,
@@ -74,6 +75,7 @@ const EXAMPLES: Record<Kind, { name: string; list: string[] }> = {
   },
   number: { name: "How many customers will we have by December?", list: [] },
   text: { name: "What should we do differently next time?", list: [] },
+  qa: { name: "What would you like to ask us?", list: [] },
 };
 
 const LIST_COPY: Record<OptionKind, { label: string; noun: string }> = {
@@ -511,6 +513,30 @@ export function PresentationForm({
                             {k.label}
                           </button>
                         ))}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm">
+                        <span className="text-xs font-semibold text-ink-soft">Shortcut:</span>
+                        {PRESETS.map((p) => {
+                          const on = matchingPreset(f.kind, f.items.map((it) => it.name))?.id === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() =>
+                                update(f.key, {
+                                  kind: p.kind,
+                                  chart: defaultChart(p.kind),
+                                  items: p.options.map((name) => ({ name })),
+                                })
+                              }
+                              className={`rounded-full border border-dashed border-line-strong px-3 py-1 font-bold ${on ? "bg-mint" : "bg-white hover:bg-canvas"}`}
+                            >
+                              {on ? "✓ " : "+ "}
+                              {p.label}
+                            </button>
+                          );
+                        })}
                       </div>
                       <p className="mt-1.5 text-xs text-ink-soft">
                         {kind.hint}

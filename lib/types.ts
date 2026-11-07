@@ -16,7 +16,7 @@ export interface NamedItem {
   name: string;
 }
 
-export type QuestionKind = "rating" | "poll" | "words" | "multi" | "text" | "rank" | "number";
+export type QuestionKind = "rating" | "poll" | "words" | "multi" | "text" | "rank" | "number" | "qa";
 
 export interface FocusItem extends NamedItem {
   kind: QuestionKind;
@@ -84,6 +84,22 @@ export interface NumberCount {
   n: number;
 }
 
+/** An audience question as voters see it: no voter id, never hidden ones. */
+export interface PublicQaItem {
+  id: string;
+  focusId: string;
+  text: string;
+  votes: number;
+  answered: boolean;
+  /** ISO time it was asked. */
+  at: string;
+}
+
+/** An audience question on the presenter's screen, hidden ones included (flagged). */
+export interface QaItem extends PublicQaItem {
+  hidden: boolean;
+}
+
 export interface TextAnswer {
   focusId: string;
   text: string;
@@ -110,6 +126,8 @@ export interface ResultsPayload {
   /** Newest first, up to 200 per question. */
   texts: TextAnswer[];
   respondents: RespondentCount[];
+  /** Audience Q&A questions, newest first, up to 200 per question. */
+  questions: QaItem[];
   /** Bumped whenever the presenter edits the questions. */
   revision: number;
 }

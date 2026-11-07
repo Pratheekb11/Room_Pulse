@@ -63,7 +63,7 @@ export function PollColumns({ tally, noun = VOTES }: { tally: PollTally; noun?: 
             />
             <div className="w-full border-t border-line-strong pt-2 text-center">
               <span className="font-display mr-1 font-semibold">{LETTERS[r.index]}</span>
-              <span className="text-[clamp(0.9rem,1.25vw,1.4rem)] font-bold break-words">{r.name}</span>
+              <span className="text-[0.8rem] font-bold break-words hyphens-auto sm:text-[clamp(0.9rem,1.25vw,1.4rem)]">{r.name}</span>
               {tally.leader?.id === r.id && <span aria-label="leading"> 👑</span>}
             </div>
           </div>
