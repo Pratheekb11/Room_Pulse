@@ -6,9 +6,20 @@ import { formatGuestCode, rememberGuestCode } from "./guestCode";
 
 const field = "mt-1 w-full rounded-lg border border-line-strong px-3 py-2.5 text-lg";
 
-/** "Start now" (shows the guest code once) and "Get back in" (type the guest code). */
-export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
-  const [mode, setMode] = useState<"idle" | "code" | "return">("idle");
+/**
+ * "Start now" (shows the guest code once) and "Get back in" (type the guest code).
+ * `returning` belongs to the sign-in screen, which hides the account form while it's on.
+ */
+export function GuestOptions({
+  onSignedIn,
+  returning,
+  onReturningChange,
+}: {
+  onSignedIn: () => void;
+  returning: boolean;
+  onReturningChange: (returning: boolean) => void;
+}) {
+  const [shown, setShown] = useState(false);
   const [guestCode, setGuestCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [typed, setTyped] = useState("");
@@ -32,7 +43,7 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
       const body = (await res.json()) as { guestCode: string };
       rememberGuestCode(body.guestCode);
       setGuestCode(body.guestCode);
-      setMode("code");
+      setShown(true);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -55,7 +66,7 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
     }
   }
 
-  if (mode === "code" && guestCode) {
+  if (shown && guestCode) {
     return (
       // Full-page, so nothing else on the screen competes with the code.
       <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-canvas p-5">
@@ -80,10 +91,11 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
     );
   }
 
-  if (mode === "return") {
+  if (returning) {
     return (
       <form onSubmit={comeBack} className="slab mt-6 rounded-xl bg-white p-6" noValidate>
-        <h2 className="font-display text-2xl">Get back in</h2>
+        <h2 className="font-display text-2xl">Get back in as a guest</h2>
+        <p className="mt-1 text-sm text-ink-soft">Type the guest code you saved when you started.</p>
         <label className="mt-3 block font-semibold">
           Your guest code
           <input
@@ -93,6 +105,7 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
             autoComplete="off"
             spellCheck={false}
             placeholder="K7QM-3XPA"
+            autoFocus
             className={`${field} font-mono tracking-[0.12em] uppercase`}
           />
         </label>
@@ -100,7 +113,10 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
         <button type="submit" disabled={busy || formatGuestCode(typed).length !== 9} className="key mt-5 w-full rounded-lg bg-primary py-3 text-lg font-semibold text-white">
           {busy ? "Checking…" : "Get back in"}
         </button>
-        <button type="button" onClick={() => setMode("idle")} className="mt-3 w-full text-sm font-semibold underline underline-offset-4">
+        <button type="button" onClick={() => {
+            setError(null);
+            onReturningChange(false);
+          }} className="mt-3 w-full text-sm font-semibold underline underline-offset-4">
           Back
         </button>
       </form>
@@ -114,7 +130,10 @@ export function GuestOptions({ onSignedIn }: { onSignedIn: () => void }) {
       </button>
       <p className="mt-2 text-sm text-ink-soft">Guest presentations last 3 days. You can save your account at any time to keep them.</p>
       {error && <p role="alert" className="mt-2 text-sm font-semibold text-error">{error}</p>}
-      <button type="button" onClick={() => setMode("return")} className="mt-3 text-sm font-semibold underline underline-offset-4">
+      <button type="button" onClick={() => {
+          setError(null);
+          onReturningChange(true);
+        }} className="mt-3 text-sm font-semibold underline underline-offset-4">
         Have a guest code? Get back in
       </button>
     </div>

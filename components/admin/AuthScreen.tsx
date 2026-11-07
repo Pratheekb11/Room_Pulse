@@ -15,6 +15,8 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Typing a guest code replaces the whole sign-in area, so only one form shows at a time.
+  const [returning, setReturning] = useState(false);
 
   const tooShort = mode === "signup" && password.length > 0 && password.length < 10;
 
@@ -53,10 +55,12 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
     <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
       <Logo />
       <div className="mx-auto my-auto w-full max-w-sm">
-        <h1 className="font-display text-center text-4xl leading-tight tracking-tight">Make a presentation</h1>
-        <p className="mt-2 text-center text-ink-soft">Takes about two minutes.</p>
+        <h1 className="font-display text-center text-4xl leading-tight tracking-tight">{returning ? "Welcome back" : "Make a presentation"}</h1>
+        {!returning && <p className="mt-2 text-center text-ink-soft">Takes about two minutes.</p>}
 
-        <GuestOptions onSignedIn={onSignedIn} />
+        <GuestOptions onSignedIn={onSignedIn} returning={returning} onReturningChange={setReturning} />
+        {!returning && (
+          <>
 
         <p className="mt-6 flex items-center gap-3 text-sm text-ink-soft before:h-px before:flex-1 before:bg-line-strong after:h-px after:flex-1 after:bg-line-strong">
           or use an account
@@ -131,6 +135,8 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
           </button>
           <p className="mt-3 text-center text-xs text-ink-soft">An account keeps your presentations for good.</p>
         </form>
+          </>
+        )}
       </div>
     </main>
   );
