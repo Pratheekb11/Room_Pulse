@@ -38,6 +38,10 @@ export const CHARTS = {
     { id: "top", label: "Most votes" },
     { id: "new", label: "Newest" },
   ],
+  quiz: [
+    { id: "answers", label: "Answers" },
+    { id: "leaderboard", label: "Leaderboard" },
+  ],
 } as const satisfies Record<QuestionKind, readonly { id: string; label: string }[]>;
 
 export type ChartId<K extends QuestionKind = QuestionKind> = (typeof CHARTS)[K][number]["id"];

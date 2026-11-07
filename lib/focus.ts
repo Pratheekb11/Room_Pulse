@@ -12,6 +12,8 @@ export interface FocusGroup {
   min: number | null;
   max: number | null;
   unit: string | null;
+  /** Quiz: seconds to answer. */
+  seconds: number | null;
   /** Chart the presenter chose; the dashboard opens on it. */
   chart: string;
   /** `index` is the topic's position in the whole presentation (drives its colour). */
@@ -36,6 +38,7 @@ export function groupByFocus(
           min: f.min ?? null,
           max: f.max ?? null,
           unit: f.unit ?? null,
+          seconds: f.seconds ?? null,
           topics: [],
         },
       ];
@@ -49,6 +52,7 @@ export function groupByFocus(
     min: null,
     max: null,
     unit: null,
+    seconds: null,
     topics: [],
   };
   topics.forEach((item, index) => {

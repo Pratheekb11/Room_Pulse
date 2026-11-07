@@ -10,6 +10,11 @@ import type {
   PollCount,
   PublicQaItem,
   QaItem,
+  LeaderRow,
+  LiveQuiz,
+  QuizCount,
+  QuizMe,
+  SessionStatus,
   NumberCount,
   RankCount,
   RespondentCount,
@@ -18,7 +23,8 @@ import type {
   TopicItem,
   WordCount,
 } from "./types";
-import type { AnswerInput, CreateSessionInput, EditSessionInput, QaAction, VoteInput } from "./validation";
+import type { AnswerInput, CreateSessionInput, EditSessionInput, QaAction, QuizAction, VoteInput } from "./validation";
+import type { QuizControl } from "./validation";
 import { MAX_QA_PER_VOTER } from "./validation";
 import { generateCode, generateDashboardKey } from "./code";
 
@@ -26,12 +32,16 @@ import { generateCode, generateDashboardKey } from "./code";
 
 // ---------------------------------------------------------------- public
 
-export async function getSession(code: string): Promise<SessionPayload | null> {
+/** Voters' copy of a presentation. `withAnswers` adds each quiz's right answer, for the owner's edit form only. */
+export async function getSession(code: string, opts: { withAnswers?: boolean } = {}): Promise<SessionPayload | null> {
+  const withAnswers = opts.withAnswers === true;
   const rows = (await sql`
     select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open, s.revision,
-      coalesce((select json_agg(json_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
+      coalesce((select json_agg(jsonb_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
                   'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end),
-                  'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit)
+                  'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit,
+                  'seconds', f.quiz_seconds)
+                  || case when ${withAnswers}::boolean then jsonb_build_object('correct', f.quiz_correct) else '{}'::jsonb end
                   order by f.position)
                 from focus_topics f where f.session_id = s.id), '[]'::json) as focus_topics,
       coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'focusId', t.focus_id) order by t.position)
@@ -70,10 +80,37 @@ export async function getSession(code: string): Promise<SessionPayload | null> {
   };
 }
 
-/** Open/closed state and question revision; `null` when the session does not exist. */
-export async function getSessionStatus(code: string): Promise<{ isOpen: boolean; revision: number } | null> {
-  const rows = (await sql`select is_open, revision from live_sessions where code = ${code}`) as { is_open: boolean; revision: number }[];
-  return rows[0] ? { isOpen: rows[0].is_open, revision: rows[0].revision } : null;
+/** Seconds after a quiz question's time is up during which late answers still count (network delay). */
+const QUIZ_GRACE = 1.5;
+/** The right answer is shown only after the grace period, so nobody can see it and still answer. */
+const QUIZ_REVEAL_AFTER = 2;
+
+/** The running quiz question as JSON (null when none), for a `live_sessions s` row. */
+const liveQuizJson = () => sql`
+  (select json_build_object('focusId', f.id, 'startedAt', s.quiz_started_at,
+            'endsAt', s.quiz_started_at + make_interval(secs => f.quiz_seconds),
+            'seconds', f.quiz_seconds, 'now', now(),
+            'correctTopicId', case when now() > s.quiz_started_at + make_interval(secs => f.quiz_seconds + ${QUIZ_REVEAL_AFTER}::float8)
+                                   then (select t.id from topics t where t.focus_id = f.id and t.position - f.position * 100 = f.quiz_correct) end)
+     from focus_topics f
+    where f.id = s.quiz_focus_id and f.kind = 'quiz' and s.quiz_started_at is not null)`;
+
+const isoQuiz = (q: LiveQuiz | null): LiveQuiz | null =>
+  q && {
+    ...q,
+    startedAt: new Date(q.startedAt).toISOString(),
+    endsAt: new Date(q.endsAt).toISOString(),
+    now: new Date(q.now).toISOString(),
+  };
+
+/** Open/closed state, question revision and the running quiz question; `null` when the session does not exist. */
+export async function getSessionStatus(code: string): Promise<SessionStatus | null> {
+  const rows = (await sql`select s.is_open, s.revision, ${liveQuizJson()} as quiz from live_sessions s where s.code = ${code}`) as {
+    is_open: boolean;
+    revision: number;
+    quiz: LiveQuiz | null;
+  }[];
+  return rows[0] ? { isOpen: rows[0].is_open, revision: rows[0].revision, quiz: isoQuiz(rows[0].quiz) } : null;
 }
 
 /** `null` when the session does not exist. */
@@ -131,7 +168,8 @@ export async function getResults(
           union select voter_id from rank_answers where session_id = s.id
           union select voter_id from number_answers where session_id = s.id
           union select voter_id from qa_questions where session_id = s.id
-          union select voter_id from qa_votes where session_id = s.id) u) as voter_count,
+          union select voter_id from qa_votes where session_id = s.id
+          union select voter_id from quiz_answers where session_id = s.id) u) as voter_count,
       coalesce((select json_agg(json_build_object(
                   'topicId', r.topic_id, 'criterionId', r.criterion_id,
                   'n', r.vote_count, 'sum', r.score_sum))
@@ -186,7 +224,30 @@ export async function getResults(
                              (select count(*)::int from qa_votes v where v.question_id = q.id) as votes,
                              row_number() over (partition by q.focus_id order by q.created_at desc) as rk
                         from qa_questions q where q.session_id = s.id) x
-               where x.rk <= 200), '[]'::json) as questions
+               where x.rk <= 200), '[]'::json) as questions,
+      coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'topicId', x.topic_id, 'n', x.n))
+                from (select focus_id, topic_id, count(*)::int as n from quiz_answers where session_id = s.id
+                       group by focus_id, topic_id) x), '[]'::json) as quiz_counts,
+      coalesce((select json_agg(json_build_object('nickname', x.nickname, 'points', x.points, 'correct', x.correct)
+                                order by x.points desc, x.correct desc, x.first_at)
+                from (select coalesce(p.nickname, 'Player') as nickname, sum(a.points)::int as points,
+                             count(*) filter (where a.correct)::int as correct, min(a.created_at) as first_at
+                        from quiz_answers a
+                        left join quiz_players p on p.session_id = a.session_id and p.voter_id = a.voter_id
+                       where a.session_id = s.id
+                       group by a.voter_id, p.nickname
+                       order by points desc, correct desc, first_at
+                       limit 10) x), '[]'::json) as leaderboard,
+      coalesce((select json_agg(json_build_object('focusId', f.id, 'topicId', t.id))
+                from focus_topics f
+                join topics t on t.focus_id = f.id and t.position - f.position * 100 = f.quiz_correct
+               where f.session_id = s.id and f.kind = 'quiz'
+                 and exists (select 1 from quiz_answers a where a.focus_id = f.id)
+                 -- not while it's running
+                 and not (f.id = s.quiz_focus_id
+                          and now() <= s.quiz_started_at + make_interval(secs => f.quiz_seconds + ${QUIZ_REVEAL_AFTER}::float8))),
+               '[]'::json) as quiz_revealed,
+      ${liveQuizJson()} as quiz
     from live_sessions s
     where s.code = ${code}
       and (s.dashboard_key = ${key}::text or s.owner_id = ${owner}::uuid)
@@ -203,6 +264,10 @@ export async function getResults(
     texts: TextAnswer[];
     respondents: RespondentCount[];
     questions: QaItem[];
+    quiz_counts: QuizCount[];
+    quiz_revealed: { focusId: string; topicId: string }[];
+    leaderboard: LeaderRow[];
+    quiz: LiveQuiz | null;
   }[];
   const r = rows[0];
   if (!r) return null;
@@ -218,6 +283,10 @@ export async function getResults(
     texts: r.texts.map((t) => ({ ...t, at: new Date(t.at).toISOString() })),
     respondents: r.respondents,
     questions: r.questions.map((q) => ({ ...q, at: new Date(q.at).toISOString() })),
+    quizCounts: r.quiz_counts,
+    quizRevealed: r.quiz_revealed,
+    leaderboard: r.leaderboard,
+    quiz: isoQuiz(r.quiz),
     revision: r.revision,
   };
 }
@@ -243,7 +312,8 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
               union all select session_id, voter_id from rank_answers
               union all select session_id, voter_id from number_answers
               union all select session_id, voter_id from qa_questions
-              union all select session_id, voter_id from qa_votes) a
+              union all select session_id, voter_id from qa_votes
+              union all select session_id, voter_id from quiz_answers) a
        group by session_id
     ) v on v.session_id = s.id
     where s.owner_id = ${ownerId}
@@ -305,10 +375,11 @@ export async function createSession(
           select e.val, e.ord - 1 as pos
           from jsonb_array_elements(${JSON.stringify(input.focusTopics)}::jsonb) with ordinality as e(val, ord)
         ), f as (
-          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit)
+          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds)
           select s.id, input.val->>'name', input.val->>'kind', input.val->>'chart', input.pos,
                  (input.val->>'maxPicks')::int, (input.val->>'min')::double precision,
-                 (input.val->>'max')::double precision, input.val->>'unit'
+                 (input.val->>'max')::double precision, input.val->>'unit',
+                 (input.val->>'correctIndex')::int, (input.val->>'seconds')::int
           from s, input
           returning id, position
         ), t as (
@@ -348,6 +419,9 @@ export async function resetSession(code: string): Promise<void> {
     sql`delete from rank_answers where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from number_answers where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from qa_questions where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from quiz_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from quiz_players where session_id = (select id from live_sessions where code = ${code})`,
+    sql`update sessions set quiz_focus_id = null, quiz_started_at = null where code = ${code}`,
     sql`delete from results where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
   ]);
@@ -477,6 +551,13 @@ export async function getRawRows(code: string): Promise<RawRow[]> {
         join s on v.session_id = s.id
         join qa_questions q on q.id = v.question_id
         join focus_topics f on f.id = v.focus_id
+      union all
+      select a.voter_id, a.created_at, a.created_at, f.position, t.position, 0,
+             f.name, t.name, 'Quiz answer', a.points::text
+        from quiz_answers a
+        join s on a.session_id = s.id
+        join focus_topics f on f.id = a.focus_id
+        join topics t on t.id = a.topic_id
     ),
     firsts as (select voter_id, min(created_at) as first_at from answers group by voter_id),
     numbered as (select voter_id, row_number() over (order by first_at, voter_id) as rn from firsts)
@@ -687,6 +768,92 @@ async function saveOptionList(kind: "multi" | "rank", code: string, focusId: str
   return allowed.length > 0 && inserted.length === ids.length;
 }
 
+// ---------------------------------------------------------------- quiz
+
+export type QuizOutcome = "ok" | "not_found" | "closed" | "invalid" | "not_live";
+
+/** Sets a nickname, or locks in an answer to the running question (scored on arrival). */
+export async function saveQuizAction(code: string, a: QuizAction): Promise<QuizOutcome> {
+  if (a.action === "join") {
+    const rows = await sql`
+      insert into quiz_players (session_id, voter_id, nickname)
+      select s.id, ${a.voterId}::uuid, ${a.nickname} from live_sessions s where s.code = ${code}
+      on conflict (session_id, voter_id) do update set nickname = excluded.nickname
+      returning 1 as ok`;
+    return rows.length ? "ok" : "not_found";
+  }
+  // Right answers score 500, plus up to 500 more the faster they come.
+  const rows = await sql`
+    insert into quiz_answers (session_id, focus_id, voter_id, topic_id, correct, points)
+    select s.id, f.id, ${a.voterId}::uuid, t.id, x.correct,
+           case when x.correct
+                then 500 + round(500 * greatest(0, 1 - extract(epoch from now() - s.quiz_started_at) / f.quiz_seconds))::int
+                else 0 end
+    from live_sessions s
+    join focus_topics f on f.id = s.quiz_focus_id and f.session_id = s.id and f.kind = 'quiz' and f.id = ${a.focusId}::uuid
+    join topics t on t.focus_id = f.id and t.id = ${a.topicId}::uuid
+    cross join lateral (select t.position - f.position * 100 = f.quiz_correct as correct) x
+    where s.code = ${code} and s.is_open
+      and now() <= s.quiz_started_at + make_interval(secs => f.quiz_seconds + ${QUIZ_GRACE}::float8)
+    on conflict (focus_id, voter_id) do nothing
+    returning 1 as ok`;
+  if (rows.length) return "ok";
+  const [st] = (await sql`
+    select s.is_open,
+           exists (select 1 from topics t join focus_topics f on f.id = t.focus_id
+                    where f.session_id = s.id and f.kind = 'quiz' and f.id = ${a.focusId}::uuid and t.id = ${a.topicId}::uuid) as valid
+    from live_sessions s where s.code = ${code}`) as { is_open: boolean; valid: boolean }[];
+  if (!st) return "not_found";
+  if (!st.is_open) return "closed";
+  // a real option, but the question isn't running, time is up, or they already answered
+  return st.valid ? "not_live" : "invalid";
+}
+
+/** One player's nickname, total, rank and their answers to questions whose time is up. */
+export async function getQuizMe(code: string, voterId: string): Promise<QuizMe | null> {
+  const rows = (await sql`
+    with s as (select * from live_sessions where code = ${code}),
+    totals as (select voter_id, sum(points)::int as points from quiz_answers where session_id = (select id from s) group by voter_id)
+    select
+      (select nickname from quiz_players where session_id = (select id from s) and voter_id = ${voterId}::uuid) as nickname,
+      coalesce((select points from totals where voter_id = ${voterId}::uuid), 0) as points,
+      case when exists (select 1 from totals where voter_id = ${voterId}::uuid)
+           then 1 + (select count(*)::int from totals where points > (select points from totals where voter_id = ${voterId}::uuid)) end as rank,
+      (select count(*)::int from totals) as players,
+      coalesce((select json_agg(json_build_object('focusId', a.focus_id, 'topicId', a.topic_id, 'correct', a.correct, 'points', a.points))
+                from quiz_answers a join focus_topics f on f.id = a.focus_id
+               where a.session_id = (select id from s) and a.voter_id = ${voterId}::uuid
+                 -- hide the result while that question is still running
+                 and not (f.id = (select quiz_focus_id from s)
+                          and now() <= (select quiz_started_at from s) + make_interval(secs => f.quiz_seconds + ${QUIZ_REVEAL_AFTER}::float8))),
+               '[]'::json) as answers
+    from s
+  `) as QuizMe[];
+  return rows[0] ?? null;
+}
+
+/** Owner's controls (the caller checks ownership). `false` when the question isn't a quiz in this presentation. */
+export async function controlQuiz(code: string, c: QuizControl): Promise<boolean> {
+  if (c.action === "start") {
+    const rows = await sql`
+      update sessions s set quiz_focus_id = f.id, quiz_started_at = now()
+        from focus_topics f
+       where s.code = ${code} and f.session_id = s.id and f.id = ${c.focusId}::uuid and f.kind = 'quiz'
+      returning 1 as ok`;
+    return rows.length > 0;
+  }
+  if (c.action === "end") {
+    // move the start back so the time is up now
+    await sql`
+      update sessions s set quiz_started_at = least(s.quiz_started_at, now() - make_interval(secs => f.quiz_seconds))
+        from focus_topics f
+       where s.code = ${code} and f.id = s.quiz_focus_id`;
+    return true;
+  }
+  await sql`update sessions set quiz_focus_id = null, quiz_started_at = null where code = ${code}`;
+  return true;
+}
+
 // ---------------------------------------------------------------- audience Q&A
 
 export type QaOutcome = { outcome: "ok"; id?: string } | { outcome: "not_found" | "closed" | "invalid" | "limit" };
@@ -781,7 +948,9 @@ export interface ChoiceSummaryRow {
     | "Answer"
     | "Audience question"
     | "Answered question"
-    | "Hidden question";
+    | "Hidden question"
+    | "Right answer"
+    | "Quiz choice";
   average: number | null;
   n: number;
 }
@@ -836,6 +1005,14 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
         join focus_topics f on f.session_id = s.id and f.kind = 'qa'
         join qa_questions q on q.focus_id = f.id
         cross join lateral (select count(*)::int as votes from qa_votes v where v.question_id = q.id) x
+       where s.code = ${code}
+      union all
+      select f.position, t.position, f.name, t.name,
+             case when t.position - f.position * 100 = f.quiz_correct then 'Right answer' else 'Quiz choice' end, null,
+             (select count(*)::int from quiz_answers a where a.topic_id = t.id)
+        from live_sessions s
+        join focus_topics f on f.session_id = s.id and f.kind = 'quiz'
+        join topics t on t.focus_id = f.id
        where s.code = ${code}
     ) x
     order by fp, tp, label
@@ -981,13 +1158,16 @@ export async function getAnswerCounts(code: string, ownerId: string): Promise<{ 
       union all
       select topic_id, count(*)::int from rank_answers where session_id = (select id from s) group by topic_id
       union all
+      select topic_id, count(*)::int from quiz_answers where session_id = (select id from s) group by topic_id
+      union all
       select focus_id, count(distinct voter_id)::int from (
         select focus_id, voter_id from choice_answers where session_id = (select id from s)
         union all select focus_id, voter_id from rank_answers where session_id = (select id from s)
         union all select focus_id, voter_id from text_answers where session_id = (select id from s)
         union all select focus_id, voter_id from number_answers where session_id = (select id from s)
         union all select focus_id, voter_id from qa_questions where session_id = (select id from s)
-        union all select focus_id, voter_id from qa_votes where session_id = (select id from s)) a
+        union all select focus_id, voter_id from qa_votes where session_id = (select id from s)
+        union all select focus_id, voter_id from quiz_answers where session_id = (select id from s)) a
       group by focus_id
     )
     select (select count(*) from s)::int as found,
@@ -1057,14 +1237,15 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
     sql`delete from topics where session_id = ${sid}::uuid and not (id = any(${keepTopics}::uuid[]))`,
     sql`delete from criteria where session_id = ${sid}::uuid and not (id = any(${keepCriteria}::uuid[]))`,
     sql`update focus_topics f set name = x.name, chart = x.chart, position = x.pos,
-          max_picks = x."maxPicks", num_min = x.min, num_max = x.max, num_unit = x.unit
+          max_picks = x."maxPicks", num_min = x.min, num_max = x.max, num_unit = x.unit,
+          quiz_correct = x."correctIndex", quiz_seconds = x.seconds
         from jsonb_to_recordset(${rows(focus.filter((f) => !f.isNew))}::jsonb)
-          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text)
+          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int)
         where f.id = x.id and f.session_id = ${sid}::uuid`,
-    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit)
-        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit
+    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds)
+        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit, x."correctIndex", x.seconds
         from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb)
-          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text)`,
+          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int)`,
     sql`update topics t set name = x.name, position = x.pos
         from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int)
         where t.id = x.id and t.session_id = ${sid}::uuid`,

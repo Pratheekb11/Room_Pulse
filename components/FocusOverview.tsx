@@ -58,11 +58,14 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
           const texts = g.kind === "text" ? results.texts.filter((t) => t.focusId === g.focus.id) : [];
           const cloud = g.kind === "words" ? wordWeights(words, g.focus.id) : [];
           const asked = g.kind === "qa" ? qaOrder(results.questions, g.focus.id, "top") : [];
+          const quizAnswers = g.kind === "quiz" ? results.quizCounts.filter((c) => c.focusId === g.focus.id).reduce((n, c) => n + c.n, 0) : 0;
+          const quizLive = g.kind === "quiz" && results.quiz?.focusId === g.focus.id && results.quiz.correctTopicId === null;
           const count =
             g.kind === "poll" && tally ? plural(tally.total, "vote", "votes")
             : g.kind === "words" ? plural(cloud.reduce((s, w) => s + w.n, 0), "answer", "answers")
             : g.kind === "text" ? plural(texts.length, "answer", "answers")
             : g.kind === "qa" ? plural(asked.length, "question", "questions")
+            : g.kind === "quiz" ? plural(quizAnswers, "answer", "answers")
             : plural(people, "person", "people");
           return (
             <button
@@ -94,6 +97,19 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
                   ))}
                   {texts.length === 0 && <li className="text-ink-soft">No answers yet</li>}
                 </ul>
+              )}
+              {g.kind === "quiz" && (
+                <p className="mt-4 text-[clamp(0.95rem,1.1vw,1.25rem)] font-semibold">
+                  {quizLive ? (
+                    <span className="inline-flex items-center gap-2 text-primary">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden /> Running now
+                    </span>
+                  ) : quizAnswers > 0 ? (
+                    "Played"
+                  ) : (
+                    <span className="text-ink-soft">Not started yet. Open it to start.</span>
+                  )}
+                </p>
               )}
               {g.kind === "qa" && (
                 <ul className="mt-4 flex flex-col gap-1.5">

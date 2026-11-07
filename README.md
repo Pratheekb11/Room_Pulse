@@ -9,6 +9,7 @@ Anonymous, near-real-time audience voting for live sessions. Presenters start st
 - **Number:** answer with a number in the presenter's range, with an optional unit. Results show a spread chart, the average and the middle value.
 - **Open answer:** one short answer (up to 280 characters) per person, shown as a wall of cards or one at a time.
 - **Audience Q&A:** people send in questions (up to 3 each) and upvote the ones they want answered. The list re-sorts live; the presenter can mark a question answered or hide it.
+- **Quiz:** one right answer and a timer. The presenter starts each question from the results screen and every phone jumps to it. Fast right answers score more, and a leaderboard shows the top 10 nicknames.
 - **Yes / No / Not sure:** a one-tap shortcut in the builder that makes a Pick one question with those options.
 - **Word cloud:** up to 3 words or short phrases per person.
 
@@ -72,6 +73,7 @@ npm test
 - `test/email-auth.test.ts` covers email verification and password reset: single use, expiry, rate limits, no account discovery, sign-out on reset, and links that can't be redirected via the Host header.
 - `test/auth.test.ts` covers sign-up, log-in, log-out, password hashing, lockout, cross-site blocking and per-account separation.
 - `test/questions.test.ts` covers polls and word clouds: validation, changing answers, closed sessions, reset and exports.
+- `test/quiz.test.ts` covers quizzes: the right answer kept secret, starting and ending questions (owner only), timing, scoring, the leaderboard, exports, editing, reset, and re-running the schema on a database that holds every question type.
 - `test/qa.test.ts` covers audience Q&A: asking, the 3-question limit, upvotes, owner-only hiding and marking answered, closed sessions, exports and reset.
 - `test/question-types.test.ts` covers pick several, open answer, ranking and number questions: settings, validation, replacing answers, closed sessions, reset, people counts, exports and editing.
 - `test/api.test.ts` runs every API route against real Postgres (PGlite) through the real Neon driver. It covers validation, 403/404/503 handling, overwrite-not-double-count, concurrent voters, reset/recalculate/delete, CSV exports, and checks that no voter id ever leaks. After the load tests, `db/check.sql` must return zero rows.

@@ -12,7 +12,7 @@ export async function GET(req: Request, ctx: Ctx) {
   try {
     const s = await requireOwnedSession(req, (await ctx.params).code);
     if (s instanceof Response) return s;
-    const [session, answers] = await Promise.all([getSession(s.code), getAnswerCounts(s.code, s.userId)]);
+    const [session, answers] = await Promise.all([getSession(s.code, { withAnswers: true }), getAnswerCounts(s.code, s.userId)]);
     if (!session || !answers) return json({ error: "not_found" }, 404);
     return json({ session, ...answers });
   } catch (err) {

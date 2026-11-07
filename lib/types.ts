@@ -16,7 +16,7 @@ export interface NamedItem {
   name: string;
 }
 
-export type QuestionKind = "rating" | "poll" | "words" | "multi" | "text" | "rank" | "number" | "qa";
+export type QuestionKind = "rating" | "poll" | "words" | "multi" | "text" | "rank" | "number" | "qa" | "quiz";
 
 export interface FocusItem extends NamedItem {
   kind: QuestionKind;
@@ -28,6 +28,10 @@ export interface FocusItem extends NamedItem {
   min?: number | null;
   max?: number | null;
   unit?: string | null;
+  /** Quiz: seconds to answer. */
+  seconds?: number | null;
+  /** Quiz: index of the right option. Only in the owner's copy, never sent to voters. */
+  correct?: number | null;
 }
 
 export interface TopicItem extends NamedItem {
@@ -100,6 +104,46 @@ export interface QaItem extends PublicQaItem {
   hidden: boolean;
 }
 
+/** The quiz question running now, as every phone sees it. */
+export interface LiveQuiz {
+  focusId: string;
+  startedAt: string;
+  endsAt: string;
+  seconds: number;
+  /** Server time when this was read, so phones can correct for a wrong clock. */
+  now: string;
+  /** The right option, only once time is up. */
+  correctTopicId: string | null;
+}
+
+export interface SessionStatus {
+  isOpen: boolean;
+  revision: number;
+  quiz: LiveQuiz | null;
+}
+
+export interface QuizCount {
+  focusId: string;
+  topicId: string;
+  n: number;
+}
+
+export interface LeaderRow {
+  nickname: string;
+  points: number;
+  /** Right answers. */
+  correct: number;
+}
+
+/** One player's own quiz score; answers only for questions whose time is up. */
+export interface QuizMe {
+  nickname: string | null;
+  points: number;
+  rank: number | null;
+  players: number;
+  answers: { focusId: string; topicId: string; correct: boolean; points: number }[];
+}
+
 export interface TextAnswer {
   focusId: string;
   text: string;
@@ -128,6 +172,14 @@ export interface ResultsPayload {
   respondents: RespondentCount[];
   /** Audience Q&A questions, newest first, up to 200 per question. */
   questions: QaItem[];
+  /** Quiz: how many picked each option. */
+  quizCounts: QuizCount[];
+  /** Quiz: right answers of questions already played (none while a question runs). */
+  quizRevealed: { focusId: string; topicId: string }[];
+  /** Quiz: top 10 players. */
+  leaderboard: LeaderRow[];
+  /** Quiz: the question running now. */
+  quiz: LiveQuiz | null;
   /** Bumped whenever the presenter edits the questions. */
   revision: number;
 }

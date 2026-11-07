@@ -25,7 +25,7 @@ import { ListEditor } from "./ListEditor";
 
 type Call = (path: string, init?: RequestInit) => Promise<Response>;
 type Kind = QuestionKind;
-type OptionKind = "rating" | "poll" | "multi" | "rank";
+type OptionKind = "rating" | "poll" | "multi" | "rank" | "quiz";
 
 interface QuestionDraft {
   key: number;
@@ -41,6 +41,9 @@ interface QuestionDraft {
   min: string;
   max: string;
   unit: string;
+  /** Quiz: the right option's text, and seconds to answer. */
+  correct: string;
+  seconds: number;
 }
 
 export type FormMode =
@@ -76,6 +79,7 @@ const EXAMPLES: Record<Kind, { name: string; list: string[] }> = {
   number: { name: "How many customers will we have by December?", list: [] },
   text: { name: "What should we do differently next time?", list: [] },
   qa: { name: "What would you like to ask us?", list: [] },
+  quiz: { name: "What is the capital of Japan?", list: ["Osaka", "Tokyo", "Kyoto"] },
 };
 
 const LIST_COPY: Record<OptionKind, { label: string; noun: string }> = {
@@ -83,10 +87,13 @@ const LIST_COPY: Record<OptionKind, { label: string; noun: string }> = {
   poll: { label: "Options", noun: "option" },
   multi: { label: "Options", noun: "option" },
   rank: { label: "Options to put in order", noun: "option" },
+  quiz: { label: "Answers to choose from", noun: "answer" },
 };
 
+const QUIZ_TIMES = [10, 15, 20, 30, 45, 60, 90, 120];
+
 /** Questions that need 2 options start with two rows; scored questions with one. */
-const needsTwo = (kind: Kind) => kind === "poll" || kind === "multi" || kind === "rank";
+const needsTwo = (kind: Kind) => kind === "poll" || kind === "multi" || kind === "rank" || kind === "quiz";
 const startRows = (kind: Kind): Row[] =>
   needsTwo(kind) ? [{ name: "" }, { name: "" }] : [{ name: "" }];
 const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
@@ -99,6 +106,8 @@ const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
   min: "0",
   max: "100",
   unit: "",
+  correct: "",
+  seconds: 20,
 });
 
 /** A typed number, or null if it isn't one. Commas are allowed as thousands separators. */
@@ -178,6 +187,11 @@ function fromSession(s: SessionPayload): Draft {
       min: String(f.min ?? 0),
       max: String(f.max ?? 100),
       unit: f.unit ?? "",
+      correct:
+        f.kind === "quiz" && typeof f.correct === "number"
+          ? (s.topics.filter((t) => t.focusId === f.id)[f.correct]?.name ?? "")
+          : "",
+      seconds: f.seconds ?? 20,
     })),
     criteria: rowsFrom(s.criteria),
   };
@@ -253,6 +267,8 @@ export function PresentationForm({
     min: f.kind === "number" ? toNumber(f.min) : null,
     max: f.kind === "number" ? toNumber(f.max) : null,
     unit: f.kind === "number" && f.unit.trim() ? f.unit.trim() : null,
+    correct: f.kind === "quiz" && f.correct.trim() ? f.correct.trim() : null,
+    seconds: f.kind === "quiz" ? f.seconds : null,
   });
   const hasRating = parsed.some((f) => f.kind === "rating");
   const criteria = hasRating ? filledItems(criteriaRows) : [];
@@ -275,6 +291,8 @@ export function PresentationForm({
       problems.push(
         `${label} has the same ${LIST_COPY[f.kind as OptionKind].noun} twice.`,
       );
+    if (f.kind === "quiz" && f.topics.length >= 2 && !f.topics.some((t) => t.trim() === f.correct.trim()))
+      problems.push(`Pick the right answer for ${label}.`);
     if (f.kind === "number") {
       const lo = toNumber(f.min);
       const hi = toNumber(f.max);
@@ -593,6 +611,50 @@ export function PresentationForm({
                         ))}
                       </select>
                     </label>
+                  )}
+
+                  {f.kind === "quiz" && (
+                    <div className="mt-3">
+                      <p id={`right-${f.key}`} className="text-sm font-semibold">
+                        Right answer
+                      </p>
+                      <div role="radiogroup" aria-labelledby={`right-${f.key}`} className="mt-1 flex flex-wrap gap-1.5">
+                        {filledItems(f.items).map((name) => {
+                          const on = name.trim() === f.correct.trim();
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              onClick={() => update(f.key, { correct: name })}
+                              className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold ${on ? "bg-mint" : "bg-white hover:bg-canvas"}`}
+                            >
+                              {on ? "✓ " : ""}
+                              {name}
+                            </button>
+                          );
+                        })}
+                        {filledItems(f.items).length === 0 && <span className="text-sm text-ink-soft">Type the answers above first.</span>}
+                      </div>
+                      <label className="mt-3 block text-sm font-semibold">
+                        Time to answer
+                        <select
+                          value={f.seconds}
+                          onChange={(e) => update(f.key, { seconds: Number(e.target.value) })}
+                          className={`${field} text-base`}
+                        >
+                          {QUIZ_TIMES.map((t) => (
+                            <option key={t} value={t}>
+                              {t < 60 ? `${t} seconds` : t === 60 ? "1 minute" : `${t / 60} minutes`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="mt-1.5 text-xs text-ink-soft">
+                        On the results screen you start each quiz question. Everyone&apos;s phone jumps to it, and the right answer shows when time is up.
+                      </p>
+                    </div>
                   )}
 
                   {f.kind === "number" && (

@@ -38,11 +38,11 @@ export const MAX_FOCUS_TOPICS = 10;
 export const MAX_TOPICS_PER_FOCUS = 10;
 export const MAX_CRITERIA = 10;
 
-export const QUESTION_KINDS = ["rating", "poll", "words", "multi", "text", "rank", "number", "qa"] as const;
+export const QUESTION_KINDS = ["rating", "poll", "words", "multi", "text", "rank", "number", "qa", "quiz"] as const;
 type Kind = (typeof QUESTION_KINDS)[number];
 
 /** Question types whose answers are picked from a list of options (topics). */
-export const KINDS_WITH_OPTIONS: readonly Kind[] = ["rating", "poll", "multi", "rank"];
+export const KINDS_WITH_OPTIONS: readonly Kind[] = ["rating", "poll", "multi", "rank", "quiz"];
 export const hasOptions = (kind: Kind) => KINDS_WITH_OPTIONS.includes(kind);
 
 /** Largest number a number question may ask for (keeps answers exact in a double). */
@@ -56,29 +56,43 @@ const settingsShape = {
   min: boundedNumber.nullish(),
   max: boundedNumber.nullish(),
   unit: z.string().trim().max(20, "Keep the unit under 20 characters").nullish(),
+  /** Quiz: the right option, by its text. */
+  correct: z.string().max(480).nullish(),
+  seconds: z.number().int().min(5, "Give at least 5 seconds").max(120, "Give at most 2 minutes").nullish(),
 };
 
-function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[]; maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null }>(f: T) {
+export const QUIZ_SECONDS_DEFAULT = 20;
+
+type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null };
+const topicName = (t: unknown) => cleanName(typeof t === "string" ? t : (t as { name: string }).name);
+
+function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] } & Settings>(f: T) {
   const isNumber = f.kind === "number";
+  const isQuiz = f.kind === "quiz";
+  const { correct, ...rest } = f;
   return {
-    ...f,
+    ...rest,
     topics: hasOptions(f.kind) ? f.topics : [],
     chart: f.chart ?? defaultChart(f.kind),
     maxPicks: f.kind === "multi" ? (f.maxPicks ?? null) : null,
     min: isNumber ? (f.min ?? 0) : null,
     max: isNumber ? (f.max ?? 100) : null,
     unit: isNumber && f.unit ? f.unit : null,
+    seconds: isQuiz ? (f.seconds ?? QUIZ_SECONDS_DEFAULT) : null,
+    // the right option's index; -1 = missing or not one of the options
+    correctIndex: isQuiz ? (correct ? f.topics.map(topicName).indexOf(cleanName(correct)) : -1) : null,
   };
 }
 
 /** Checks shared by creating and editing a question. */
 function checkQuestion(
-  f: { name: string; kind: Kind; chart: string; topics: unknown[]; min: number | null; max: number | null },
+  f: { name: string; kind: Kind; chart: string; topics: unknown[]; min: number | null; max: number | null; correctIndex: number | null },
   ctx: z.RefinementCtx,
 ) {
   if (!isChartFor(f.kind, f.chart)) ctx.addIssue({ code: "custom", message: `“${f.chart}” isn't a chart for ${f.kind} questions` });
   if (f.kind === "rating" && f.topics.length < 1) ctx.addIssue({ code: "custom", message: `Add at least 1 thing to rate to “${f.name}”` });
-  if ((f.kind === "poll" || f.kind === "multi" || f.kind === "rank") && f.topics.length < 2)
+  if (f.kind === "quiz" && f.correctIndex === -1) ctx.addIssue({ code: "custom", message: `Mark the right answer for “${f.name}”` });
+  if ((f.kind === "poll" || f.kind === "multi" || f.kind === "rank" || f.kind === "quiz") && f.topics.length < 2)
     ctx.addIssue({ code: "custom", message: `Give “${f.name}” at least 2 options` });
   if (f.kind === "number" && !((f.min ?? 0) < (f.max ?? 0)))
     ctx.addIssue({ code: "custom", message: `In “${f.name}”, the lowest number must be below the highest` });
@@ -272,6 +286,26 @@ export const qaActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("vote"), focusId: z.uuid(), voterId: z.uuid(), questionId: z.uuid(), up: z.boolean() }),
 ]);
 export type QaAction = z.infer<typeof qaActionSchema>;
+
+export const nicknameSchema = z
+  .string()
+  .max(80)
+  .transform((t) => t.trim().replace(/\s+/g, " "))
+  .pipe(z.string().min(1, "Pick a nickname").max(20, "Keep it under 20 characters"));
+
+export const quizActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("join"), voterId: z.uuid(), nickname: nicknameSchema }),
+  z.object({ action: z.literal("answer"), voterId: z.uuid(), focusId: z.uuid(), topicId: z.uuid() }),
+]);
+export type QuizAction = z.infer<typeof quizActionSchema>;
+
+/** Owner's quiz controls: start a question, end it now, or stop the quiz. */
+export const quizControlSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("start"), focusId: z.uuid() }),
+  z.object({ action: z.literal("end") }),
+  z.object({ action: z.literal("stop") }),
+]);
+export type QuizControl = z.infer<typeof quizControlSchema>;
 
 /** Owner moderation: hide/unhide and mark answered/not answered (at least one). */
 export const qaModerateSchema = z

@@ -17,6 +17,7 @@ import { RankList, RankPlaces } from "./results/RankResults";
 import { NumberHistogram, NumberSummary } from "./results/NumberResults";
 import { TextSpotlight, TextWall } from "./results/TextResults";
 import { QaList } from "./results/QaResults";
+import { Leaderboard, QuizStage } from "./results/QuizResults";
 import { PollBars, PollColumns, PollPie } from "./PollResults";
 import { WordCloud, WordList } from "./WordCloud";
 import { CHARTS, isChartFor } from "@/lib/charts";
@@ -74,6 +75,10 @@ const EMPTY: ResultsPayload = {
   texts: [],
   respondents: [],
   questions: [],
+  quizCounts: [],
+  quizRevealed: [],
+  leaderboard: [],
+  quiz: null,
   revision: 0,
 };
 
@@ -366,6 +371,37 @@ function Stage({
                 );
               })()}
             </ResultCard>
+          ) : group.kind === "quiz" ? (
+            view === "leaderboard" ? (
+              <ResultCard title="Leaderboard">
+                <Leaderboard rows={r.leaderboard} />
+              </ResultCard>
+            ) : (
+              (() => {
+                const quizzes = groups.map((g, i) => ({ g, i })).filter((x) => x.g.kind === "quiz");
+                const after = quizzes.find((x) => focusIndex !== null && x.i > focusIndex);
+                return (
+                  <QuizStage
+                    code={code}
+                    focusId={group.focus.id}
+                    question={group.focus.name}
+                    options={group.topics.map((t) => t.item)}
+                    seconds={group.seconds ?? 20}
+                    live={r.quiz}
+                    receivedAt={lastOkAt}
+                    counts={r.quizCounts}
+                    revealed={r.quizRevealed.find((x) => x.focusId === group.focus.id)?.topicId ?? null}
+                    owner={isOwner}
+                    next={after ? { focusId: after.g.focus.id, name: after.g.focus.name } : null}
+                    onShowLeaderboard={() => setView("leaderboard")}
+                    onNext={(id) => {
+                      const i = groups.findIndex((g) => g.focus.id === id);
+                      if (i !== -1) setFocusIndex(i);
+                    }}
+                  />
+                );
+              })()
+            )
           ) : group.kind === "qa" ? (
             <ResultCard title={group.focus.name}>
               <QaList code={code} items={r.questions} focusId={group.focus.id} mode={view === "new" ? "new" : "top"} owner={isOwner} />

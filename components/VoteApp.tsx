@@ -5,7 +5,7 @@ import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
 import { groupByFocus } from "@/lib/focus";
 import { getVoterId, readJSON, writeJSON } from "@/lib/storage";
-import type { QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
+import type { LiveQuiz, QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
 import { VoteQueue, type SaveStatus } from "@/lib/vote-queue";
 import { Confetti } from "./Confetti";
 import { Logo } from "./Logo";
@@ -18,6 +18,8 @@ import { NumberCard } from "./vote/NumberCard";
 import { RankCard } from "./vote/RankCard";
 import { TextCard } from "./vote/TextCard";
 import { QaCard } from "./vote/QaCard";
+import { QuizCard } from "./vote/QuizCard";
+import { clockOffset } from "@/lib/quiz";
 import { useSession } from "./useSession";
 
 export function VoteApp({ code }: { code: string }) {
@@ -34,6 +36,8 @@ export function VoteApp({ code }: { code: string }) {
 }
 
 const STATUS_POLL_MS = 10_000;
+/** With quiz questions, phones check more often so a started question reaches them within ~2 seconds. */
+const QUIZ_POLL_MS = 1_500;
 
 /**
  * poll: chosen option id · words: list of words · multi: picked option ids ·
@@ -79,6 +83,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           return typeof v === "string" && v.length > 0;
         case "qa":
           return false; // Q&A keeps its own state (QaCard)
+        case "quiz":
+          return typeof v === "string" && isOption(v);
         default:
           return Array.isArray(v) && v.length <= 3 && v.every((w) => typeof w === "string");
       }
@@ -163,6 +169,11 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     answerQueue.setOpen(isOpen);
   }, [queue, answerQueue, isOpen]);
 
+  // Quiz: the question running now, and server minus phone time.
+  const hasQuiz = groups.some((g) => g.kind === "quiz");
+  const [liveQuiz, setLiveQuiz] = useState<LiveQuiz | null>(null);
+  const [quizOffset, setQuizOffset] = useState(0);
+
   // Poll open/closed state while the tab is visible (served from the CDN cache).
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -170,8 +181,12 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       try {
         const res = await fetch(`/api/session/${encodeURIComponent(code)}/status`, { cache: "no-store" });
         if (!res.ok) return;
-        const body = (await res.json()) as { isOpen: boolean; revision?: number };
+        const body = (await res.json()) as { isOpen: boolean; revision?: number; quiz?: LiveQuiz | null };
         setIsOpen(body.isOpen);
+        if (body.quiz !== undefined) {
+          setLiveQuiz((prev) => (JSON.stringify(prev) === JSON.stringify(body.quiz) ? prev : (body.quiz ?? null)));
+          if (body.quiz) setQuizOffset(clockOffset(body.quiz.now, Date.now()));
+        }
         if (typeof body.revision === "number" && body.revision !== session.revision) onRevision(body.revision);
       } catch {
         /* offline: try again next tick */
@@ -179,7 +194,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     };
     const startPolling = () => {
       if (timer) clearInterval(timer);
-      timer = setInterval(check, STATUS_POLL_MS);
+      timer = setInterval(check, hasQuiz ? QUIZ_POLL_MS : STATUS_POLL_MS);
     };
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -190,13 +205,16 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         timer = undefined;
       }
     };
-    if (document.visibilityState === "visible") startPolling();
+    if (document.visibilityState === "visible") {
+      if (hasQuiz) void check();
+      startPolling();
+    }
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [code, session.revision, onRevision]);
+  }, [code, session.revision, onRevision, hasQuiz]);
 
   // ---- steps: one screen per rated topic, one per poll, one per word cloud
   const steps: Step[] = useMemo(
@@ -226,6 +244,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         case "qa":
           // done once they ask, upvote or skip
           return finished.includes(g.focus.id);
+        case "quiz":
+          // done once answered, or once its time is up
+          return typeof v === "string" || finished.includes(g.focus.id);
         default:
           return Array.isArray(v) && (v.length >= 3 || (v.length > 0 && finished.includes(g.focus.id)));
       }
@@ -367,6 +388,44 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   );
 
   const qaStep = steps.findIndex((s) => s.kind === "qa");
+
+  /** Quiz: answer locked in on the server (no queue: a quiz answer is one-shot and timed). */
+  const onQuizAnswer = useCallback(
+    (gi: number, topicId: string) => {
+      const focusId = groups[gi].focus.id;
+      reward();
+      const next = { ...answers, [focusId]: topicId };
+      setAnswers(next);
+      writeJSON(answersKey, next);
+    },
+    [groups, answers, answersKey, reward],
+  );
+  /** Quiz: time is up for this question. */
+  const onQuizOver = useCallback(
+    (focusId: string) => {
+      setFinished((f) => {
+        if (f.includes(focusId)) return f;
+        const next = [...f, focusId];
+        writeJSON(finishedKey, next);
+        return next;
+      });
+    },
+    [finishedKey],
+  );
+
+  // When the presenter starts a quiz question, every phone jumps to it (even from the thank-you screen).
+  const liveStart = liveQuiz ? `${liveQuiz.focusId}@${liveQuiz.startedAt}` : null;
+  const lastStart = useRef<string | null>(null);
+  useEffect(() => {
+    if (!liveQuiz || liveStart === lastStart.current) return;
+    const first = lastStart.current === null;
+    lastStart.current = liveStart;
+    const i = steps.findIndex((s) => s.kind === "quiz" && groups[s.gi].focus.id === liveQuiz.focusId);
+    // on page load, only jump if the question is still running
+    if (i === -1 || (first && liveQuiz.correctTopicId !== null)) return;
+    setReviewing(true);
+    goTo(i);
+  }, [liveQuiz, liveStart, steps, groups, goTo]);
 
   // Confetti only when the voter finishes during this visit, not on reload.
   const wasComplete = useRef(complete);
@@ -588,6 +647,21 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   status={statuses[group.focus.id]}
                   disabled={!isOpen}
                   onSend={(text) => onAnswer(here.gi, text)}
+                />
+              ) : here.kind === "quiz" ? (
+                <QuizCard
+                  code={code}
+                  voterId={voterId}
+                  focusId={group.focus.id}
+                  question={group.focus.name}
+                  options={group.topics.map((t) => t.item)}
+                  color={topicColor(here.gi)}
+                  live={liveQuiz}
+                  offset={quizOffset}
+                  value={typeof answers[group.focus.id] === "string" ? (answers[group.focus.id] as string) : undefined}
+                  disabled={!isOpen}
+                  onAnswer={(id) => onQuizAnswer(here.gi, id)}
+                  onOver={() => onQuizOver(group.focus.id)}
                 />
               ) : here.kind === "qa" ? (
                 <QaCard

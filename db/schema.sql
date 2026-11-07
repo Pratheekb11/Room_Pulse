@@ -227,8 +227,8 @@ create unique index if not exists users_guest_code_idx on users(guest_code_hash)
 --   rank   = put every option in order
 --   number = answer with a number between num_min and num_max
 alter table focus_topics drop constraint if exists focus_topics_kind_check;
-alter table focus_topics add constraint focus_topics_kind_check
-  check (kind in ('rating', 'poll', 'words', 'multi', 'text', 'rank', 'number'));
+-- (the check is added once, with every kind, in the quiz section below: re-adding a shorter
+--  list here would fail on databases that already hold newer kinds)
 alter table focus_topics add column if not exists max_picks int check (max_picks between 1 and 10);
 alter table focus_topics add column if not exists num_min double precision;
 alter table focus_topics add column if not exists num_max double precision;
@@ -285,8 +285,8 @@ create index if not exists number_answers_session_idx on number_answers(session_
 -- Audience Q&A: voters send in questions (up to 3 each) and upvote other people's.
 -- The owner can hide a question or mark it answered.
 alter table focus_topics drop constraint if exists focus_topics_kind_check;
-alter table focus_topics add constraint focus_topics_kind_check
-  check (kind in ('rating', 'poll', 'words', 'multi', 'text', 'rank', 'number', 'qa'));
+-- (the check is added once, with every kind, in the quiz section below: re-adding a shorter
+--  list here would fail on databases that already hold newer kinds)
 
 create table if not exists qa_questions (
   id          uuid primary key default gen_random_uuid(),
@@ -310,3 +310,40 @@ create table if not exists qa_votes (
   primary key (question_id, voter_id)
 );
 create index if not exists qa_votes_session_idx on qa_votes(session_id, voter_id);
+
+-- Quiz: presenter-paced questions with a right answer, a timer and a leaderboard.
+--   quiz_correct = index of the right option (0 = first, by position)
+--   sessions.quiz_focus_id / quiz_started_at = the question running now (phones follow it)
+alter table focus_topics drop constraint if exists focus_topics_kind_check;
+alter table focus_topics add constraint focus_topics_kind_check
+  check (kind in ('rating', 'poll', 'words', 'multi', 'text', 'rank', 'number', 'qa', 'quiz'));
+alter table focus_topics add column if not exists quiz_correct int check (quiz_correct between 0 and 9);
+alter table focus_topics add column if not exists quiz_seconds int check (quiz_seconds between 5 and 120);
+alter table sessions add column if not exists quiz_focus_id uuid references focus_topics(id) on delete set null;
+alter table sessions add column if not exists quiz_started_at timestamptz;
+
+-- Nickname for the leaderboard, one per voter per presentation
+create table if not exists quiz_players (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  voter_id    uuid not null,
+  nickname    text not null check (length(nickname) between 1 and 20),
+  created_at  timestamptz not null default now(),
+  primary key (session_id, voter_id)
+);
+
+-- One locked-in answer per voter per quiz question, scored when it arrives
+create table if not exists quiz_answers (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  topic_id    uuid not null references topics(id) on delete cascade,
+  correct     boolean not null,
+  points      int not null check (points between 0 and 1000),
+  created_at  timestamptz not null default now(),
+  primary key (focus_id, voter_id)
+);
+create index if not exists quiz_answers_session_idx on quiz_answers(session_id, voter_id);
+
+-- Recreate the view so it includes the quiz columns added above (a view keeps the columns it had when made).
+create or replace view live_sessions as
+  select * from sessions where expires_at is null or expires_at > now();
