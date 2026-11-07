@@ -4,7 +4,8 @@
  * a presentation keeps the answers of items that were renamed or moved.
  */
 
-export type Row = { id?: string; name: string };
+/** `description`: optional words under the item; undefined = no description box open. */
+export type Row = { id?: string; name: string; description?: string };
 type Item = string | Row;
 
 const clean = (s: string) => s.trim().replace(/\s+/g, " ");
@@ -91,9 +92,25 @@ export function toItems(value: string[] | string | undefined): string[] {
 }
 
 /** Editable rows from saved items (or from a draft's plain strings); always at least one row. */
-export function rowsFrom(items: (Row | string)[] | string | undefined): Row[] {
+export function rowsFrom(items: (Row | { id?: string; name: string; description?: string | null } | string)[] | string | undefined): Row[] {
   const list = typeof items === "string" ? toItems(items) : (items ?? []);
-  const rows = list.map((x) => (typeof x === "string" ? { name: x } : x.id ? { id: x.id, name: x.name } : { name: x.name }));
+  const rows = list.map((x): Row => {
+    if (typeof x === "string") return { name: x };
+    const row: Row = x.id ? { id: x.id, name: x.name } : { name: x.name };
+    if (x.description) row.description = x.description;
+    return row;
+  });
   const kept = rows.filter((r) => r.id || r.name);
   return kept.length ? kept : [{ name: "" }];
+}
+
+/** Filled descriptions by item name, for saving (`itemDescriptions`). */
+export function descriptionsOf(rows: Row[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const name = clean(r.name);
+    const d = r.description?.trim();
+    if (name && d) out[name] = d;
+  }
+  return out;
 }

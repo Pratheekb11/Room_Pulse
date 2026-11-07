@@ -103,3 +103,25 @@ describe("list editor helpers", () => {
     });
   });
 });
+
+describe("item descriptions in the list editor", () => {
+  it("rows from saved items keep their description", async () => {
+    const { rowsFrom } = await import("@/lib/list-edit");
+    expect(rowsFrom([{ id: "a", name: "A", description: "First" }, { id: "b", name: "B", description: null }])).toEqual([
+      { id: "a", name: "A", description: "First" },
+      { id: "b", name: "B" },
+    ]);
+  });
+
+  it("collects filled descriptions by item name, skipping blank items and blank descriptions", async () => {
+    const { descriptionsOf } = await import("@/lib/list-edit");
+    expect(descriptionsOf([{ name: " Dark  mode ", description: " Night theme " }, { name: "B", description: "  " }, { name: "", description: "lost" }, { name: "C" }])).toEqual({
+      "Dark mode": "Night theme",
+    });
+  });
+
+  it("typing a new name keeps the row's description", async () => {
+    const { setAt } = await import("@/lib/list-edit");
+    expect(setAt([{ name: "A", description: "d" }], 0, "AB")).toEqual([{ name: "AB", description: "d" }]);
+  });
+});

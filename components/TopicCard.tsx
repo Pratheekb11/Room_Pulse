@@ -5,7 +5,7 @@ import { readableOn } from "@/lib/colors";
 import { RatingRow } from "./RatingRow";
 
 interface Props {
-  topic: NamedItem;
+  topic: NamedItem & { description?: string | null };
   index: number;
   total: number;
   color: string;
@@ -32,6 +32,7 @@ export function TopicCard(p: Props) {
           <h2 id={`topic-${p.topic.id}`} className="font-display text-2xl font-semibold leading-tight break-words">
             {p.topic.name}
           </h2>
+          {p.topic.description && <p className="mt-1 text-[15px] leading-snug opacity-90 break-words">{p.topic.description}</p>}
         </div>
         <span
           className="mt-1 shrink-0 rounded-full border px-2.5 py-0.5 text-sm font-medium"

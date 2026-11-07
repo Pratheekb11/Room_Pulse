@@ -41,6 +41,8 @@ export interface FocusItem extends NamedItem {
 }
 
 export interface TopicItem extends NamedItem {
+  /** Optional words under the item on phones. */
+  description?: string | null;
   /** null only for sessions created before focus topics existed */
   focusId: string | null;
 }

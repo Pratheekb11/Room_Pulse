@@ -51,6 +51,8 @@ export const MAX_ABS_NUMBER = 1e12;
 export const MAX_TEXT_ANSWER = 280;
 /** Longest optional description under a question. */
 export const MAX_DESCRIPTION = 200;
+/** Longest optional description under an item to score. */
+export const MAX_ITEM_DESCRIPTION = 140;
 const boundedNumber = z.number().finite().min(-MAX_ABS_NUMBER).max(MAX_ABS_NUMBER);
 
 /** Settings some question types have; normalised to null for the others. */
@@ -64,11 +66,18 @@ const settingsShape = {
   seconds: z.number().int().min(5, "Give at least 5 seconds").max(120, "Give at most 2 minutes").nullish(),
   /** Any type: extra words under the question. Blank = none. */
   description: z.string().trim().max(MAX_DESCRIPTION, `Keep the description under ${MAX_DESCRIPTION} characters`).nullish(),
+  /** Items' descriptions, keyed by item name (matched ignoring case and spacing). Blank = none. */
+  itemDescriptions: z
+    .record(z.string().max(480), z.string().trim().max(MAX_ITEM_DESCRIPTION, `Keep item descriptions under ${MAX_ITEM_DESCRIPTION} characters`))
+    .nullish(),
 };
+
+/** "  Offline  Mode " → "offline mode": how an item description finds its item. */
+export const itemKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
 
 export const QUIZ_SECONDS_DEFAULT = 20;
 
-type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null };
+type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null };
 const topicName = (t: unknown) => cleanName(typeof t === "string" ? t : (t as { name: string }).name);
 
 function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] } & Settings>(f: T) {
@@ -85,6 +94,11 @@ function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] 
     unit: isNumber && f.unit ? f.unit : null,
     seconds: isQuiz ? (f.seconds ?? QUIZ_SECONDS_DEFAULT) : null,
     description: f.description ? f.description : null,
+    itemDescriptions: Object.fromEntries(
+      Object.entries(f.itemDescriptions ?? {})
+        .filter(([, d]) => d)
+        .map(([name, d]) => [itemKey(name), d]),
+    ),
     // the right option's index; -1 = missing or not one of the options
     correctIndex: isQuiz ? (correct ? f.topics.map(topicName).indexOf(cleanName(correct)) : -1) : null,
   };

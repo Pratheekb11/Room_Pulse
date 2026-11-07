@@ -384,3 +384,5 @@ create or replace view live_sessions as
 
 -- Optional description under a question (extra instructions or context), shown on phones and the big screen.
 alter table focus_topics add column if not exists description text check (length(description) <= 200);
+-- Optional description under each item to score (or option), shown on phones.
+alter table topics add column if not exists description text check (length(description) <= 140);

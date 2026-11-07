@@ -25,7 +25,7 @@ import type {
 } from "./types";
 import type { AnswerInput, CreateSessionInput, EditSessionInput, QaAction, QuizAction, VoteInput } from "./validation";
 import type { QuizControl } from "./validation";
-import { MAX_QA_PER_VOTER } from "./validation";
+import { itemKey, MAX_QA_PER_VOTER } from "./validation";
 import { generateCode, generateDashboardKey } from "./code";
 
 // All SQL lives here. Every statement is a parameterised tagged template.
@@ -44,7 +44,7 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
                   || case when ${withAnswers}::boolean then jsonb_build_object('correct', f.quiz_correct) else '{}'::jsonb end
                   order by f.position)
                 from focus_topics f where f.session_id = s.id), '[]'::json) as focus_topics,
-      coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'focusId', t.focus_id) order by t.position)
+      coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'focusId', t.focus_id, 'description', t.description) order by t.position)
                 from topics t where t.session_id = s.id), '[]'::json)   as topics,
       coalesce((select json_agg(json_build_object('id', c.id, 'name', c.name) order by c.position)
                 from criteria c where c.session_id = s.id), '[]'::json) as criteria
@@ -394,8 +394,9 @@ export async function createSession(
           from s, input
           returning id, position
         ), t as (
-          insert into topics (session_id, focus_id, name, position)
-          select s.id, f.id, tt.name, f.position * 100 + tt.ord - 1
+          insert into topics (session_id, focus_id, name, position, description)
+          select s.id, f.id, tt.name, f.position * 100 + tt.ord - 1,
+                 input.val->'itemDescriptions'->>lower(tt.name)  -- names are already cleaned (validation)
           from s
           join f on true
           join input on input.pos = f.position
@@ -1263,7 +1264,16 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
 
   // New items get their ids here, so topics can point at new questions in the same transaction.
   const focus = input.focusTopics.map((f, pos) => ({ ...f, id: f.id ?? crypto.randomUUID(), isNew: !f.id, pos }));
-  const topics = focus.flatMap((f) => f.topics.map((t, i) => ({ id: t.id ?? crypto.randomUUID(), isNew: !t.id, focusId: f.id, name: t.name, pos: f.pos * 100 + i })));
+  const topics = focus.flatMap((f) =>
+    f.topics.map((t, i) => ({
+      id: t.id ?? crypto.randomUUID(),
+      isNew: !t.id,
+      focusId: f.id,
+      name: t.name,
+      pos: f.pos * 100 + i,
+      description: f.itemDescriptions[itemKey(t.name)] ?? null,
+    })),
+  );
   const crit = input.criteria.map((c, pos) => ({ id: c.id ?? crypto.randomUUID(), isNew: !c.id, name: c.name, pos }));
   const keepFocus = focus.filter((f) => !f.isNew).map((f) => f.id);
   const keepTopics = topics.filter((t) => !t.isNew).map((t) => t.id);
@@ -1291,12 +1301,12 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
         select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit, x."correctIndex", x.seconds, x.description
         from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb)
           as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text)`,
-    sql`update topics t set name = x.name, position = x.pos
-        from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int)
+    sql`update topics t set name = x.name, position = x.pos, description = x.description
+        from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int, description text)
         where t.id = x.id and t.session_id = ${sid}::uuid`,
-    sql`insert into topics (id, session_id, focus_id, name, position)
-        select x.id, ${sid}::uuid, x."focusId", x.name, x.pos
-        from jsonb_to_recordset(${rows(topics.filter((t) => t.isNew))}::jsonb) as x(id uuid, "focusId" uuid, name text, pos int)`,
+    sql`insert into topics (id, session_id, focus_id, name, position, description)
+        select x.id, ${sid}::uuid, x."focusId", x.name, x.pos, x.description
+        from jsonb_to_recordset(${rows(topics.filter((t) => t.isNew))}::jsonb) as x(id uuid, "focusId" uuid, name text, pos int, description text)`,
     sql`update criteria c set name = x.name, position = x.pos
         from jsonb_to_recordset(${rows(crit.filter((c) => !c.isNew))}::jsonb) as x(id uuid, name text, pos int)
         where c.id = x.id and c.session_id = ${sid}::uuid`,

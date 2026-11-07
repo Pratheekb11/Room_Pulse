@@ -8,6 +8,7 @@ import {
   MAX_ABS_NUMBER,
   MAX_CRITERIA,
   MAX_DESCRIPTION,
+  MAX_ITEM_DESCRIPTION,
   MAX_FOCUS_TOPICS,
   MAX_TOPICS_PER_FOCUS,
 } from "@/lib/validation";
@@ -18,6 +19,7 @@ import {
   duplicateIndexes,
   filledItems,
   filledRows,
+  descriptionsOf,
   rowsFrom,
   type Row,
 } from "@/lib/list-edit";
@@ -343,6 +345,7 @@ export function PresentationForm({
     correct: f.kind === "quiz" && f.correct.trim() ? f.correct.trim() : null,
     seconds: f.kind === "quiz" ? f.seconds : null,
     description: f.description?.trim() || null,
+    itemDescriptions: f.kind === "rating" ? descriptionsOf(f.items) : null,
   });
   const hasRating = parsed.some((f) => f.kind === "rating");
 
@@ -438,6 +441,7 @@ export function PresentationForm({
         unit: f.unit.trim() || null,
         maxPicks: f.maxPicks,
         description: f.description?.trim() || null,
+        itemDescriptions: f.kind === "rating" ? descriptionsOf(f.items) : undefined,
       })),
     );
 
@@ -972,6 +976,7 @@ export function PresentationForm({
                       maxLength={120}
                       placeholders={EXAMPLES[f.kind].list}
                       answers={counts}
+                      describe={f.kind === "rating" ? { max: MAX_ITEM_DESCRIPTION, placeholder: "Description (optional), e.g. what it would change" } : undefined}
                     />
                   )}
 

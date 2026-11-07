@@ -15,10 +15,12 @@ interface Props {
   hint?: string;
   /** Answers saved per row id (edit mode), shown so nobody deletes answers by accident. */
   answers?: Record<string, number>;
+  /** Let each row have an optional description (Score items). */
+  describe?: { max: number; placeholder?: string };
 }
 
 /** One input per row. Enter adds a row, Backspace on an empty row removes it, a multi-line paste fills several rows. */
-export function ListEditor({ label, noun, items, onChange, max, maxLength, placeholders = [], hint, answers }: Props) {
+export function ListEditor({ label, noun, items, onChange, max, maxLength, placeholders = [], hint, answers, describe }: Props) {
   const id = useId();
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const focusNext = useRef<number | null>(null);
@@ -142,6 +144,41 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
                   </svg>
                 </button>
               </span>
+              {describe &&
+                (row.description === undefined ? (
+                  <button
+                    type="button"
+                    onClick={() => change(items.map((r, j) => (j === i ? { ...r, description: "" } : r)))}
+                    className="mt-0.5 rounded px-1 text-xs font-semibold text-ink-soft underline underline-offset-4 hover:text-ink sm:ml-[5.75rem]"
+                    aria-label={`Add a description to ${noun} ${i + 1}`}
+                  >
+                    + description
+                  </button>
+                ) : (
+                  <div className="mt-1 flex w-full items-center gap-1 sm:pl-[6rem]">
+                    <label htmlFor={`${id}-${i}-desc`} className="sr-only">
+                      Description of {noun} {i + 1}
+                    </label>
+                    <input
+                      id={`${id}-${i}-desc`}
+                      value={row.description}
+                      onChange={(e) => change(items.map((r, j) => (j === i ? { ...r, description: e.target.value } : r)))}
+                      maxLength={describe.max}
+                      placeholder={describe.placeholder ?? "Description (optional)"}
+                      className="min-w-0 flex-1 rounded-lg border border-line-strong bg-white px-3 py-1.5 text-sm"
+                    />
+                    <button
+                      type="button"
+                      className={iconButton}
+                      onClick={() => change(items.map((r, j) => (j === i ? { id: r.id, name: r.name } : r)))}
+                      aria-label={`Remove the description of ${noun} ${i + 1}`}
+                    >
+                      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
+                        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
               {saved > 0 && (
                 <span className="order-last w-full text-xs text-ink-soft sm:pl-[6rem]">
                   {saved} {saved === 1 ? "answer" : "answers"} so far
