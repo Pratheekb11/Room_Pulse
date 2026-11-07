@@ -27,7 +27,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <footer className="px-5 py-5 text-center text-[13.5px] text-ink-soft">
           Built and maintained by{" "}
           <a href="https://github.com/Pratheekb11" className="font-semibold text-ink underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
-            Pratheek
+            Pratheek B
           </a>
         </footer>
       </body>
