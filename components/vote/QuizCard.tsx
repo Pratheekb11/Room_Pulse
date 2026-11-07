@@ -166,7 +166,8 @@ export function QuizCard({ code, voterId, focusId, question, options, color, liv
                     aria-checked={picked}
                     disabled={disabled || !running || !!value}
                     onClick={() => pick(o.id)}
-                    className={`key relative flex min-h-14 items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-lg font-bold disabled:cursor-default ${
+                    // not .key: its disabled fade and 1px border would hide which option was picked and which is right
+                    className={`relative flex min-h-14 items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-lg font-bold transition-[transform,opacity,border-color] duration-150 enabled:hover:border-ink enabled:active:scale-[0.97] disabled:cursor-default ${
                       right ? "border-success bg-mint" : wrongPick ? "border-error bg-white" : picked ? "border-ink bg-white" : "border-line-strong bg-white"
                     } ${revealed && !right && !picked ? "opacity-50" : ""} ${value && !picked && !revealed ? "opacity-50" : ""}`}
                   >

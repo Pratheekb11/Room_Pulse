@@ -253,6 +253,17 @@ export function PresentationForm({
   }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows]);
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
+  // The problem list and save errors sit at the bottom of a long form, under the sticky Create
+  // button: on a phone, a failed tap would otherwise look like nothing happened.
+  const [failedTries, setFailedTries] = useState(0);
+  const feedbackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!failedTries) return;
+    const el = feedbackRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus({ preventScroll: true });
+  }, [failedTries]);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
   const [confirmLoss, setConfirmLoss] = useState<string | null>(null);
@@ -405,6 +416,7 @@ export function PresentationForm({
       await onDone(body.code);
     } catch (err) {
       setError((err as Error).message);
+      setFailedTries((n) => n + 1);
     } finally {
       setBusy(false);
     }
@@ -413,7 +425,10 @@ export function PresentationForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
-    if (problems.length) return;
+    if (problems.length) {
+      setFailedTries((n) => n + 1);
+      return;
+    }
     const lost = answersLost();
     if (lost.total > 0) {
       setConfirmLoss(
@@ -821,6 +836,7 @@ export function PresentationForm({
           .
         </p>
 
+        <div ref={feedbackRef} tabIndex={-1} className="scroll-mb-28 outline-none">
         {touched && problems.length > 0 && (
           <div
             role="alert"
@@ -845,6 +861,7 @@ export function PresentationForm({
             presentations&rdquo;.
           </p>
         )}
+        </div>
 
         <div className="sticky bottom-0 z-10 -mx-4 mt-5 flex gap-3 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
           {onCancel && (

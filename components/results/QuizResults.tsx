@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { topicColor } from "@/lib/colors";
-import { clockOffset, quizTimeLeft } from "@/lib/quiz";
+import { clockOffset, quizOwnerAction, quizStartConfirmed, quizTimeLeft, type PendingStart } from "@/lib/quiz";
 import type { LeaderRow, LiveQuiz, NamedItem, QuizCount } from "@/lib/types";
 
 const LETTERS = "ABCDEFGHIJ";
@@ -43,13 +43,17 @@ interface Props {
  */
 export function QuizStage({ code, focusId, question, options, seconds, live, receivedAt, counts, revealed, owner, next, onShowLeaderboard, onNext }: Props) {
   // A tap on Start shows the countdown at once, before the next results refresh confirms it.
-  const [pending, setPending] = useState<{ focusId: string; at: number } | null>(null);
+  const [pending, setPending] = useState<PendingStart | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Server minus this screen's clock, from the server time in the latest results read.
   const offset = live && receivedAt ? clockOffset(live.now, receivedAt) : 0;
 
   const here = live?.focusId === focusId ? live : null;
-  const starting = pending?.focusId === focusId && (!here || Date.parse(here.startedAt) < pending.at + offset - 5000);
+  const confirmed = pending !== null && quizStartConfirmed(pending, live, offset);
+  const starting = pending?.focusId === focusId && !confirmed;
+  // Forget the tap once the server confirms it: "End now" moves the start back, which would
+  // otherwise look like the start hadn't arrived yet and freeze a full countdown on screen.
+  if (confirmed) setPending(null);
   const running = starting || (here !== null && here.correctTopicId === null);
   const now = useTick(running);
   const left = starting ? seconds * 1000 : here ? quizTimeLeft(here, now, offset) : 0;
@@ -58,6 +62,7 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
   const mine = counts.filter((c) => c.focusId === focusId);
   const total = mine.reduce((s, c) => s + c.n, 0);
   const showAnswers = !running && (ended || total > 0);
+  const action = quizOwnerAction({ running, ended, total, hasNext: next !== null });
 
   async function control(body: object) {
     setError(null);
@@ -153,8 +158,15 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
         </p>
         {owner && (
           <div className="flex flex-wrap gap-2">
-            {running ? (
-              <button type="button" onClick={() => void control({ action: "end" })} className={`${btn} bg-white hover:bg-canvas`}>
+            {action === "end" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPending(null);
+                  void control({ action: "end" });
+                }}
+                className={`${btn} bg-white hover:bg-canvas`}
+              >
                 End now
               </button>
             ) : (
@@ -164,7 +176,7 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
                     Leaderboard
                   </button>
                 )}
-                {ended && next ? (
+                {action === "next" && next ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -175,15 +187,15 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
                   >
                     Next question →
                   </button>
-                ) : !ended ? (
+                ) : (
                   <button
                     type="button"
                     onClick={() => start(focusId)}
-                    className={`${btn} ${total > 0 ? "bg-white hover:bg-canvas" : "border-primary bg-primary text-white"}`}
+                    className={`${btn} ${action === "again" ? "bg-white hover:bg-canvas" : "border-primary bg-primary text-white"}`}
                   >
-                    {total > 0 ? "Run it again" : "Start question"}
+                    {action === "again" ? "Run it again" : "Start question"}
                   </button>
-                ) : null}
+                )}
               </>
             )}
           </div>

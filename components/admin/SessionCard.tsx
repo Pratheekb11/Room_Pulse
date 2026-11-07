@@ -158,7 +158,8 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2.5">
+      {/* relative: on phones the More menu spans this row, so it can't run off the screen edge */}
+      <div className="relative mt-4 flex flex-wrap items-center gap-2.5">
         {urls && (
           <a href={urls.dash} target="_blank" rel="noopener noreferrer" className="key rounded-lg bg-primary px-5 py-2.5 font-semibold text-white">
             Present
@@ -170,14 +171,14 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
         <button type="button" onClick={toggle} disabled={pending !== null} className={`${btn} bg-white`}>
           {pending === "toggle" ? "Saving…" : s.isOpen ? "Close voting" : "Reopen voting"}
         </button>
-        <details ref={more} className="relative">
+        <details ref={more} className="md:relative">
           <summary className={`${btn} cursor-pointer list-none bg-white [&::-webkit-details-marker]:hidden`}>More</summary>
           {/* Picking an item closes the menu */}
           <div
             onClick={() => {
               if (more.current) more.current.open = false;
             }}
-            className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-line-strong bg-white p-1 sm:left-0 sm:right-auto"
+            className="absolute inset-x-0 z-20 mt-1 rounded-lg border border-line-strong bg-white p-1 md:right-auto md:left-0 md:w-64"
           >
             <button type="button" onClick={() => exportCsv("summary")} disabled={pending !== null} className={menuItem}>
               {pending === "summary" ? "Downloading…" : "Download results (CSV)"}
