@@ -135,7 +135,8 @@ function Stage({
   const [showQr, setShowQr] = useState(() => !audience && window.matchMedia("(min-width: 1024px)").matches);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const joinUrl = useClientValue(() => voterUrl(code));
-  const signedInOwner = useIsOwner(code);
+  // Voters on the audience page are never the owner: don't ask (it would cost a request and log a 401).
+  const signedInOwner = useIsOwner(code, !audience);
   const isOwner = signedInOwner && !audience;
   const aiOn = useAiOn(code, isOwner);
 
@@ -558,9 +559,10 @@ function useAiOn(code: string, isOwner: boolean): boolean {
   return isOwner && on;
 }
 
-function useIsOwner(code: string): boolean {
+function useIsOwner(code: string, ask: boolean): boolean {
   const [owner, setOwner] = useState(false);
   useEffect(() => {
+    if (!ask) return;
     let cancelled = false;
     fetch(`/api/admin/sessions/${encodeURIComponent(code)}`, { cache: "no-store", credentials: "same-origin" })
       .then((res) => {
@@ -570,6 +572,6 @@ function useIsOwner(code: string): boolean {
     return () => {
       cancelled = true;
     };
-  }, [code]);
-  return owner;
+  }, [code, ask]);
+  return ask && owner;
 }

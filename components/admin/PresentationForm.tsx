@@ -159,7 +159,11 @@ interface Draft {
   theme: ThemeId | null;
   /** Fun illustrations on. */
   decor: boolean;
+  /** How it was started (template or AI draft), so the way back survives a refresh. */
+  start?: StartChoice;
 }
+
+type StartChoice = null | "blank" | { label: string; snapshot: string };
 
 /** Older drafts kept lists as one-per-line text (topicsText / criteriaText) or plain strings. */
 type StoredDraft = Omit<Draft, "focus" | "criteria"> & {
@@ -190,6 +194,7 @@ function readDraft(): Draft | null {
       criteria: plain(d.criteria ?? d.criteriaText),
       theme: isThemeId(d.theme) ? d.theme : null,
       decor: d.decor !== false,
+      start: d.start ?? null,
     };
   } catch {
     return null;
@@ -270,6 +275,11 @@ export function PresentationForm({
   );
   const [themeChoice, setThemeChoice] = useState<ThemeId | null>(initial?.theme ?? null);
   const [decor, setDecor] = useState(initial?.decor ?? true);
+  /**
+   * How this presentation was started: null while choosing, "blank", or the template / AI draft used
+   * (with a snapshot, so going back can tell whether anything was changed since).
+   */
+  const [start, setStart] = useState<StartChoice>(initial?.start ?? null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const counts = mode.kind === "edit" ? mode.counts : {};
   const scaleLocked = mode.kind === "edit" && mode.scaleLocked;
@@ -288,12 +298,13 @@ export function PresentationForm({
           criteria: criteriaRows,
           theme: themeChoice,
           decor,
+          start,
         }),
       );
     } catch {
       /* storage unavailable */
     }
-  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows, themeChoice, decor]);
+  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows, themeChoice, decor, start]);
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
   // The problem list and save errors sit at the bottom of a long form, under the sticky Create
@@ -389,11 +400,26 @@ export function PresentationForm({
     !editing &&
     !title.trim() &&
     focus.every((f) => !f.name.trim() && f.items.every((it) => !it.name.trim()));
-  function applyPlan(plan: PresentationPlan) {
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  // Keys differ between renders of the same questions, so leave them out of the comparison.
+  const snapshotOf = (t: string, f: QuestionDraft[]) => JSON.stringify([t, f.map((q) => ({ ...q, key: 0 }))]);
+  function applyPlan(plan: PresentationPlan, label: string) {
+    const drafts = draftsFromPlan(plan, nextKey.current);
     setTitle(plan.title);
-    setFocus(draftsFromPlan(plan, nextKey.current));
+    setFocus(drafts);
     nextKey.current += plan.questions.length;
+    setStart({ label, snapshot: snapshotOf(plan.title, drafts) });
   }
+  /** Back to the start choices with an empty form. */
+  function restart() {
+    setTitle("");
+    setFocus([blank(nextKey.current++)]);
+    setCriteriaRows(DEFAULT_CRITERIA);
+    setThemeChoice(null);
+    setStart(null);
+    setConfirmRestart(false);
+  }
+  const changedSinceStart = start !== null && start !== "blank" && snapshotOf(title, focus) !== start.snapshot;
 
   // "Write questions with AI": closed until asked for, so nothing changes for people who don't want it.
   const [aiOpen, setAiOpen] = useState(false);
@@ -407,7 +433,7 @@ export function PresentationForm({
     try {
       const res = await call("/api/admin/ai/questions", { method: "POST", body: JSON.stringify({ prompt: aiPrompt }) });
       const { plan } = (await res.json()) as { plan: PresentationPlan };
-      applyPlan(plan);
+      applyPlan(plan, "questions written by AI");
       setAiOpen(false);
     } catch (err) {
       setAiError((err as Error).message);
@@ -508,6 +534,7 @@ export function PresentationForm({
       setTitle("");
       setFocus([blank(nextKey.current++)]);
       setThemeChoice(null);
+      setStart(null);
       setTouched(false);
       await onDone(body.code);
     } catch (err) {
@@ -552,15 +579,56 @@ export function PresentationForm({
           </p>
         )}
 
-        {pristine && (
+        {/* After a template or AI draft: say so, and offer the way back. */}
+        {!editing && start !== null && start !== "blank" && (
+          <div role="status" className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-lg bg-canvas px-3 py-2.5 text-sm">
+            <span>
+              Started from <span className="font-semibold">{start.label}</span>. Change anything you like.
+            </span>
+            <button
+              type="button"
+              onClick={() => (changedSinceStart ? setConfirmRestart(true) : restart())}
+              className="font-semibold underline underline-offset-4"
+            >
+              Choose a different start
+            </button>
+          </div>
+        )}
+        {!editing && start === "blank" && pristine && (
+          <p className="mt-4 text-sm text-ink-soft">
+            Writing your own questions.{" "}
+            <button type="button" onClick={() => setStart(null)} className="font-semibold text-ink underline underline-offset-4">
+              Use a template instead
+            </button>
+          </p>
+        )}
+
+        {pristine && start === null && (
           <section aria-labelledby="templates-heading" className="mt-5">
-            <h3 id="templates-heading" className="font-semibold">Start from a template</h3>
+            <h3 id="templates-heading" className="font-semibold">How do you want to start?</h3>
+            <button
+              type="button"
+              onClick={() => {
+                setStart("blank");
+                requestAnimationFrame(() => document.getElementById("presentation-name")?.focus());
+              }}
+              className="mt-2 flex w-full items-center gap-3 rounded-lg border-2 border-ink bg-white px-3 py-3 text-left hover:bg-canvas"
+            >
+              <span aria-hidden className="font-display flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink text-xl text-white">+</span>
+              <span>
+                <span className="block font-bold">Start blank</span>
+                <span className="block text-sm text-ink-soft">Write your own questions from scratch</span>
+              </span>
+            </button>
+            <p className="mt-4 text-sm font-semibold">
+              Or use a template <span className="font-normal text-ink-soft">(optional, you can change everything)</span>
+            </p>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {TEMPLATES.map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => applyPlan(t.plan)}
+                  onClick={() => applyPlan(t.plan, `the “${t.label}” template`)}
                   className="rounded-lg border border-line-strong bg-white px-3 py-2.5 text-left hover:bg-canvas"
                 >
                   <span className="block font-bold">{t.label}</span>
@@ -568,7 +636,6 @@ export function PresentationForm({
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-sm text-ink-soft">You can change anything after you pick one. Or start from scratch below.</p>
 
             {!aiAvailable ? null : !aiOpen ? (
               <button
@@ -642,6 +709,7 @@ export function PresentationForm({
         <label className="mt-5 block font-semibold">
           Presentation name
           <input
+            id="presentation-name"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
@@ -1115,6 +1183,15 @@ export function PresentationForm({
       </form>
 
       {/* Outside the form, so its buttons can't submit it */}
+      {confirmRestart && (
+        <ConfirmDialog
+          title="Start over?"
+          body="This clears the questions in the form, including your changes, so you can pick a different template or start blank."
+          confirmLabel="Start over"
+          onConfirm={restart}
+          onCancel={() => setConfirmRestart(false)}
+        />
+      )}
       {previewOpen && (
         <PresentationPreview
           title={title}

@@ -29,7 +29,8 @@ export function useSession(code: string, revision?: number, initial?: SessionPay
 
     async function load() {
       try {
-        const res = await fetch(`/api/session/${encodeURIComponent(code)}`, { cache: "no-store" });
+        // A stuck request counts as no connection, so the retry below takes over instead of a frozen screen.
+        const res = await fetch(`/api/session/${encodeURIComponent(code)}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
         if (cancelled) return;
         if (res.status === 404) return setState({ kind: "not_found" });
         if (!res.ok) throw new Error(String(res.status));
