@@ -1145,15 +1145,23 @@ export async function countOwnedSessions(ownerId: string): Promise<number> {
   return rows[0].n;
 }
 
-/** Deletes expired guest data: expired presentations (with their votes) and old, signed-out guests. */
-export async function purgeExpiredGuestData(guestDays: number): Promise<void> {
-  await sql.transaction([
-    sql`delete from sessions where expires_at < now()`,
+/**
+ * Deletes expired guest data for good: expired presentations (with every answer, through the foreign keys),
+ * expired sign-ins, and guest accounts older than `guestDays` that are signed out and own nothing still live.
+ * Saved accounts' presentations never expire, so they are never touched.
+ */
+export async function purgeExpiredGuestData(guestDays: number): Promise<{ sessions: number; users: number }> {
+  const [sessions, , users] = (await sql.transaction([
+    sql`delete from sessions where expires_at < now() returning id`,
     sql`delete from auth_sessions where expires_at < now()`,
+    // a guest's presentation made late lives its full time: the account (which cascades to it) waits
     sql`delete from users u
          where u.is_guest and u.created_at < now() - make_interval(days => ${guestDays})
-           and not exists (select 1 from auth_sessions a where a.user_id = u.id)`,
-  ]);
+           and not exists (select 1 from auth_sessions a where a.user_id = u.id)
+           and not exists (select 1 from sessions s where s.owner_id = u.id)
+         returning id`,
+  ])) as unknown[][];
+  return { sessions: sessions.length, users: users.length };
 }
 
 /**

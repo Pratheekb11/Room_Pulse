@@ -1,5 +1,6 @@
 "use client";
 
+import { GUEST_DAYS, GUEST_PRESENTATION_LIMIT } from "@/lib/guest-rules";
 import { useCallback, useEffect, useState } from "react";
 import type { AdminSessionRow } from "@/lib/types";
 import { Logo } from "../Logo";
@@ -299,7 +300,7 @@ function GuestBanner({ onSaved, open, setOpen }: { onSaved: () => void; open: bo
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
           <p>
-            <strong>Guest account.</strong> Presentations are deleted after 3 days.
+            <strong>Guest account.</strong> Presentations are deleted after {GUEST_DAYS} days.
             {guestCode && (
               <>
                 {" "}
@@ -310,7 +311,7 @@ function GuestBanner({ onSaved, open, setOpen }: { onSaved: () => void; open: bo
           <details className="mt-0.5">
             <summary className="cursor-pointer text-ink-soft underline underline-offset-4">What does this mean?</summary>
             <p className="mt-1 max-w-2xl text-ink-soft">
-              You can have up to 3 presentations, and each is deleted 3 days after you make it. Closing the browser logs you out; to get back in,
+              You can have up to {GUEST_PRESENTATION_LIMIT} presentations, and each is deleted {GUEST_DAYS} days after you make it, with all its answers. Closing the browser logs you out; to get back in,
               choose &ldquo;Have a guest code?&rdquo; and type your guest code, on this or any other device. Save your account to keep everything.
             </p>
           </details>

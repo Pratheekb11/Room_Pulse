@@ -1,6 +1,6 @@
 # LiveRate
 
-Anonymous, near-real-time audience voting for live sessions. Presenters start straight away as a guest (no sign-up; they get an 8-character **guest code** like `K7QM-3XPA` to get back in on any device, and guest presentations are deleted after 3 days) or sign up with email and password. A presentation has up to 10 **questions**. Each question is one of:
+Anonymous, near-real-time audience voting for live sessions. Presenters start straight away as a guest (no sign-up; they get an 8-character **guest code** like `K7QM-3XPA` to get back in on any device, and guest presentations and their answers are deleted after 7 days by a daily clean-up job) or sign up with email and password. A presentation has up to 10 **questions**. Each question is one of:
 
 - **Rate topics:** up to 10 topics, each scored on your criteria (e.g. Impact, Feasibility).
 - **Pick one (poll):** pick one of 2–10 options.

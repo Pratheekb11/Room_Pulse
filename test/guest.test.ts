@@ -175,11 +175,11 @@ describe("guest 3-day limit", () => {
       sessions: { expiresAt: string | null }[];
     };
     const hours = (Date.parse(listed.sessions[0].expiresAt!) - Date.now()) / 3_600_000;
-    expect(hours).toBeGreaterThan(71.9);
-    expect(hours).toBeLessThanOrEqual(72);
+    expect(hours).toBeGreaterThan(167.9);
+    expect(hours).toBeLessThanOrEqual(168);
   });
 
-  it("after 3 days the presentation, its voting link and its results are gone", async () => {
+  it("after 7 days the presentation, its voting link and its results are gone", async () => {
     const { cookie, code } = await guestPresentation();
     const info = (await (await sessionRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).json()) as SessionPayload;
     await db.exec("update sessions set expires_at = now() - interval '1 second'");
@@ -199,7 +199,7 @@ describe("guest 3-day limit", () => {
   it("expired guest data is deleted for good", async () => {
     await guestPresentation();
     await db.exec("update sessions set expires_at = now() - interval '1 second'");
-    await db.exec("update users set created_at = now() - interval '4 days'");
+    await db.exec("update users set created_at = now() - interval '8 days'");
     await db.exec("update auth_sessions set expires_at = now() - interval '1 second'");
     await guest(); // creating a guest also cleans up expired guest data
     const n = (await db.query<{ s: number; u: number }>("select (select count(*)::int from sessions) s, (select count(*)::int from users) u")).rows[0];
@@ -312,18 +312,18 @@ describe("guest code", () => {
     expect((await back(g.guestCode)).status).toBe(401);
   });
 
-  it("stops working once the guest's presentations are gone and the 3 days are up", async () => {
+  it("stops working once the guest's presentations are gone and the 7 days are up", async () => {
     const g = await newGuest();
     await create(g.cookie, "Old");
     await db.exec("update sessions set expires_at = now() - interval '1 second'");
-    await db.exec("update users set created_at = now() - interval '4 days' where is_guest");
+    await db.exec("update users set created_at = now() - interval '8 days' where is_guest");
     expect((await back(g.guestCode)).status).toBe(401);
   });
 
-  it("keeps working while a presentation is still live, even after 3 days", async () => {
+  it("keeps working while a presentation is still live, even after 7 days", async () => {
     const g = await newGuest();
     await create(g.cookie, "Late");
-    await db.exec("update users set created_at = now() - interval '4 days' where is_guest");
+    await db.exec("update users set created_at = now() - interval '8 days' where is_guest");
     expect((await back(g.guestCode)).status).toBe(200);
   });
 

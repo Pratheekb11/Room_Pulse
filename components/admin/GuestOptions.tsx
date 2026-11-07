@@ -1,5 +1,6 @@
 "use client";
 
+import { GUEST_DAYS } from "@/lib/guest-rules";
 import { useState } from "react";
 import { apiFetch } from "./api";
 import { formatGuestCode, rememberGuestCode } from "./guestCode";
@@ -128,7 +129,7 @@ export function GuestOptions({
       <button type="button" disabled={busy} onClick={start} className="key font-display w-full rounded-lg bg-primary py-3 text-xl text-white">
         {busy ? "Starting…" : "Start now, no sign-up"}
       </button>
-      <p className="mt-2 text-sm text-ink-soft">Guest presentations last 3 days. You can save your account at any time to keep them.</p>
+      <p className="mt-2 text-sm text-ink-soft">Guest presentations last {GUEST_DAYS} days, then they and their answers are deleted. You can save your account at any time to keep them.</p>
       {error && <p role="alert" className="mt-2 text-sm font-semibold text-error">{error}</p>}
       <button type="button" onClick={() => {
           setError(null);
