@@ -1,4 +1,4 @@
-import { TOPIC_COLORS } from "@/lib/colors";
+import { topicColor } from "@/lib/colors";
 
 // Deterministic pseudo-random so the render is pure.
 const rand = (i: number, salt: number) => {
@@ -11,7 +11,7 @@ const PIECES = Array.from({ length: 48 }, (_, i) => ({
   delay: rand(i, 2) * 400,
   dx: (rand(i, 3) - 0.5) * 240,
   rot: (rand(i, 4) - 0.5) * 1080,
-  color: TOPIC_COLORS[i % TOPIC_COLORS.length],
+  color: topicColor(i),
   round: rand(i, 5) > 0.6,
 }));
 

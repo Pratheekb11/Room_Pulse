@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useClientValue } from "./useClientValue";
-import { CountUp } from "./CountUp";
 import { avg, cellKey, indexCells, sumAggs, topicHistograms } from "@/lib/stats";
 import { voterUrl } from "@/lib/site";
 import { readDashboardKey } from "@/lib/dashboard-key";
@@ -24,16 +23,14 @@ import { WordCloud, WordList } from "./WordCloud";
 import { CHARTS, isChartFor } from "@/lib/charts";
 import { ScoreLegend } from "./Donut";
 import { Heatmap } from "./Heatmap";
+import { QuestionDescription, QuestionTabs, ResultCard, ScreenHeader, VotingPills } from "./ScreenChrome";
 import { LiveBadge } from "./LiveBadge";
-import { Logo } from "./Logo";
 import { OverallBars, type BarDatum } from "./OverallBars";
 import { QrPanel } from "./QrPanel";
 import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { useResultsPoll } from "./useResultsPoll";
 import { useSession } from "./useSession";
 import { useDocumentTheme } from "./useDocumentTheme";
-import { Doodle } from "./Doodle";
-import { charactersFor } from "@/lib/decor";
 
 type View = "heatmap" | "ranking" | "breakdown" | "summary";
 type Sort = "order" | "overall";
@@ -221,31 +218,18 @@ function Stage({
 
   return (
     <div className="flex min-h-dvh flex-col gap-[clamp(0.75rem,1.6vh,1.5rem)] px-[clamp(1rem,2.2vw,2.75rem)] py-[clamp(0.75rem,2vh,1.75rem)]">
-      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="min-w-0 flex-1">
-          <Logo />
-          <div className="mt-2 flex items-end gap-3">
-            <h1 className="font-display min-w-0 text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[0.98] tracking-tight break-words">
-              {session.title}
-            </h1>
-            {session.decor && <Doodle character={charactersFor(session.theme).screen} className="h-[clamp(4rem,8vw,8.5rem)] w-auto shrink-0" />}
-          </div>
-        </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:gap-2.5">
+      <ScreenHeader
+        title={session.title}
+        theme={session.theme}
+        decor={session.decor}
+        status={
+          <>
             <LiveBadge lastOkAt={lastOkAt} />
-            <span className="rounded-full border border-line-strong bg-white px-3 py-1 text-base font-bold tabular-nums sm:px-3.5 sm:text-lg">
-              <CountUp value={voters} /> {voters === 1 ? "person" : "people"} voted
-            </span>
-            <span
-              className={`rounded-full border border-line-strong px-3 py-1 text-base font-bold sm:px-3.5 sm:text-lg ${
-                r.isOpen ? "bg-mint text-ink" : "bg-ink text-white"
-              }`}
-            >
-              {r.isOpen ? "Voting open" : "Voting closed"}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold sm:justify-end">
+            <VotingPills voters={voters} isOpen={r.isOpen} />
+          </>
+        }
+        controls={
+          <>
             {group && CHARTS[group.kind].length > 1 && (
               <div role="tablist" aria-label="Chart" className="flex max-w-full overflow-x-auto rounded-full border border-line-strong bg-white p-0.5">
                 {CHARTS[group.kind].map((c, i) => (
@@ -299,46 +283,18 @@ function Stage({
                 Edit questions
               </a>
             )}
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <div className="flex min-h-0 flex-1 flex-col gap-[clamp(0.75rem,1.6vw,2rem)] lg:flex-row">
         <main className="min-w-0 flex-1">
           {!single && (
-            <nav aria-label="Questions" className="mb-[clamp(0.6rem,1.4vh,1.25rem)] flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setFocusIndex(null)}
-                aria-current={focusIndex === null ? "page" : undefined}
-                className={`rounded-full border border-line-strong px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${
-                  focusIndex === null ? "bg-ink text-white" : "bg-white"
-                }`}
-              >
-                All questions
-              </button>
-              {groups.map((g, i) => (
-                <button
-                  key={g.focus.id || "loose"}
-                  type="button"
-                  onClick={() => setFocusIndex(i)}
-                  aria-current={focusIndex === i ? "page" : undefined}
-                  className={`flex items-center gap-2 rounded-full border border-line-strong px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${
-                    focusIndex === i ? "bg-ink text-white" : "bg-white"
-                  }`}
-                >
-                  {g.focus.name}
-                </button>
-              ))}
-            </nav>
+            <QuestionTabs names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />
           )}
 
           <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
-          {group?.focus.description && (
-            <p className="mb-[clamp(0.6rem,1.4vh,1.25rem)] max-w-[70ch] text-[clamp(1rem,1.3vw,1.5rem)] leading-snug text-ink-soft break-words">
-              {group.focus.description}
-            </p>
-          )}
+          <QuestionDescription text={group?.focus.description} />
           {groups.length === 0 ? (
             <p className="text-xl text-ink-soft">This presentation has no questions yet. Use “Edit questions” to add some.</p>
           ) : !group ? (
@@ -532,15 +488,6 @@ function Stage({
         />
       )}
     </div>
-  );
-}
-
-function ResultCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
-      <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight break-words">{title}</h2>
-      {children}
-    </section>
   );
 }
 

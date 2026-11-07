@@ -1,4 +1,4 @@
-import { TOPIC_COLORS, TOPIC_INKS } from "@/lib/colors";
+import { topicColor, topicInk } from "@/lib/colors";
 
 /** Biggest words in the middle: alternate placing words to the left and right of the centre. */
 function centreOut<T>(items: T[]): T[] {
@@ -23,7 +23,7 @@ export function WordCloud({ words }: { words: { word: string; n: number; weight:
           className="font-display animate-pop leading-none font-semibold transition-[font-size] duration-500"
           style={{
             fontSize: `clamp(1rem, ${1.2 + w.weight * 4.3}vw, ${1.4 + w.weight * 5}rem)`,
-            color: TOPIC_INKS[w.i % TOPIC_INKS.length],
+            color: `var(--topic-ink-${w.i % 8}, ${topicInk(w.i)})`,
             opacity: 0.8 + w.weight * 0.2,
           }}
           title={`${w.n} ${w.n === 1 ? "person" : "people"}`}
@@ -53,7 +53,7 @@ export function WordList({ words }: { words: { word: string; n: number; weight: 
           <span className="relative h-[clamp(1.6rem,3.4vh,2.6rem)] flex-1 overflow-hidden rounded-full border border-line-strong bg-white">
             <span
               className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700"
-              style={{ width: `${(w.n / max) * 100}%`, backgroundColor: TOPIC_COLORS[i % TOPIC_COLORS.length] }}
+              style={{ width: `${(w.n / max) * 100}%`, backgroundColor: topicColor(i) }}
             />
           </span>
           <span className="font-display w-[4ch] text-right text-[clamp(1.1rem,1.6vw,1.9rem)] font-semibold tabular-nums">{w.n}</span>

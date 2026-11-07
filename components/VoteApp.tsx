@@ -6,10 +6,9 @@ import { cellKey } from "@/lib/stats";
 import { groupByFocus } from "@/lib/focus";
 import { getVoterId, readJSON, writeJSON } from "@/lib/storage";
 import type { LiveQuiz, QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
-import { showStepDots } from "@/lib/progress";
+import { ScorePill, StepIntro, StepNav, VoterHeader, VoterProgress } from "./VoterChrome";
 import { VoteQueue, type SaveStatus } from "@/lib/vote-queue";
 import { Confetti } from "./Confetti";
-import { Logo } from "./Logo";
 import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { TopicCard } from "./TopicCard";
 import { PollCard } from "./PollCard";
@@ -452,7 +451,6 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     wasComplete.current = complete;
   }, [complete]);
 
-  const pct = unitsTotal ? Math.round((unitsDone / unitsTotal) * 100) : 0;
   const here = steps[current];
   const group = here ? groups[here.gi] : null;
 
@@ -487,92 +485,49 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         </div>
       )}
 
-      <header className="mx-auto max-w-xl px-4 pt-5">
-        <div className="flex items-center justify-between">
-          <Logo />
-          <span className="relative flex items-center gap-2">
+      <VoterHeader
+        title={session.title}
+        theme={session.theme}
+        decor={session.decor}
+        score={
+          <>
             {combo >= 3 && (
               <span key={`combo-${combo}`} className="animate-pop rounded-full bg-lavender px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase">
                 Combo ×{combo}
               </span>
             )}
-            <span
-              key={points}
-              className="font-mono animate-pop rounded-full border border-line bg-white px-3 py-1 text-sm tabular-nums"
-              aria-label={`${points} points`}
-            >
-              <span className="text-primary">★</span> {points}
-            </span>
+            <ScorePill points={points} />
             {plus > 0 && (
               <span key={`plus-${plus}`} aria-hidden className="float-up font-mono absolute -top-1 right-1 text-sm font-medium text-primary">
                 +10
               </span>
             )}
-          </span>
-        </div>
-        <div className="mt-4 flex items-end justify-between gap-3">
-          <h1 className="font-display min-w-0 text-[clamp(1.7rem,7vw,2.4rem)] font-semibold leading-[1.02] tracking-tight break-words">
-            {session.title}
-          </h1>
-          {session.decor && <Doodle character={charactersFor(session.theme).phone} className="h-20 w-20 shrink-0" />}
-        </div>
-        <p className="mt-1.5 text-[0.95rem] text-ink-soft">
-          Tap an answer. It saves straight away. Your answers are anonymous.
-        </p>
+          </>
+        }
+      >
         {resultsHref && (
           <a href={resultsHref} className="mt-2 inline-block text-[0.95rem] font-bold underline decoration-primary decoration-2 underline-offset-4">
             See live results
           </a>
         )}
-      </header>
+      </VoterHeader>
 
-      <div className="sticky top-0 z-20 mt-4 border-b border-line-strong bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
-        <div className="mx-auto max-w-xl px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div
-              className="h-4 flex-1 overflow-hidden rounded-full border border-line-strong bg-white"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={unitsTotal}
-              aria-valuenow={unitsDone}
-              aria-label="Answers completed"
-            >
-              <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary),#ff8a4c)] transition-[width] duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="font-display shrink-0 text-base font-bold tabular-nums">
-              {unitsDone} / {unitsTotal} done
-            </span>
-          </div>
-          {groups.length > 1 && (
-            <nav aria-label="Questions" className="-mx-1 mt-2.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
-              {groups.map((g, gi) => {
-                const own = steps.filter((s) => s.gi === gi);
-                const doneHere = own.filter((s) => stepDone(s, ratings, answers)).length;
-                const finished = doneHere === own.length;
-                const active = here?.gi === gi;
-                return (
-                  <button
-                    key={g.focus.id || "loose"}
-                    type="button"
-                    onClick={() => goTo(steps.findIndex((s) => s.gi === gi))}
-                    aria-current={active ? "step" : undefined}
-                    className={`shrink-0 rounded-full border border-line-strong px-3 py-1 text-xs font-bold whitespace-nowrap ${
-                      active ? "bg-ink text-white" : finished ? "bg-mint" : "bg-white"
-                    }`}
-                  >
-                    {finished ? "✓ " : ""}
-                    {g.focus.name}
-                    {!finished && own.length > 1 && <span className="opacity-70"> {doneHere}/{own.length}</span>}
-                  </button>
-                );
-              })}
-            </nav>
-          )}
-        </div>
-      </div>
+      <VoterProgress
+        done={unitsDone}
+        total={unitsTotal}
+        chips={groups.map((g, gi) => {
+          const own = steps.filter((s) => s.gi === gi);
+          const doneHere = own.filter((s) => stepDone(s, ratings, answers)).length;
+          return {
+            key: g.focus.id || "loose",
+            label: g.focus.name,
+            active: here?.gi === gi,
+            finished: doneHere === own.length,
+            progress: own.length > 1 ? `${doneHere}/${own.length}` : undefined,
+          };
+        })}
+        onChip={(gi) => goTo(steps.findIndex((s) => s.gi === gi))}
+      />
 
       <main className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-5">
         {!isOpen && (
@@ -593,15 +548,12 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           <p className="text-ink-soft">There are no questions yet. Wait for the presenter to add some.</p>
         ) : (
           <>
-            {groups.length > 1 && (
-              <p className="text-sm font-bold text-ink-soft">
-                Level {here.gi + 1} of {groups.length}
-                {here.kind === "rating" ? `: ${group.focus.name}` : ""}
-              </p>
-            )}
-            {group.focus.description && (
-              <p className="mt-1 mb-2 rounded-lg bg-white px-3 py-2 text-[15px] leading-snug text-ink break-words">{group.focus.description}</p>
-            )}
+            <StepIntro
+              level={here.gi + 1}
+              levels={groups.length}
+              name={here.kind === "rating" ? group.focus.name : undefined}
+              description={group.focus.description}
+            />
             <div
               key={here.kind === "rating" ? here.item.id : group.focus.id}
               className={direction === 1 ? "animate-[slide-in-right_260ms_ease-out]" : "animate-[slide-in-left_260ms_ease-out]"}
@@ -714,48 +666,11 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => goTo(current - 1)}
-                disabled={current === 0}
-                className="key shrink-0 rounded-lg bg-white px-3.5 py-2.5 font-bold whitespace-nowrap"
-              >
-                ← Back
-              </button>
-              {!showStepDots(steps.length) ? (
-                <span className="font-display text-base font-bold tabular-nums text-ink-soft">
-                  {current + 1} / {steps.length}
-                </span>
-              ) : (
-              <div className="flex min-w-0 flex-wrap justify-center gap-1.5" aria-label="Steps">
-                {steps.map((s, i) => {
-                  const d = stepDone(s, ratings, answers);
-                  const name = s.kind === "rating" ? s.item.name : groups[s.gi].focus.name;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => goTo(i)}
-                      aria-label={`Go to ${name}${d ? " (done)" : ""}`}
-                      aria-current={i === current ? "step" : undefined}
-                      className={`h-2.5 rounded-full border border-ink transition-all ${
-                        i === current ? "w-6 bg-ink" : d ? "w-2.5 bg-mint" : "w-2.5 bg-white"
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-              )}
-              <button
-                type="button"
-                onClick={() => goTo(current + 1)}
-                disabled={current === steps.length - 1}
-                className="key shrink-0 rounded-lg bg-primary px-3.5 py-2.5 font-bold whitespace-nowrap text-white"
-              >
-                Next →
-              </button>
-            </div>
+            <StepNav
+              current={current}
+              steps={steps.map((st) => ({ label: st.kind === "rating" ? st.item.name : groups[st.gi].focus.name, done: stepDone(st, ratings, answers) }))}
+              onGo={goTo}
+            />
           </>
         )}
       </main>

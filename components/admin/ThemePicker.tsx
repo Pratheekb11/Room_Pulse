@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { topicColor } from "@/lib/colors";
 import { THEMES, getTheme, themeStyle, type ThemeId } from "@/lib/themes";
 
@@ -39,9 +41,20 @@ export function ThemePicker({
   compact?: boolean;
 }) {
   const rec = getTheme(recommended.id);
+  const row = useRef<HTMLDivElement>(null);
+  // In the scrolling row, keep the picked design in view (it may be far along on a phone).
+  useEffect(() => {
+    if (!compact || !row.current) return;
+    const el = row.current.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (!el) return;
+    const r = row.current;
+    const left = el.offsetLeft - r.offsetLeft;
+    if (left < r.scrollLeft || left + el.offsetWidth > r.scrollLeft + r.clientWidth) r.scrollTo({ left: left - 8, behavior: "instant" as ScrollBehavior });
+  }, [compact, value]);
   return (
     <div>
       <div
+        ref={row}
         role="radiogroup"
         aria-label="Slide design"
         className={compact ? "-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" : "grid grid-cols-3 gap-1.5 sm:grid-cols-5 sm:gap-2"}

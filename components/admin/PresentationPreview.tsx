@@ -18,8 +18,12 @@ import { NumberCard } from "../vote/NumberCard";
 import { RankCard } from "../vote/RankCard";
 import { TextCard } from "../vote/TextCard";
 import { ThemePicker } from "./ThemePicker";
-import { Doodle } from "../Doodle";
-import { charactersFor, type Character } from "@/lib/decor";
+import { LiveBadge } from "../LiveBadge";
+import { useClientValue } from "../useClientValue";
+import { voterUrl } from "@/lib/site";
+import { QrPanel } from "../QrPanel";
+import { QuestionDescription, QuestionTabs, ResultCard, ScreenHeader, VotingPills } from "../ScreenChrome";
+import { ScorePill, StepIntro, StepNav, VoterHeader, VoterProgress } from "../VoterChrome";
 
 type Device = "screen" | "phone";
 
@@ -33,123 +37,168 @@ function tally(q: PreviewQuestion): PollTally {
   return { total, rows, leader: rows.length ? { id: rows[0].id, name: rows[0].name, n: rows[0].n } : null };
 }
 
-/** The question as it shows on the big screen, with sample results. */
-function ScreenSlide({ title, q, voters, doodle }: { title: string; q: PreviewQuestion; voters: number; doodle?: Character }) {
-  return (
-    <div className="flex h-full flex-col gap-4 p-[4%]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink-soft">{title || "Your presentation"}</p>
-          <h3 className="font-display mt-1 text-[clamp(1.4rem,3vw,2.6rem)] leading-[1.05] break-words">{q.name}</h3>
-          {q.description && <p className="mt-1.5 max-w-[60ch] text-[clamp(0.9rem,1.3vw,1.2rem)] leading-snug text-ink-soft break-words">{q.description}</p>}
-        </div>
-        <span className="flex shrink-0 flex-col items-end gap-2">
-          <span className="rounded-full border border-line-strong bg-white px-3 py-1 text-sm font-bold">{voters} people voted</span>
-          {doodle && <Doodle character={doodle} className="h-[clamp(4.5rem,9vw,8.5rem)] w-auto" />}
-        </span>
+/** Sample results for a question, as its chart on the big screen. */
+function SampleChart({ q }: { q: PreviewQuestion }) {
+  if (q.kind === "words") return <WordCloud words={sampleWords(q.name)} />;
+  if (q.kind === "number")
+    return (
+      <div className="flex flex-col items-center justify-center py-6">
+        <p className="text-sm font-semibold text-ink-soft">Average answer</p>
+        <p className="font-display text-[clamp(3rem,8vw,6rem)] leading-none text-primary">
+          {Math.round(((q.min ?? 0) + (q.max ?? 100)) / 2)}
+          {q.unit ? <span className="ml-2 text-[0.4em] text-ink">{q.unit}</span> : null}
+        </p>
       </div>
-      <div className="min-h-0 flex-1">
-        {q.kind === "words" ? (
-          <WordCloud words={sampleWords(q.name)} />
-        ) : q.kind === "number" ? (
-          <div className="flex h-full flex-col items-center justify-center">
-            <p className="text-sm font-semibold text-ink-soft">Average answer</p>
-            <p className="font-display text-[clamp(3rem,8vw,6rem)] leading-none text-primary">
-              {Math.round(((q.min ?? 0) + (q.max ?? 100)) / 2)}
-              {q.unit ? <span className="ml-2 text-[0.4em] text-ink">{q.unit}</span> : null}
-            </p>
+    );
+  if (q.kind === "text" || q.kind === "qa")
+    return (
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {(q.kind === "qa" ? SAMPLE_QA : SAMPLE_TEXT).map((t, i) => (
+          <li key={t} className="slab flex items-start justify-between gap-2 rounded-xl bg-white px-4 py-3 text-base font-semibold" style={{ boxShadow: `inset 4px 0 0 ${topicColor(i)}` }}>
+            <span>{t}</span>
+            {q.kind === "qa" && <span className="shrink-0 rounded-full bg-canvas px-2 text-sm">▲ {sampleCounts(3)[i]}</span>}
+          </li>
+        ))}
+      </ul>
+    );
+  return <PollBars tally={tally(q)} noun={q.kind === "rating" ? ["score", "scores"] : ["vote", "votes"]} />;
+}
+
+const SCREEN_W = 1280;
+// a common laptop screen (16:10), like most presenters' results screen
+const SCREEN_H = 800;
+const Pill = ({ children, on = false }: { children: React.ReactNode; on?: boolean }) => (
+  <span className={`rounded-full border border-line-strong px-3 py-1 ${on ? "bg-sun" : "bg-white"}`}>{children}</span>
+);
+
+/** The real results screen (same header, tabs, card and QR panel), drawn at 1280×800 and scaled to fit. */
+function ScreenSlide({ title, questions, index, onPick, session }: { title: string; questions: PreviewQuestion[]; index: number; onPick: (i: number) => void; session: SessionInfo }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.6);
+  const [now] = useState(() => Date.now());
+  const joinUrl = useClientValue(() => voterUrl("abc123")) ?? "";
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const fit = () => setScale(el.clientWidth / SCREEN_W);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const q = questions[index];
+  const voters = sampleCounts(q.options.length || 4).reduce((a, b) => a + b, 0);
+  return (
+    <div ref={box} className="slab mx-auto w-full max-w-[calc((100dvh-17rem)*1.6)] min-w-0 overflow-hidden rounded-xl" style={{ height: SCREEN_H * scale }}>
+      <div className="theme-pattern origin-top-left bg-canvas" style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}>
+        <div className="flex h-full flex-col gap-5 px-8 py-6">
+          <ScreenHeader
+            title={title || "Your presentation"}
+            theme={session.theme}
+            decor={session.decor}
+            status={
+              <>
+                <LiveBadge lastOkAt={now} />
+                <VotingPills voters={voters} isOpen />
+              </>
+            }
+            controls={
+              <>
+                <Pill on>Hide QR</Pill>
+                <Pill>Full screen</Pill>
+                <Pill>Edit questions</Pill>
+              </>
+            }
+          />
+          <div className="flex min-h-0 flex-1 flex-row gap-6">
+            <main className="min-w-0 flex-1">
+              {questions.length > 1 && <QuestionTabs names={questions.map((x, i) => ({ key: String(i), name: x.name }))} active={index} onPick={(i) => onPick(i ?? 0)} />}
+              <QuestionDescription text={q.description} />
+              <ResultCard title={q.name}>
+                <SampleChart q={q} />
+              </ResultCard>
+            </main>
+            <div className="w-[18rem] shrink-0">
+              <QrPanel url={joinUrl} code="abc123" />
+            </div>
           </div>
-        ) : q.kind === "text" || q.kind === "qa" ? (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {(q.kind === "qa" ? SAMPLE_QA : SAMPLE_TEXT).map((t, i) => (
-              <li key={t} className="slab flex items-start justify-between gap-2 rounded-xl bg-white px-4 py-3 text-base font-semibold" style={{ boxShadow: `inset 4px 0 0 ${topicColor(i)}` }}>
-                <span>{t}</span>
-                {q.kind === "qa" && <span className="shrink-0 rounded-full bg-canvas px-2 text-sm">▲ {sampleCounts(3)[i]}</span>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <PollBars tally={tally(q)} noun={q.kind === "rating" ? ["score", "scores"] : ["vote", "votes"]} />
-        )}
+        </div>
       </div>
     </div>
   );
 }
 
-/** The question as it shows on a voter's phone: the real answer card, tappable. */
+/** The real phone page (same header, progress, chips and buttons) with the real answer card, tappable. */
 function PhoneSlide({
   title,
-  q,
+  questions,
   index,
-  total,
+  onPick,
   session,
   criteria,
-  doodle,
 }: {
-  doodle?: Character;
   title: string;
-  q: PreviewQuestion;
+  questions: PreviewQuestion[];
   index: number;
-  total: number;
+  onPick: (i: number) => void;
   session: SessionInfo;
   criteria: NamedItem[];
 }) {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const q = questions[index];
   const id = `q${index}`;
   const value = answers[id];
   const set = (v: unknown) => setAnswers((a) => ({ ...a, [id]: v }));
   const color = topicColor(index);
   const common = { question: q.name, color, status: undefined, disabled: false };
+  const done = (i: number) => (questions[i].kind === "rating" ? Object.keys(ratings).some((k) => k.startsWith(`${questions[i].options[0]?.id}:`)) : answers[`q${i}`] !== undefined);
   return (
-    <div className="flex flex-col gap-4 px-4 pt-5 pb-8">
-      <div>
-        <div className="flex items-end justify-between gap-3">
-          <h3 className="font-display min-w-0 text-[1.7rem] leading-[1.05] font-semibold break-words">{title || "Your presentation"}</h3>
-          {doodle && <Doodle character={doodle} className="h-20 w-20 shrink-0" />}
+    <div className="pb-10">
+      <VoterHeader title={title || "Your presentation"} theme={session.theme} decor={session.decor} score={<ScorePill points={0} />} />
+      <VoterProgress
+        done={questions.filter((_, i) => done(i)).length}
+        total={questions.length}
+        chips={questions.map((x, i) => ({ key: String(i), label: x.name, active: i === index, finished: done(i) }))}
+        onChip={onPick}
+      />
+      <main className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-5">
+        <div>
+          <StepIntro level={index + 1} levels={questions.length} name={q.kind === "rating" ? q.name : undefined} description={q.description} />
+        {q.kind === "rating" ? (
+          <TopicCard
+            topic={q.options[0]}
+            index={0}
+            total={q.options.length}
+            color={color}
+            criteria={criteria}
+            session={session}
+            ratings={ratings}
+            statuses={{}}
+            disabled={false}
+            onRate={(t, c, s) => setRatings((r) => ({ ...r, [cellKey(t, c)]: s }))}
+          />
+        ) : q.kind === "poll" || q.kind === "quiz" ? (
+          <PollCard {...common} options={q.options} value={value as string | undefined} onPick={set} />
+        ) : q.kind === "multi" ? (
+          <MultiCard {...common} options={q.options} maxPicks={q.maxPicks ?? null} value={value as string[] | undefined} finished={false} onChange={set} onFinish={() => {}} />
+        ) : q.kind === "rank" ? (
+          <RankCard {...common} options={q.options} value={value as string[] | undefined} onRank={set} />
+        ) : q.kind === "number" ? (
+          <NumberCard {...common} min={q.min ?? 0} max={q.max ?? 100} unit={q.unit ?? null} value={value as number | undefined} onSend={set} />
+        ) : q.kind === "words" ? (
+          <WordsCard {...common} value={value as string[] | undefined} finished={false} onSend={set} onFinish={() => {}} />
+        ) : (
+          <TextCard {...common} value={value as string | undefined} onSend={set} />
+        )}
         </div>
-        <p className="mt-1 text-sm text-ink-soft">Tap an answer. It saves straight away. Your answers are anonymous.</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="h-3 flex-1 overflow-hidden rounded-full border border-line-strong bg-white">
-          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((index / total) * 100)}%` }} />
-        </div>
-        <span className="text-sm font-bold tabular-nums">
-          {index} / {total} done
-        </span>
-      </div>
-      {q.description && <p className="-mb-2 rounded-lg bg-white px-3 py-2 text-[15px] leading-snug break-words">{q.description}</p>}
-      {q.kind === "rating" ? (
-        <TopicCard
-          topic={q.options[0]}
-          index={0}
-          total={q.options.length}
-          color={color}
-          criteria={criteria}
-          session={session}
-          ratings={ratings}
-          statuses={{}}
-          disabled={false}
-          onRate={(t, c, s) => setRatings((r) => ({ ...r, [cellKey(t, c)]: s }))}
-        />
-      ) : q.kind === "poll" || q.kind === "quiz" ? (
-        <PollCard {...common} options={q.options} value={value as string | undefined} onPick={set} />
-      ) : q.kind === "multi" ? (
-        <MultiCard {...common} options={q.options} maxPicks={q.maxPicks ?? null} value={value as string[] | undefined} finished={false} onChange={set} onFinish={() => {}} />
-      ) : q.kind === "rank" ? (
-        <RankCard {...common} options={q.options} value={value as string[] | undefined} onRank={set} />
-      ) : q.kind === "number" ? (
-        <NumberCard {...common} min={q.min ?? 0} max={q.max ?? 100} unit={q.unit ?? null} value={value as number | undefined} onSend={set} />
-      ) : q.kind === "words" ? (
-        <WordsCard {...common} value={value as string[] | undefined} finished={false} onSend={set} onFinish={() => {}} />
-      ) : (
-        <TextCard {...common} value={value as string | undefined} onSend={set} />
-      )}
-      {(q.kind === "quiz" || q.kind === "qa") && (
-        <p className="text-xs text-ink-soft">
-          {q.kind === "quiz" ? "In the real quiz a timer runs and you start each question from the results screen." : "In the real Q&A people also vote for each other's questions."}
-        </p>
-      )}
+        {(q.kind === "quiz" || q.kind === "qa") && (
+          <p className="text-xs text-ink-soft">
+            {q.kind === "quiz" ? "In the real quiz a timer runs and you start each question from the results screen." : "In the real Q&A people also vote for each other's questions."}
+          </p>
+        )}
+        <StepNav current={index} steps={questions.map((x, i) => ({ label: x.name, done: done(i) }))} onGo={(i) => onPick(Math.max(0, Math.min(questions.length - 1, i)))} />
+      </main>
     </div>
   );
 }
@@ -210,7 +259,6 @@ export function PresentationPreview({
   }, [questions.length]);
 
   const session: SessionInfo = { code: "preview", title, scaleMax, lowLabel: lowLabel || "Low", highLabel: highLabel || "High", isOpen: true, revision: 0, theme, decor };
-  const chars = charactersFor(theme);
   const crit = (criteria.length ? criteria : ["Impact"]).map((name, n) => ({ id: `c${n}`, name }));
   const t = getTheme(theme);
 
@@ -259,16 +307,14 @@ export function PresentationPreview({
             </div>
           </div>
 
-          {/* The slide, in the chosen design */}
+          {/* The real screens, in the chosen design */}
           <div style={themeStyle(theme)} className="text-ink">
             {device === "screen" ? (
-              <div className="slab theme-pattern mx-auto aspect-video w-full max-w-[calc((100dvh-17rem)*16/9)] min-w-0 overflow-hidden rounded-xl bg-canvas max-sm:aspect-auto max-sm:max-w-none max-sm:min-h-[22rem]">
-                <ScreenSlide title={title} q={q} doodle={decor ? chars.screen : undefined} voters={sampleCounts(q.options.length || 4).reduce((a, b) => a + b, 0)} />
-              </div>
+              <ScreenSlide title={title} questions={questions} index={i} onPick={setAt} session={session} />
             ) : (
               <div className="mx-auto w-full max-w-[390px] overflow-hidden rounded-[2rem] border-[6px] border-[#26251e] bg-canvas">
                 <div className="theme-pattern h-[min(720px,max(28rem,calc(100dvh-19rem)))] overflow-y-auto">
-                  <PhoneSlide key={`${i}-${theme}`} title={title} q={q} index={i} total={questions.length} session={session} criteria={crit} doodle={decor ? chars.phone : undefined} />
+                  <PhoneSlide key={theme} title={title} questions={questions} index={i} onPick={setAt} session={session} criteria={crit} />
                 </div>
               </div>
             )}

@@ -41,6 +41,8 @@ export interface Theme {
   dark: boolean;
   /** Headline typeface (body text stays the same everywhere). */
   font: "sans" | "serif" | "chalk" | "poster" | "mono" | "anime";
+  /** Plain design: option colours, score colours and illustrations turn grey (`--theme-chroma: 0%`). */
+  plain?: boolean;
   /** Background pattern drawn behind everything (CSS image), e.g. halftone dots. */
   pattern?: { image: string; size: string };
   colors: ThemeColors;
@@ -81,6 +83,7 @@ export const THEMES: Theme[] = [
     label: "Mono",
     blurb: "Black on white, nothing extra. The easiest to read.",
     dark: false,
+    plain: true,
     font: "sans",
     colors: {
       canvas: "#ffffff",
@@ -94,13 +97,13 @@ export const THEMES: Theme[] = [
       line: "#d4d4d4",
       lineSoft: "#e5e5e5",
       lineStrong: "#1a1a1a",
-      primary: "#0033cc",
-      primaryActive: "#002699",
-      sun: "#fff1b8",
-      mint: "#c9f2d0",
-      lavender: "#e2dcff",
+      primary: "#111111",
+      primaryActive: "#000000",
+      sun: "#efefef",
+      mint: "#e0e0e0",
+      lavender: "#d6d6d6",
       error: "#b00020",
-      success: "#00703c",
+      success: "#1a1a1a",
     },
   },
   {
@@ -400,7 +403,10 @@ export function themeStyle(id: string | null | undefined): Record<string, string
     "--font-display": FONTS[t.font],
     "--theme-pattern": t.pattern?.image ?? "none",
     // Doodles (components/Doodle.tsx) have dark outlines: a white sticker edge keeps them visible on dark designs.
-    "--doodle-halo": t.dark ? "drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff)" : "none",
+    "--doodle-halo": t.plain ? "grayscale(1)" : t.dark ? "drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff)" : "none",
+    "--theme-chroma": t.plain ? "0%" : "100%",
+    // Accent colours some badges use directly (bg-peach…): greys in plain designs.
+    ...(t.plain ? { "--color-peach": "#d9d9d9", "--color-sky": "#cccccc", "--color-gold": "#8c8c8c", "--color-coral": "#d9d9d9" } : {}),
     "--theme-pattern-size": t.pattern?.size ?? "auto",
     // Coloured words (e.g. word lists): the dark inks vanish on dark designs, the pastels read well.
     ...(t.dark ? Object.fromEntries(TOPIC_COLORS.map((c, i) => [`--topic-ink-${i}`, c])) : {}),

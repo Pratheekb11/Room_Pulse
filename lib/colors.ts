@@ -15,9 +15,21 @@ export const TOPIC_COLORS = [
 /** Darker partner of each topic colour, for text drawn in that colour on white (≥ 4.5:1). */
 export const TOPIC_INKS = ["#9a4a26", "#2f5f99", "#2f7340", "#6a4799", "#7d5a12", "#9b3a5a", "#2a6e69", "#6e5a3a"] as const;
 
-export const topicInk = (index: number) => TOPIC_INKS[index % TOPIC_INKS.length];
+/**
+ * A colour at the design's colour strength (`--theme-chroma`, set by lib/themes.ts): full colour normally,
+ * a grey of the same brightness in plain designs (Mono). Same brightness = text contrast is unchanged.
+ */
+export function tinted(full: string): string {
+  // grey with the same relative luminance (WCAG), so contrast with any text colour is unchanged
+  const l = luminance(parseHex(full));
+  const s = l <= 0.0031308 ? 12.92 * l : 1.055 * l ** (1 / 2.4) - 0.055;
+  const y = Math.round(s * 255);
+  return `color-mix(in srgb, ${full} var(--theme-chroma, 100%), ${hex([y, y, y])})`;
+}
 
-export const topicColor = (index: number) => TOPIC_COLORS[index % TOPIC_COLORS.length];
+export const topicInk = (index: number) => tinted(TOPIC_INKS[index % TOPIC_INKS.length]);
+
+export const topicColor = (index: number) => tinted(TOPIC_COLORS[index % TOPIC_COLORS.length]);
 
 const INK: RGB = [38, 37, 30]; // #26251e
 const WHITE: RGB = [255, 255, 255];
@@ -84,11 +96,13 @@ export function scaleColor(value: number, scaleMax: number): { bg: string; fg: s
   const t = (value - 1) / Math.max(1, scaleMax - 1);
   const rgb = avoidDeadZone(sample(0.12 + 0.88 * t));
   const fg = contrast(rgb, WHITE) >= contrast(rgb, INK) ? WHITE : INK;
-  return { bg: hex(rgb), fg: hex(fg) };
+  return { bg: tinted(hex(rgb)), fg: hex(fg) };
 }
 
 function parseHex(h: string): RGB {
-  const n = parseInt(h.slice(1), 16);
+  // also takes a tinted() colour: its first #rrggbb is the full colour (the grey has the same brightness)
+  const m = /#[0-9a-f]{6}/i.exec(h);
+  const n = parseInt((m ? m[0] : h).slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 

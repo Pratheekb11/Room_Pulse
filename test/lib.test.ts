@@ -45,14 +45,18 @@ describe("colours", () => {
     for (let max = 3; max <= 10; max++) {
       for (let v = 1; v <= max; v += 0.1) {
         const { bg, fg } = scaleColor(v, max);
-        expect(contrast(bg, fg), `${v}/${max}`).toBeGreaterThanOrEqual(4.5);
+        // full colour, and the grey Mono shows instead
+        const [full, grey] = bg.match(/#[0-9a-f]{6}/gi)!;
+        expect(contrast(full, fg), `${v}/${max}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(grey, fg), `grey ${v}/${max}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
 
   it("scale goes from light to dark", () => {
     const lum = (h: string) => parseInt(h.slice(1, 3), 16) + parseInt(h.slice(3, 5), 16) + parseInt(h.slice(5, 7), 16);
-    expect(lum(scaleColor(1, 5).bg)).toBeGreaterThan(lum(scaleColor(5, 5).bg));
+    const full = (s: string) => s.match(/#[0-9a-f]{6}/i)![0];
+    expect(lum(full(scaleColor(1, 5).bg))).toBeGreaterThan(lum(full(scaleColor(5, 5).bg)));
   });
 
   it("text on topic colours is readable", () => {
