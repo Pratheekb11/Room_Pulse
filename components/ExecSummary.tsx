@@ -14,7 +14,7 @@ interface Props {
 
 const AGREEMENT_STYLE = {
   "Most people agree": "bg-mint/30 text-success",
-  "Opinions vary": "bg-sun text-[#7a4f12]",
+  "Opinions vary": "bg-sun text-ink",
   "People disagree": "bg-peach/35 text-error",
 } as const;
 

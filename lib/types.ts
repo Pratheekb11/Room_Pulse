@@ -9,6 +9,10 @@ export interface SessionInfo {
   isOpen: boolean;
   /** Bumped whenever the presenter edits the questions. */
   revision: number;
+  /** Slide design id (lib/themes.ts). */
+  theme: string;
+  /** Fun illustrations are on. */
+  decor: boolean;
 }
 
 export interface NamedItem {

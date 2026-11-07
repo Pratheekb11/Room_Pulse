@@ -23,6 +23,10 @@ import {
 import type { QuestionKind, SessionPayload } from "@/lib/types";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { ListEditor } from "./ListEditor";
+import { ThemePicker } from "./ThemePicker";
+import { PresentationPreview } from "./PresentationPreview";
+import { isThemeId, recommendTheme, type ThemeId } from "@/lib/themes";
+import { previewQuestions } from "@/lib/preview";
 
 type Call = (path: string, init?: RequestInit) => Promise<Response>;
 type Kind = QuestionKind;
@@ -151,6 +155,10 @@ interface Draft {
   highLabel: string;
   focus: QuestionDraft[];
   criteria: Row[];
+  /** Slide design picked by hand; null = use the recommended one. */
+  theme: ThemeId | null;
+  /** Fun illustrations on. */
+  decor: boolean;
 }
 
 /** Older drafts kept lists as one-per-line text (topicsText / criteriaText) or plain strings. */
@@ -180,6 +188,8 @@ function readDraft(): Draft | null {
         items: plain(items ?? topicsText),
       })),
       criteria: plain(d.criteria ?? d.criteriaText),
+      theme: isThemeId(d.theme) ? d.theme : null,
+      decor: d.decor !== false,
     };
   } catch {
     return null;
@@ -212,6 +222,8 @@ function fromSession(s: SessionPayload): Draft {
       seconds: f.seconds ?? 20,
     })),
     criteria: rowsFrom(s.criteria),
+    theme: isThemeId(s.session.theme) ? s.session.theme : "paper",
+    decor: s.session.decor !== false,
   };
 }
 
@@ -256,6 +268,9 @@ export function PresentationForm({
   const [criteriaRows, setCriteriaRows] = useState<Row[]>(
     initial?.criteria ?? DEFAULT_CRITERIA,
   );
+  const [themeChoice, setThemeChoice] = useState<ThemeId | null>(initial?.theme ?? null);
+  const [decor, setDecor] = useState(initial?.decor ?? true);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const counts = mode.kind === "edit" ? mode.counts : {};
   const scaleLocked = mode.kind === "edit" && mode.scaleLocked;
 
@@ -271,12 +286,14 @@ export function PresentationForm({
           highLabel,
           focus,
           criteria: criteriaRows,
+          theme: themeChoice,
+          decor,
         }),
       );
     } catch {
       /* storage unavailable */
     }
-  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows]);
+  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows, themeChoice, decor]);
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
   // The problem list and save errors sit at the bottom of a long form, under the sticky Create
@@ -314,6 +331,22 @@ export function PresentationForm({
       .filter((f) => f.kind === "rating")
       .reduce((n, f) => n + f.topics.length, 0) * criteria.length;
   const otherQuestions = parsed.filter((f) => f.kind !== "rating").length;
+
+  const recommended = recommendTheme({ title, kinds: focus.map((f) => f.kind) });
+  /** The design that will be saved: the presenter's pick, or the recommendation. */
+  const theme: ThemeId = themeChoice ?? recommended.id;
+  const preview = () =>
+    previewQuestions(
+      focus.map((f) => ({
+        kind: f.kind,
+        name: f.name,
+        options: f.items.map((it) => it.name),
+        min: toNumber(f.min) ?? 0,
+        max: toNumber(f.max) ?? 100,
+        unit: f.unit.trim() || null,
+        maxPicks: f.maxPicks,
+      })),
+    );
 
   const problems: string[] = [];
   if (!title.trim()) problems.push("Give your presentation a name.");
@@ -435,6 +468,8 @@ export function PresentationForm({
             scaleMax,
             lowLabel,
             highLabel,
+            theme,
+            decor,
             focusTopics: focus.map((f) => ({
               id: f.id,
               name: f.name,
@@ -456,6 +491,8 @@ export function PresentationForm({
           scaleMax,
           lowLabel,
           highLabel,
+          theme,
+          decor,
           focusTopics: parsed.map((f) => ({
             name: f.name,
             kind: f.kind,
@@ -470,6 +507,7 @@ export function PresentationForm({
       setCreated(body.code);
       setTitle("");
       setFocus([blank(nextKey.current++)]);
+      setThemeChoice(null);
       setTouched(false);
       await onDone(body.code);
     } catch (err) {
@@ -902,6 +940,34 @@ export function PresentationForm({
           </button>
         </fieldset>
 
+        <section className="mt-6" aria-labelledby="design-h">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 id="design-h" className="font-semibold">
+              Slide design
+            </h3>
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="text-sm font-semibold underline underline-offset-4"
+            >
+              Preview how it looks
+            </button>
+          </div>
+          <p className="text-sm text-ink-soft">
+            Colours and lettering on the big screen and on people&rsquo;s phones.
+          </p>
+          <div className="mt-2">
+            <ThemePicker value={theme} onChange={setThemeChoice} recommended={recommended} title={title} />
+          </div>
+          <label className="mt-3 flex items-start gap-2.5 text-sm">
+            <input type="checkbox" checked={decor} onChange={(e) => setDecor(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-ink" />
+            <span>
+              <span className="font-semibold">Fun illustrations</span>
+              <span className="block text-ink-soft">Cheerful doodle characters next to the title on the big screen and on phones, picked to match the design.</span>
+            </span>
+          </label>
+        </section>
+
         {hasRating && (
           <section
             className="mt-6 rounded-xl border border-line-strong p-4"
@@ -1013,21 +1079,32 @@ export function PresentationForm({
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-lg border border-line-strong px-5 py-3 font-semibold hover:bg-canvas"
+              className="rounded-lg border border-line-strong px-3 py-3 font-semibold hover:bg-canvas sm:px-5"
             >
               Cancel
             </button>
           )}
           <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            className="key rounded-lg bg-white px-3 py-3 font-semibold sm:px-5"
+          >
+            Preview
+          </button>
+          <button
             type="submit"
             disabled={busy || locked}
-            className="key font-display flex-1 rounded-lg bg-primary py-3 text-xl font-bold text-white"
+            className="key font-display min-w-0 flex-1 rounded-lg bg-primary px-2 py-3 text-lg font-bold whitespace-nowrap text-white sm:text-xl"
           >
             {busy
               ? "Saving…"
               : editing
                 ? "Save changes"
-                : "Create presentation"}
+                : (
+                    <>
+                      Create<span className="max-sm:hidden"> presentation</span>
+                    </>
+                  )}
           </button>
         </div>
         {locked && (
@@ -1038,6 +1115,22 @@ export function PresentationForm({
       </form>
 
       {/* Outside the form, so its buttons can't submit it */}
+      {previewOpen && (
+        <PresentationPreview
+          title={title}
+          questions={preview()}
+          theme={theme}
+          onTheme={setThemeChoice}
+          decor={decor}
+          onDecor={setDecor}
+          recommended={recommended}
+          criteria={criteria}
+          scaleMax={scaleMax}
+          lowLabel={lowLabel}
+          highLabel={highLabel}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
       {confirmLoss && (
         <ConfirmDialog
           title="Delete these answers?"

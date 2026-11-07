@@ -369,3 +369,15 @@ create table if not exists ai_usage (
   n        int  not null default 0,
   primary key (user_id, day)
 );
+
+-- Slide design of a presentation (lib/themes.ts): colours and headline type on the big screen
+-- and on voters' phones.
+alter table sessions add column if not exists theme text not null default 'paper';
+alter table sessions drop constraint if exists sessions_theme_check;
+alter table sessions add constraint sessions_theme_check
+  check (theme in ('paper', 'mono', 'harbour', 'forest', 'blush', 'pop', 'anime', 'chalk', 'midnight', 'neon', 'arcade'));
+-- Fun illustrations (lib/decor.ts): doodle characters on the big screen and phones.
+alter table sessions add column if not exists decor boolean not null default true;
+-- Recreate the view so it includes the columns above.
+create or replace view live_sessions as
+  select * from sessions where expires_at is null or expires_at > now();

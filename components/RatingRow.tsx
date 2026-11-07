@@ -16,7 +16,7 @@ const STATUS_TEXT: Record<SaveStatus, string> = {
 const STATUS_CLASS: Record<SaveStatus, string> = {
   saving: "text-ink-soft",
   saved: "text-success",
-  retrying: "text-[#9a5b00]",
+  retrying: "text-warn",
   error: "text-error",
   closed: "text-error",
 };

@@ -25,7 +25,7 @@ function TopBars({ rows }: { rows: { id: string; name: string; index: number; pc
           <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.name}>
             {r.name}
           </span>
-          <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#efeee8]">
+          <span className="h-3 flex-1 overflow-hidden rounded-full bg-line-soft">
             <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${r.pct}%`, backgroundColor: topicColor(r.index) }} />
           </span>
           <span className="font-display w-[4ch] text-right font-semibold tabular-nums">{r.label}</span>
@@ -127,7 +127,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
               {g.kind === "words" && (
                 <ul className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   {cloud.slice(0, 8).map((w, j) => (
-                    <li key={w.word} className="font-display font-semibold" style={{ fontSize: `${0.95 + w.weight * 0.9}rem`, color: topicInk(j) }}>
+                    <li key={w.word} className="font-display font-semibold" style={{ fontSize: `${0.95 + w.weight * 0.9}rem`, color: `var(--topic-ink-${j % 8}, ${topicInk(j)})` }}>
                       {w.word}
                     </li>
                   ))}
@@ -180,7 +180,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
                   <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.item.name}>
                     {r.item.name}
                   </span>
-                  <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#efeee8]">
+                  <span className="h-3 flex-1 overflow-hidden rounded-full bg-line-soft">
                     <span
                       className="block h-full rounded-full transition-[width] duration-700"
                       style={{ width: `${r.value === null ? 0 : (r.value / scaleMax) * 100}%`, backgroundColor: topicColor(r.index) }}

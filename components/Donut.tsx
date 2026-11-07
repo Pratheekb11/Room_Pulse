@@ -17,7 +17,7 @@ export function Donut({ counts, scaleMax, center, label }: Props) {
 
   return (
     <svg viewBox="0 0 100 100" className="h-full w-full" role="img" aria-label={`${label}. Ratings by score — ${summary}`}>
-      <circle cx="50" cy="50" r={R} fill="none" stroke="#efeee8" strokeWidth="16" />
+      <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-line-soft)" strokeWidth="16" />
       {total > 0 &&
         counts.map((c, i) => {
           if (c === 0) return null;
@@ -48,7 +48,7 @@ export function Donut({ counts, scaleMax, center, label }: Props) {
         textAnchor="middle"
         dominantBaseline="central"
         className="font-display"
-        style={{ fontSize: 22, fontWeight: 800, fill: "#26251e" }}
+        style={{ fontSize: 22, fontWeight: 800, fill: "var(--color-ink)" }}
       >
         {center}
       </text>

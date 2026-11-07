@@ -33,7 +33,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
+      // `.+`: not the home page, which is static (CDN-cached) and gets its CSP from next.config.ts.
+      source: "/((?!api|_next/static|_next/image|favicon.ico).+)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

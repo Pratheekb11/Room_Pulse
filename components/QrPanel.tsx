@@ -7,7 +7,8 @@ export function QrPanel({ url, code }: { url: string; code: string }) {
   return (
     <aside className="slab flex flex-col items-center rounded-xl bg-white p-6 text-center" aria-label="How to join">
       <p className="font-display text-[clamp(1.4rem,1.8vw,2rem)] font-semibold leading-tight">Scan with your phone camera</p>
-      <div className="mt-4 rounded-xl border border-line-strong bg-white p-3">
+      {/* Always real white: a QR code on a dark design must stay scannable */}
+      <div className="mt-4 rounded-xl border border-line-strong p-3" style={{ backgroundColor: "#ffffff" }}>
         <QRCodeSVG value={url} size={240} marginSize={0} fgColor="#26251e" level="M" title={`QR code for ${url}`} />
       </div>
       <p className="mt-4 text-base text-ink-soft">No camera? Go to</p>

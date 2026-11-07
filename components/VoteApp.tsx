@@ -21,12 +21,19 @@ import { QaCard } from "./vote/QaCard";
 import { QuizCard } from "./vote/QuizCard";
 import { clockOffset } from "@/lib/quiz";
 import { useSession } from "./useSession";
+import { useClientValue } from "./useClientValue";
+import { useDocumentTheme } from "./useDocumentTheme";
+import { Doodle } from "./Doodle";
+import { charactersFor, type Character } from "@/lib/decor";
 
-export function VoteApp({ code }: { code: string }) {
+export function VoteApp({ code, initial = null }: { code: string; initial?: SessionPayload | null }) {
   // Set when the status poll sees the presenter changed the questions; reloads them.
   const [revision, setRevision] = useState<number | undefined>(undefined);
-  const state = useSession(code, revision);
-  if (state.kind === "loading") return <LoadingScreen label="Loading questions" />;
+  const state = useSession(code, revision, initial);
+  // The ballot reads saved answers from this phone's storage, so it renders only in the browser.
+  const inBrowser = useClientValue(() => true);
+  useDocumentTheme(state.kind === "ready" ? state.data.session.theme : undefined);
+  if (state.kind === "loading" || !inBrowser) return <LoadingScreen label="Loading questions" />;
   if (state.kind === "not_found")
     return <CenteredMessage title="We can't find that code" body={`There's no presentation with the code “${code}”. Check the code on the screen and try again.`} />;
   if (state.kind === "error")
@@ -452,6 +459,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     return (
       <ThankYou
         title={session.title}
+        doodle={session.decor ? charactersFor(session.theme).screen : undefined}
         statuses={statuses}
         celebrate={celebrate}
         resultsHref={resultsHref}
@@ -501,9 +509,12 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
             )}
           </span>
         </div>
-        <h1 className="font-display mt-4 text-[clamp(1.7rem,7vw,2.4rem)] font-semibold leading-[1.02] tracking-tight break-words">
-          {session.title}
-        </h1>
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <h1 className="font-display min-w-0 text-[clamp(1.7rem,7vw,2.4rem)] font-semibold leading-[1.02] tracking-tight break-words">
+            {session.title}
+          </h1>
+          {session.decor && <Doodle character={charactersFor(session.theme).phone} className="h-20 w-20 shrink-0" />}
+        </div>
         <p className="mt-1.5 text-[0.95rem] text-ink-soft">
           Tap an answer. It saves straight away. Your answers are anonymous.
         </p>
@@ -751,12 +762,15 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
 /** Shown once every question is answered: the ballot closes; saving status stays honest. */
 function ThankYou({
   title,
+  doodle,
   statuses,
   celebrate,
   resultsHref,
   onSeeQuestions,
 }: {
   title: string;
+  /** Fun illustration shown above the tick. */
+  doodle?: Character;
   statuses: Record<string, SaveStatus>;
   celebrate: boolean;
   /** Set when the presenter shows results on phones. */
@@ -770,6 +784,7 @@ function ThankYou({
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
       {celebrate && <Confetti />}
+      {doodle && <Doodle character={doodle} className="mb-6 h-36 w-36" />}
       <svg viewBox="0 0 64 64" className="h-20 w-20" aria-hidden>
         <circle cx="32" cy="32" r="29" fill="none" stroke="var(--color-line)" strokeWidth="3" />
         <circle

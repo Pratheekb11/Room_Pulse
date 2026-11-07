@@ -1,8 +1,17 @@
 import type { Metadata } from "next";
 import { AdminApp } from "@/components/admin/AdminApp";
+import { WarmUp } from "@/components/WarmUp";
 
 export const metadata: Metadata = { title: "Your presentations · LiveRate", robots: { index: false } };
 
+// Rendered per request: the page carries this request's CSP nonce (proxy.ts).
+export const dynamic = "force-dynamic";
+
 export default function AdminPage() {
-  return <AdminApp />;
+  return (
+    <>
+      <WarmUp />
+      <AdminApp />
+    </>
+  );
 }

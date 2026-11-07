@@ -83,7 +83,7 @@ export function PollPie({ tally, hole = true }: { tally: PollTally; hole?: boole
     <div className="flex flex-wrap items-center justify-center gap-[clamp(1rem,4vw,5rem)]">
       <div className="relative aspect-square w-[clamp(16rem,32vw,34rem)]">
         <svg viewBox="0 0 100 100" className="h-full w-full" role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
-          <circle cx="50" cy="50" r={R} fill="none" stroke="#efeee8" strokeWidth={W} />
+          <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-line-soft)" strokeWidth={W} />
           {tally.total > 0 &&
             tally.rows.map((r) => {
               if (r.n === 0) return null;

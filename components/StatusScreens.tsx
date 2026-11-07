@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { SlowHint } from "./SlowHint";
 
 export function CenteredMessage({ title, body, link = true }: { title: string; body: string; link?: boolean }) {
   return (
@@ -20,7 +21,7 @@ export function CenteredMessage({ title, body, link = true }: { title: string; b
 
 export function LoadingScreen({ label }: { label: string }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center" aria-busy="true">
+    <main className="flex min-h-dvh flex-col items-center justify-center px-6" aria-busy="true">
       <div className="flex items-end gap-1.5" role="status" aria-label={label}>
         {["bg-line-strong", "bg-primary", "bg-line-strong"].map((c, i) => (
           <span
@@ -30,6 +31,7 @@ export function LoadingScreen({ label }: { label: string }) {
           />
         ))}
       </div>
+      <SlowHint />
     </main>
   );
 }

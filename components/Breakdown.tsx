@@ -50,7 +50,7 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
                       </span>
                       <span className="font-display font-semibold tabular-nums">{fmt1(v)}</span>
                     </div>
-                    <div className="mt-0.5 h-[clamp(0.5rem,1vh,0.8rem)] overflow-hidden rounded-full bg-[#efeee8]">
+                    <div className="mt-0.5 h-[clamp(0.5rem,1vh,0.8rem)] overflow-hidden rounded-full bg-line-soft">
                       <div
                         className="h-full rounded-full transition-[width] duration-700 ease-out"
                         style={{ width: `${v === null ? 0 : (v / scaleMax) * 100}%`, backgroundColor: topicColor(index) }}

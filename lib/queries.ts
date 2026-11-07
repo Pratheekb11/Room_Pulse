@@ -36,7 +36,7 @@ import { generateCode, generateDashboardKey } from "./code";
 export async function getSession(code: string, opts: { withAnswers?: boolean } = {}): Promise<SessionPayload | null> {
   const withAnswers = opts.withAnswers === true;
   const rows = (await sql`
-    select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open, s.revision,
+    select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open, s.revision, s.theme, s.decor,
       coalesce((select json_agg(jsonb_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
                   'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end),
                   'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit,
@@ -58,6 +58,8 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
     high_label: string;
     is_open: boolean;
     revision: number;
+    theme: string;
+    decor: boolean;
     focus_topics: FocusItem[];
     topics: TopicItem[];
     criteria: NamedItem[];
@@ -73,6 +75,8 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
       highLabel: r.high_label,
       isOpen: r.is_open,
       revision: r.revision,
+      theme: r.theme,
+      decor: r.decor,
     },
     focusTopics: r.focus_topics,
     topics: r.topics,
@@ -374,8 +378,8 @@ export async function createSession(
     try {
       await sql`
         with s as (
-          insert into sessions (code, dashboard_key, title, scale_max, low_label, high_label, owner_id, expires_at)
-          values (${code}, ${dashboardKey}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${ownerId},
+          insert into sessions (code, dashboard_key, title, scale_max, low_label, high_label, theme, decor, owner_id, expires_at)
+          values (${code}, ${dashboardKey}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${input.theme}, ${input.decor}, ${ownerId},
                   case when ${expiresInDays}::int is null then null else now() + make_interval(days => ${expiresInDays}::int) end)
           returning id
         ), input as (
@@ -1262,6 +1266,7 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
   await sql.transaction([
     // The scale guard repeats the check, in case a rating arrived since the read above.
     sql`update sessions set title = ${input.title}, low_label = ${input.lowLabel}, high_label = ${input.highLabel},
+          theme = coalesce(${input.theme ?? null}::text, theme), decor = coalesce(${input.decor ?? null}::boolean, decor),
           scale_max = case when exists (select 1 from votes where session_id = ${sid}::uuid) then scale_max else ${input.scaleMax}::int end,
           revision = revision + 1
         where id = ${sid}::uuid`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SessionPayload } from "@/lib/types";
 
 export type SessionState =
@@ -13,10 +13,17 @@ export type SessionState =
  * Loads session info; keeps retrying (every 3 s) while the server is unreachable.
  * Loads again when `revision` changes (the presenter edited the questions), keeping the old data meanwhile.
  */
-export function useSession(code: string, revision?: number): SessionState {
-  const [state, setState] = useState<SessionState>({ kind: "loading" });
+export function useSession(code: string, revision?: number, initial?: SessionPayload | null): SessionState {
+  const [state, setState] = useState<SessionState>(initial ? { kind: "ready", data: initial } : { kind: "loading" });
+  // Questions that came with the page don't need loading again until the presenter edits them.
+  const skipFirst = useRef(Boolean(initial));
+  const initialRevision = useRef(initial?.session.revision);
 
   useEffect(() => {
+    if (skipFirst.current) {
+      skipFirst.current = false;
+      if (revision === undefined || revision === initialRevision.current) return;
+    }
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 

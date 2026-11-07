@@ -2,6 +2,7 @@ import Link from "next/link";
 import { JoinForm } from "@/components/JoinForm";
 import { LiveDemo } from "@/components/LiveDemo";
 import { Logo } from "@/components/Logo";
+import { WarmUp } from "@/components/WarmUp";
 
 const FEATURES = [
   {
@@ -33,6 +34,7 @@ const STEPS = [
 export default function Home() {
   return (
     <div className="min-h-dvh">
+      <WarmUp />
       <header className="mx-auto flex h-[72px] max-w-[1200px] gap-3 items-center justify-between px-5 sm:px-8">
         <Logo />
         <nav className="flex items-center gap-2 text-[15px] font-semibold whitespace-nowrap">

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { defaultChart, isChartFor } from "./charts";
+import { DEFAULT_THEME, THEME_IDS } from "./themes";
 
 export const codeSchema = z
   .string()
@@ -117,6 +118,10 @@ export const createSessionSchema = z.object({
   scaleMax: z.number().int().min(3).max(10).default(5),
   lowLabel: z.string().trim().min(1).max(30).default("Low"),
   highLabel: z.string().trim().min(1).max(30).default("High"),
+  /** Slide design (lib/themes.ts). */
+  theme: z.enum(THEME_IDS).default(DEFAULT_THEME),
+  /** Fun illustrations (lib/decor.ts) on the big screen and phones. */
+  decor: z.boolean().default(true),
   focusTopics: z
     .array(focusTopicSchema)
     .min(1, "Add at least 1 focus topic")
@@ -167,6 +172,9 @@ export const editSessionSchema = z
     scaleMax: z.number().int().min(3).max(10),
     lowLabel: z.string().trim().min(1).max(30),
     highLabel: z.string().trim().min(1).max(30),
+    /** Left out = keep the current design. */
+    theme: z.enum(THEME_IDS).optional(),
+    decor: z.boolean().optional(),
     focusTopics: z.array(editFocusSchema).min(1, "Add at least 1 question").max(MAX_FOCUS_TOPICS),
     criteria: z.array(itemSchema(60)).max(MAX_CRITERIA).default([]),
   })

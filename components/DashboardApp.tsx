@@ -31,6 +31,9 @@ import { QrPanel } from "./QrPanel";
 import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { useResultsPoll } from "./useResultsPoll";
 import { useSession } from "./useSession";
+import { useDocumentTheme } from "./useDocumentTheme";
+import { Doodle } from "./Doodle";
+import { charactersFor } from "@/lib/decor";
 
 type View = "heatmap" | "ranking" | "breakdown" | "summary";
 type Sort = "order" | "overall";
@@ -49,6 +52,7 @@ export function DashboardApp({ code, audience = false }: { code: string; audienc
   const poll = useResultsPoll(code, audience ? null : (key ?? null), audience || key !== undefined, audience);
   // Reload the questions whenever the presenter edits them.
   const session = useSession(code, poll.data?.revision);
+  useDocumentTheme(session.kind === "ready" ? session.data.session.theme : undefined);
 
   if (session.kind === "not_found")
     return <CenteredMessage title="Presentation not found" body={`There's no presentation with the code “${code}”. It may have been deleted.`} />;
@@ -219,9 +223,12 @@ function Stage({
       <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1">
           <Logo />
-          <h1 className="font-display mt-2 text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[0.98] tracking-tight break-words">
-            {session.title}
-          </h1>
+          <div className="mt-2 flex items-end gap-3">
+            <h1 className="font-display min-w-0 text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[0.98] tracking-tight break-words">
+              {session.title}
+            </h1>
+            {session.decor && <Doodle character={charactersFor(session.theme).screen} className="h-[clamp(4rem,8vw,8.5rem)] w-auto shrink-0" />}
+          </div>
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
           <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:gap-2.5">

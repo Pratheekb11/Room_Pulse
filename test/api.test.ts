@@ -83,7 +83,7 @@ describe("POST /api/admin/sessions", () => {
     expect(code).toMatch(/^[abcdefghjkmnpqrstuvwxyz23456789]{6}$/);
 
     const info = (await (await sessionRoute.GET(new Request(url("/x")), ctx(code))).json()) as SessionPayload;
-    expect(info.session).toEqual({ code, title: "Demo", scaleMax: 5, lowLabel: "Low", highLabel: "High", isOpen: true, revision: 0 });
+    expect(info.session).toEqual({ code, title: "Demo", scaleMax: 5, lowLabel: "Low", highLabel: "High", isOpen: true, revision: 0, theme: "paper", decor: true });
     expect(info.focusTopics.map((f) => f.name)).toEqual(["Growth", "Platform"]);
     const [growth, platform] = info.focusTopics;
     expect(info.topics.map((t) => [t.name, t.focusId])).toEqual([

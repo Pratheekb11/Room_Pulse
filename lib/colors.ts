@@ -97,3 +97,8 @@ export function readableOn(bgHex: string): string {
   const rgb = parseHex(bgHex);
   return contrast(rgb, WHITE) >= contrast(rgb, INK) ? "#ffffff" : "#26251e";
 }
+
+/** WCAG contrast ratio between two #rrggbb colours (1 to 21). */
+export function contrastRatio(a: string, b: string): number {
+  return contrast(parseHex(a), parseHex(b));
+}
