@@ -15,7 +15,8 @@ import { groupByFocus } from "@/lib/focus";
 import { numberStats, pollTally, rankTally, wordWeights } from "@/lib/answers";
 import { RankList, RankPlaces } from "./results/RankResults";
 import { NumberHistogram, NumberSummary } from "./results/NumberResults";
-import { TextSpotlight, TextWall } from "./results/TextResults";
+import { TextAnswers } from "./results/TextResults";
+import { AiInsights } from "./results/AiInsights";
 import { QaList } from "./results/QaResults";
 import { Leaderboard, QuizStage } from "./results/QuizResults";
 import { PollBars, PollColumns, PollPie } from "./PollResults";
@@ -41,15 +42,23 @@ const VIEWS: { id: View; label: string; key: string }[] = [
   { id: "summary", label: "Summary", key: "4" },
 ];
 
-export function DashboardApp({ code }: { code: string }) {
+/** The presenter's results screen; with `audience`, the read-only copy on voters' phones. */
+export function DashboardApp({ code, audience = false }: { code: string; audience?: boolean }) {
   // undefined until the browser has read the link's #k=… part
   const key = useClientValue(() => readDashboardKey(code));
-  const poll = useResultsPoll(code, key ?? null, key !== undefined);
+  const poll = useResultsPoll(code, audience ? null : (key ?? null), audience || key !== undefined, audience);
   // Reload the questions whenever the presenter edits them.
   const session = useSession(code, poll.data?.revision);
 
   if (session.kind === "not_found")
     return <CenteredMessage title="Presentation not found" body={`There's no presentation with the code “${code}”. It may have been deleted.`} />;
+  if (poll.notFound && audience)
+    return (
+      <CenteredMessage
+        title="Results aren't shared right now"
+        body="The presenter shows results on the big screen. If they share them with phones, they'll appear here."
+      />
+    );
   if (poll.notFound)
     return (
       <CenteredMessage
@@ -60,7 +69,7 @@ export function DashboardApp({ code }: { code: string }) {
   if (session.kind === "error")
     return <CenteredMessage title="No connection" body="Check your internet. We'll keep trying on our own." link={false} />;
   if (session.kind === "loading") return <LoadingScreen label="Loading results" />;
-  return <Stage code={code} info={session.data} results={poll.data} lastOkAt={poll.lastOkAt} flash={poll.flash} />;
+  return <Stage code={code} info={session.data} results={poll.data} lastOkAt={poll.lastOkAt} flash={poll.flash} audience={audience} />;
 }
 
 const EMPTY: ResultsPayload = {
@@ -88,17 +97,23 @@ function Stage({
   results,
   lastOkAt,
   flash,
+  audience,
 }: {
   code: string;
   info: SessionPayload;
   results: ResultsPayload | null;
   lastOkAt: number | null;
   flash: Record<string, number>;
+  /** Voters' phones: no QR, no owner controls, no quiz. */
+  audience: boolean;
 }) {
   const { session, topics, criteria } = info;
   // Fill in fields an older server version may not send.
   const r: ResultsPayload = { ...EMPTY, isOpen: session.isOpen, ...(results ?? {}) };
-  const groups = useMemo(() => groupByFocus(info.focusTopics ?? [], topics), [info.focusTopics, topics]);
+  const groups = useMemo(
+    () => groupByFocus((info.focusTopics ?? []).filter((f) => !audience || f.kind !== "quiz"), topics),
+    [info.focusTopics, topics, audience],
+  );
   const single = groups.length <= 1;
 
   // Stage only renders in the browser (after the session loads), so reading the URL here is safe.
@@ -113,10 +128,12 @@ function Stage({
   // Index (within the open focus topic) of the topic shown full screen, or null.
   const [detail, setDetail] = useState<number | null>(null);
   const [sort, setSort] = useState<Sort>("order");
-  const [showQr, setShowQr] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
+  const [showQr, setShowQr] = useState(() => !audience && window.matchMedia("(min-width: 1024px)").matches);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const joinUrl = useClientValue(() => voterUrl(code));
-  const isOwner = useIsOwner(code);
+  const signedInOwner = useIsOwner(code);
+  const isOwner = signedInOwner && !audience;
+  const aiOn = useAiOn(code, isOwner);
 
   const cells = useMemo(() => indexCells(r.cells), [r.cells]);
   const histograms = useMemo(() => topicHistograms(r.dist, session.scaleMax), [r.dist, session.scaleMax]);
@@ -186,14 +203,14 @@ function Stage({
       if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
       const v = VIEWS.find((x) => x.key === e.key);
       if (v && groupKind === "rating") setView(v.id);
-      else if (e.key.toLowerCase() === "q") setShowQr((s) => !s);
+      else if (!audience && e.key.toLowerCase() === "q") setShowQr((s) => !s);
       else if (!single && e.key === "Escape") setFocusIndex(null);
       else if (!single && e.key === "ArrowRight") setFocusIndex((i) => (i === null ? 0 : Math.min(groups.length - 1, i + 1)));
       else if (!single && e.key === "ArrowLeft") setFocusIndex((i) => (i === null || i === 0 ? null : i - 1));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [single, groups.length, setView, groupKind]);
+  }, [single, groups.length, setView, groupKind, audience]);
 
   const voters = r.voterCount;
 
@@ -251,15 +268,21 @@ function Stage({
                 </select>
               </label>
             )}
-            <button
-              type="button"
-              aria-pressed={showQr}
-              title="Shortcut: Q"
-              onClick={() => setShowQr((s) => !s)}
-              className={`rounded-full border border-line-strong px-3 py-1 ${showQr ? "bg-sun" : "bg-white"}`}
-            >
-              {showQr ? "Hide QR" : "Show QR"}
-            </button>
+            {audience ? (
+              <a href={`/s/${encodeURIComponent(code)}`} className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas">
+                Back to answering
+              </a>
+            ) : (
+              <button
+                type="button"
+                aria-pressed={showQr}
+                title="Shortcut: Q"
+                onClick={() => setShowQr((s) => !s)}
+                className={`rounded-full border border-line-strong px-3 py-1 ${showQr ? "bg-sun" : "bg-white"}`}
+              >
+                {showQr ? "Hide QR" : "Show QR"}
+              </button>
+            )}
             <button type="button" onClick={toggleFullscreen} className="hidden rounded-full border border-line-strong bg-white px-3 py-1 sm:inline-block">
               {isFullscreen ? "Exit full screen" : "Full screen"}
             </button>
@@ -404,14 +427,13 @@ function Stage({
             )
           ) : group.kind === "qa" ? (
             <ResultCard title={group.focus.name}>
+              {aiOn && <AiInsights code={code} focusId={group.focus.id} kind="qa" questions={r.questions.filter((q) => q.focusId === group.focus.id)} />}
               <QaList code={code} items={r.questions} focusId={group.focus.id} mode={view === "new" ? "new" : "top"} owner={isOwner} />
             </ResultCard>
           ) : group.kind === "text" ? (
             <ResultCard title={group.focus.name}>
-              {(() => {
-                const answers = r.texts.filter((t) => t.focusId === group.focus.id);
-                return view === "spotlight" ? <TextSpotlight answers={answers} /> : <TextWall answers={answers} />;
-              })()}
+              {aiOn && <AiInsights code={code} focusId={group.focus.id} kind="text" />}
+              <TextAnswers code={code} answers={r.texts} focusId={group.focus.id} view={view === "spotlight" ? "spotlight" : "wall"} owner={isOwner} />
             </ResultCard>
           ) : group.kind === "words" ? (
             <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
@@ -510,6 +532,25 @@ function ResultCard({ title, children }: { title: string; children: React.ReactN
 }
 
 /** True when the signed-in account owns this presentation (it can open the edit form). */
+/** Owner only: AI insights are switched on for this presentation and the site has a Gemini key. */
+function useAiOn(code: string, isOwner: boolean): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!isOwner) return;
+    let cancelled = false;
+    fetch(`/api/admin/sessions/${encodeURIComponent(code)}/ai`, { cache: "no-store", credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { enabled?: boolean; available?: boolean } | null) => {
+        if (!cancelled) setOn(Boolean(body?.enabled && body.available));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [code, isOwner]);
+  return isOwner && on;
+}
+
 function useIsOwner(code: string): boolean {
   const [owner, setOwner] = useState(false);
   useEffect(() => {

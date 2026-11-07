@@ -83,6 +83,26 @@ function Console({
   const [error, setError] = useState<string | null>(null);
   // The form shows by itself until there's a presentation; after that it opens on request.
   const [formOpen, setFormOpen] = useState(false);
+  // Guests who try an account-only feature (AI insights) get the save-account form opened for them.
+  const [saveOpen, setSaveOpen] = useState(false);
+  // AI controls only show once the site has a Gemini key.
+  const [aiAvailable, setAiAvailable] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/ai/questions", { cache: "no-store", credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { available?: boolean } | null) => {
+        if (!cancelled) setAiAvailable(body?.available === true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const askForAccount = useCallback(() => {
+    setSaveOpen(true);
+    requestAnimationFrame(() => document.getElementById("save-account")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, []);
 
   const call = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -135,7 +155,7 @@ function Console({
         </div>
       </header>
 
-      {guest && <GuestBanner onSaved={onAccountChanged} />}
+      {guest && <GuestBanner onSaved={onAccountChanged} open={saveOpen} setOpen={setSaveOpen} />}
       {mustVerify && email && <VerifyBanner email={email} onVerified={onVerified} />}
       {confirmLeave && (
         <ConfirmDialog
@@ -174,6 +194,9 @@ function Console({
               requestAnimationFrame(() => document.getElementById(`card-${code}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
             }}
             locked={mustVerify}
+            guest={guest}
+            aiAvailable={aiAvailable}
+            onNeedAccount={askForAccount}
           />
         </div>
       )}
@@ -190,7 +213,7 @@ function Console({
           </div>
           <div className="mt-4 grid gap-6 xl:grid-cols-2">
             {sessions.map((s) => (
-              <SessionCard key={s.code} session={s} call={call} onChanged={refresh} />
+              <SessionCard key={s.code} session={s} call={call} onChanged={refresh} guest={guest} aiAvailable={aiAvailable} onNeedAccount={askForAccount} />
             ))}
           </div>
         </section>
@@ -249,9 +272,8 @@ function VerifyBanner({ email, onVerified }: { email: string; onVerified: () => 
 }
 
 /** Guest accounts: explains the 3-day limit and lets the presenter save the account. */
-function GuestBanner({ onSaved }: { onSaved: () => void }) {
+function GuestBanner({ onSaved, open, setOpen }: { onSaved: () => void; open: boolean; setOpen: (open: boolean) => void }) {
   const guestCode = useClientValue(readGuestCode);
-  const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -273,7 +295,7 @@ function GuestBanner({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div role="status" className="mt-6 rounded-xl bg-sun px-5 py-3">
+    <div id="save-account" role="status" className="mt-6 scroll-mt-6 rounded-xl bg-sun px-5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
           <p>

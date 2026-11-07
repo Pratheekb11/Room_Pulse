@@ -8,7 +8,7 @@ import type { AdminSessionRow } from "@/lib/types";
 import { ConfirmDialog } from "../ConfirmDialog";
 
 type Call = (path: string, init?: RequestInit) => Promise<Response>;
-type Pending = "toggle" | "reset" | "recalc" | "delete" | "summary" | "raw" | null;
+type Pending = "toggle" | "results" | "ai" | "markdown" | "reset" | "recalc" | "delete" | "summary" | "raw" | null;
 
 function CopyLink({ label, url, newTab }: { label: string; url: string; newTab?: boolean }) {
   const [copied, setCopied] = useState(false);
@@ -41,7 +41,23 @@ function CopyLink({ label, url, newTab }: { label: string; url: string; newTab?:
   );
 }
 
-export function SessionCard({ session: s, call, onChanged }: { session: AdminSessionRow; call: Call; onChanged: () => Promise<void> }) {
+export function SessionCard({
+  session: s,
+  call,
+  onChanged,
+  guest = false,
+  aiAvailable = false,
+  onNeedAccount,
+}: {
+  session: AdminSessionRow;
+  call: Call;
+  onChanged: () => Promise<void>;
+  /** Guests can't use AI insights: ticking it asks them to save their account. */
+  guest?: boolean;
+  /** The site has a Gemini key; without one the AI setting doesn't show. */
+  aiAvailable?: boolean;
+  onNeedAccount?: () => void;
+}) {
   const voter = useClientValue(() => voterUrl(s.code));
   const dash = useClientValue(() => dashboardUrl(s.code, s.dashboardKey));
   const urls = voter && dash ? { voter, dash } : null;
@@ -89,6 +105,26 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
       await call(base, { method: "PATCH", body: JSON.stringify({ isOpen: !s.isOpen }) });
     });
 
+  // Ticks show at once; they go back if saving fails.
+  const [shown, setShown] = useState<{ showResults?: boolean; aiEnabled?: boolean }>({});
+  const showResults = shown.showResults ?? s.showResults;
+  const aiEnabled = shown.aiEnabled ?? s.aiEnabled;
+  const setting = async (kind: "results" | "ai", change: { showResults?: boolean; aiEnabled?: boolean }) => {
+    setShown((m) => ({ ...m, ...change }));
+    await run(kind, async () => {
+      await call(base, { method: "PATCH", body: JSON.stringify(change) });
+    });
+    setShown({});
+  };
+  const [needAccount, setNeedAccount] = useState(false);
+  function toggleAi() {
+    if (guest && !aiEnabled) {
+      setNeedAccount(true);
+      return;
+    }
+    void setting("ai", { aiEnabled: !aiEnabled });
+  }
+
   const reset = () =>
     run("reset", async () => {
       await call(`${base}/reset`, { method: "POST" });
@@ -119,6 +155,18 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
       a.remove();
       setTimeout(() => URL.revokeObjectURL(href), 1000);
     });
+
+  // Copy as Markdown for Slack, Notion or Jira. The clipboard write starts inside the tap (Safari
+  // refuses it after an await), with the text arriving when the request finishes.
+  const copyMarkdown = () =>
+    run("markdown", async () => {
+      const text = call(`${base}/export?type=markdown`).then((res) => res.text());
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then((t) => new Blob([t], { type: "text/plain" })) })]);
+      } else {
+        await navigator.clipboard.writeText(await text);
+      }
+    }, "Results copied. Paste them into Slack, Notion or Jira.");
 
   function downloadPng() {
     const canvas = canvasWrap.current?.querySelector("canvas");
@@ -180,6 +228,10 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
             }}
             className="absolute inset-x-0 z-20 mt-1 rounded-lg border border-line-strong bg-white p-1 md:right-auto md:left-0 md:w-64"
           >
+            <button type="button" onClick={copyMarkdown} disabled={pending !== null} className={menuItem}>
+              {pending === "markdown" ? "Copying…" : "Copy results as text"}
+              <span className="block text-xs font-normal text-ink-soft">Markdown, for Slack, Notion or Jira.</span>
+            </button>
             <button type="button" onClick={() => exportCsv("summary")} disabled={pending !== null} className={menuItem}>
               {pending === "summary" ? "Downloading…" : "Download results (CSV)"}
             </button>
@@ -219,6 +271,66 @@ export function SessionCard({ session: s, call, onChanged }: { session: AdminSes
           )}
         </div>
       </div>
+
+      <fieldset className="mt-4 border-t border-line pt-4">
+        <legend className="sr-only">Settings</legend>
+        <div className="flex flex-col gap-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={showResults}
+              disabled={pending !== null}
+              onChange={() => void setting("results", { showResults: !showResults })}
+              className="mt-1 size-5 shrink-0 accent-primary"
+            />
+            <span>
+              <span className="block font-semibold">Show live results on people&rsquo;s phones</span>
+              <span className="block text-sm text-ink-soft">Handy when there&rsquo;s no big screen, like a video call. Hidden answers and quiz answers stay private.</span>
+            </span>
+          </label>
+          {aiAvailable && (
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={aiEnabled}
+              disabled={pending !== null}
+              onChange={toggleAi}
+              className="mt-1 size-5 shrink-0 accent-primary"
+            />
+            <span>
+              <span className="block font-semibold">
+                AI insights <span className="ml-1 rounded-full bg-canvas px-2 py-0.5 text-xs font-bold">Accounts</span>
+              </span>
+              <span className="block text-sm text-ink-soft">
+                Summarise open answers into themes and next steps, and spot Q&amp;A questions that ask the same thing. Answers are sent to Google
+                Gemini only when you press an AI button.
+              </span>
+            </span>
+          </label>
+          )}
+          {needAccount && (
+            <div role="alert" className="rounded-lg bg-sun px-4 py-3 text-sm">
+              <p className="font-semibold">AI insights need an account.</p>
+              <p className="mt-0.5">Save your guest account with an email and password (it&rsquo;s free and keeps your presentations), or log in to an account you already have.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNeedAccount(false);
+                    onNeedAccount?.();
+                  }}
+                  className="key rounded-lg bg-white px-3 py-1.5 font-bold"
+                >
+                  Save my account
+                </button>
+                <button type="button" onClick={() => setNeedAccount(false)} className="rounded-lg px-3 py-1.5 font-semibold underline underline-offset-4">
+                  Not now
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </fieldset>
 
       {error && (
         <p role="alert" className="mt-3 text-sm font-semibold text-error">

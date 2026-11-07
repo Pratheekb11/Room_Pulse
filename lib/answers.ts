@@ -1,4 +1,4 @@
-import type { NamedItem, NumberCount, PollCount, PublicQaItem, RankCount, WordCount } from "./types";
+import type { NamedItem, NumberCount, PollCount, PublicQaItem, RankCount, ResultsPayload, WordCount } from "./types";
 
 export interface PollTally {
   total: number;
@@ -169,4 +169,26 @@ export function qaVoterView(
     return { ...q, votes, mine: mine.has(q.id), voted: voted.has(q.id) };
   });
   return qaOrder(items, focusId, "top");
+}
+
+/** Open answers to show on the big screen: one question's, hidden ones left out. */
+export function visibleTexts<T extends { focusId: string; hidden?: boolean }>(texts: T[], focusId: string): T[] {
+  return texts.filter((t) => t.focusId === focusId && !t.hidden);
+}
+
+/**
+ * Results as voters may see them on their phones: hidden answers and questions left out,
+ * and nothing about quizzes (right answers, scores and nicknames stay on the presenter's screen).
+ */
+export function audienceResults(r: ResultsPayload, quizFocusIds: Set<string>): ResultsPayload {
+  return {
+    ...r,
+    texts: r.texts.filter((t) => !t.hidden),
+    questions: r.questions.filter((q) => !q.hidden),
+    respondents: r.respondents.filter((x) => !quizFocusIds.has(x.focusId)),
+    quizCounts: [],
+    quizRevealed: [],
+    leaderboard: [],
+    quiz: null,
+  };
 }

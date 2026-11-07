@@ -119,6 +119,8 @@ export interface LiveQuiz {
 export interface SessionStatus {
   isOpen: boolean;
   revision: number;
+  /** The owner lets voters see live results on their phones. */
+  showResults: boolean;
   quiz: LiveQuiz | null;
 }
 
@@ -145,7 +147,11 @@ export interface QuizMe {
 }
 
 export interface TextAnswer {
+  /** Names the answer for hiding; never the voter. */
+  id: string;
   focusId: string;
+  /** Hidden by the owner: kept in results and exports, never on the big screen. */
+  hidden: boolean;
   text: string;
   /** ISO time of the latest change. */
   at: string;
@@ -198,4 +204,8 @@ export interface AdminSessionRow {
   totalVotes: number;
   /** Secret for the presenter's results link (#k=…). */
   dashboardKey: string;
+  /** Voters can see live results on their phones. */
+  showResults: boolean;
+  /** AI insights are on (accounts only). */
+  aiEnabled: boolean;
 }

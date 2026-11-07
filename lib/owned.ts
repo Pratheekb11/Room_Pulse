@@ -11,12 +11,12 @@ import { codeSchema } from "./validation";
 export async function requireOwnedSession(
   req: Request,
   rawCode: string,
-): Promise<Response | { code: string; isOpen: boolean; userId: string }> {
+): Promise<Response | { code: string; isOpen: boolean; userId: string; isGuest: boolean }> {
   const user = await requireUser(req);
   if (user instanceof Response) return user;
   const code = codeSchema.safeParse(rawCode);
   if (!code.success) return notFound();
   const isOpen = await getOwnedSessionIsOpen(code.data, user.id);
   if (isOpen === null) return notFound();
-  return { code: code.data, isOpen, userId: user.id };
+  return { code: code.data, isOpen, userId: user.id, isGuest: user.isGuest };
 }

@@ -180,9 +180,11 @@ export const editSessionSchema = z
   });
 export type EditSessionInput = z.infer<typeof editSessionSchema>;
 
-export const patchSessionSchema = z.object({ isOpen: z.boolean() });
+export const patchSessionSchema = z
+  .object({ isOpen: z.boolean().optional(), showResults: z.boolean().optional(), aiEnabled: z.boolean().optional() })
+  .refine((p) => p.isOpen !== undefined || p.showResults !== undefined || p.aiEnabled !== undefined, "Nothing to change");
 
-export const exportTypeSchema = z.enum(["summary", "raw"]);
+export const exportTypeSchema = z.enum(["summary", "raw", "markdown"]);
 
 /** Same cleaning the server applies, for the admin form preview. */
 export function splitLines(text: string): string[] {
@@ -311,3 +313,12 @@ export type QuizControl = z.infer<typeof quizControlSchema>;
 export const qaModerateSchema = z
   .object({ id: z.uuid(), hidden: z.boolean().optional(), answered: z.boolean().optional() })
   .refine((m) => m.hidden !== undefined || m.answered !== undefined, "Nothing to change");
+
+/** Owner moderation of an open answer. */
+export const textModerateSchema = z.object({ id: z.uuid(), hidden: z.boolean() });
+
+/** AI insights on one question's answers. */
+export const aiActionSchema = z.object({ action: z.enum(["summary", "duplicates"]), focusId: z.uuid() });
+
+/** "Write questions for me": what the presentation is for. */
+export const aiDraftSchema = z.object({ prompt: z.string().trim().min(3, "Say a little more").max(500, "Keep it under 500 characters") });

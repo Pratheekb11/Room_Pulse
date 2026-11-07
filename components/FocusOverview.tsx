@@ -55,7 +55,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
           const tally = g.kind === "poll" || g.kind === "multi" ? pollTally(options, polls, g.focus.id, g.kind === "multi" ? people : undefined) : null;
           const ranked = g.kind === "rank" ? rankTally(options, results.ranks, g.focus.id) : null;
           const stats = g.kind === "number" ? numberStats(results.numbers, g.focus.id, g.min ?? 0, g.max ?? 100) : null;
-          const texts = g.kind === "text" ? results.texts.filter((t) => t.focusId === g.focus.id) : [];
+          const texts = g.kind === "text" ? results.texts.filter((t) => t.focusId === g.focus.id && !t.hidden) : [];
           const cloud = g.kind === "words" ? wordWeights(words, g.focus.id) : [];
           const asked = g.kind === "qa" ? qaOrder(results.questions, g.focus.id, "top") : [];
           const quizAnswers = g.kind === "quiz" ? results.quizCounts.filter((c) => c.focusId === g.focus.id).reduce((n, c) => n + c.n, 0) : 0;

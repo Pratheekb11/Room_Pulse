@@ -5,6 +5,7 @@ import type { ResultsPayload } from "@/lib/types";
 
 const FAST_MS = 1500;
 const SLOW_MS = 5000;
+const AUDIENCE_MS = 3000;
 
 export interface PollState {
   data: ResultsPayload | null;
@@ -34,7 +35,7 @@ function diffCells(prev: ResultsPayload | null, next: ResultsPayload, flash: Rec
  * pauses while the tab is hidden and resumes immediately when visible.
  * `dashboardKey` is the secret from the presenter link; without it only the signed-in owner gets results.
  */
-export function useResultsPoll(code: string, dashboardKey: string | null, enabled = true): PollState {
+export function useResultsPoll(code: string, dashboardKey: string | null, enabled = true, audience = false): PollState {
   const [state, setState] = useState<PollState>({ data: null, lastOkAt: null, notFound: false, flash: {} });
 
   useEffect(() => {
@@ -57,7 +58,8 @@ export function useResultsPoll(code: string, dashboardKey: string | null, enable
       controller = new AbortController();
       const timeout = setTimeout(() => controller?.abort(), 10_000);
       try {
-        const res = await fetch(`/api/results/${encodeURIComponent(code)}`, {
+        // Voters' phones read the audience copy (CDN-cached, hidden and quiz data left out).
+        const res = await fetch(`/api/results/${encodeURIComponent(code)}${audience ? "/public" : ""}`, {
           cache: "no-store",
           signal: controller.signal,
           headers: dashboardKey ? { "x-dashboard-key": dashboardKey } : undefined,
@@ -71,7 +73,7 @@ export function useResultsPoll(code: string, dashboardKey: string | null, enable
           const data = (await res.json()) as ResultsPayload;
           if (!stopped)
             setState((s) => ({ data, lastOkAt: Date.now(), notFound: false, flash: diffCells(s.data, data, s.flash) }));
-          delay = FAST_MS;
+          delay = audience ? AUDIENCE_MS : FAST_MS;
         }
       } catch {
         delay = SLOW_MS;
@@ -105,7 +107,7 @@ export function useResultsPoll(code: string, dashboardKey: string | null, enable
       controller?.abort();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [code, dashboardKey, enabled]);
+  }, [code, dashboardKey, enabled, audience]);
 
   return state;
 }

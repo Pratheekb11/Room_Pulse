@@ -110,6 +110,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   // Still on the ballot although everything is done: following the live Q&A.
   const [reviewing, setReviewing] = useState(false);
   const [isOpen, setIsOpen] = useState(session.isOpen);
+  // The presenter lets people see live results on their phones.
+  const [showResults, setShowResults] = useState(false);
+  const resultsHref = showResults ? `/s/${encodeURIComponent(code)}/results` : undefined;
 
   const onStatus = useCallback(
     (key: string, status: SaveStatus) => setStatuses((s) => (s[key] === status ? s : { ...s, [key]: status })),
@@ -181,8 +184,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       try {
         const res = await fetch(`/api/session/${encodeURIComponent(code)}/status`, { cache: "no-store" });
         if (!res.ok) return;
-        const body = (await res.json()) as { isOpen: boolean; revision?: number; quiz?: LiveQuiz | null };
+        const body = (await res.json()) as { isOpen: boolean; revision?: number; showResults?: boolean; quiz?: LiveQuiz | null };
         setIsOpen(body.isOpen);
+        setShowResults(body.showResults === true);
         if (body.quiz !== undefined) {
           setLiveQuiz((prev) => (JSON.stringify(prev) === JSON.stringify(body.quiz) ? prev : (body.quiz ?? null)));
           if (body.quiz) setQuizOffset(clockOffset(body.quiz.now, Date.now()));
@@ -206,7 +210,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       }
     };
     if (document.visibilityState === "visible") {
-      if (hasQuiz) void check();
+      void check();
       startPolling();
     }
     document.addEventListener("visibilitychange", onVisibility);
@@ -450,6 +454,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         title={session.title}
         statuses={statuses}
         celebrate={celebrate}
+        resultsHref={resultsHref}
         onSeeQuestions={
           qaStep === -1
             ? undefined
@@ -502,6 +507,11 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         <p className="mt-1.5 text-[0.95rem] text-ink-soft">
           Tap an answer. It saves straight away. Your answers are anonymous.
         </p>
+        {resultsHref && (
+          <a href={resultsHref} className="mt-2 inline-block text-[0.95rem] font-bold underline decoration-primary decoration-2 underline-offset-4">
+            See live results
+          </a>
+        )}
       </header>
 
       <div className="sticky top-0 z-20 mt-4 border-b border-line-strong bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
@@ -743,11 +753,14 @@ function ThankYou({
   title,
   statuses,
   celebrate,
+  resultsHref,
   onSeeQuestions,
 }: {
   title: string;
   statuses: Record<string, SaveStatus>;
   celebrate: boolean;
+  /** Set when the presenter shows results on phones. */
+  resultsHref?: string;
   /** Set when the presentation has a Q&A: people come back to vote on new questions. */
   onSeeQuestions?: () => void;
 }) {
@@ -786,6 +799,14 @@ function ThankYou({
         >
           See the room&apos;s questions
         </button>
+      )}
+      {resultsHref && (
+        <a
+          href={resultsHref}
+          className={`key animate-rise mt-4 rounded-xl px-6 py-3 font-bold [animation-delay:460ms] ${onSeeQuestions ? "bg-white" : "bg-primary text-white"}`}
+        >
+          See live results
+        </a>
       )}
       <p role="status" aria-live="polite" className="font-mono animate-fade mt-8 text-xs text-muted [animation-delay:600ms]">
         {closed ? (

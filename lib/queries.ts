@@ -105,12 +105,14 @@ const isoQuiz = (q: LiveQuiz | null): LiveQuiz | null =>
 
 /** Open/closed state, question revision and the running quiz question; `null` when the session does not exist. */
 export async function getSessionStatus(code: string): Promise<SessionStatus | null> {
-  const rows = (await sql`select s.is_open, s.revision, ${liveQuizJson()} as quiz from live_sessions s where s.code = ${code}`) as {
+  const rows = (await sql`select s.is_open, s.revision, s.show_results, ${liveQuizJson()} as quiz from live_sessions s where s.code = ${code}`) as {
     is_open: boolean;
     revision: number;
+    show_results: boolean;
     quiz: LiveQuiz | null;
   }[];
-  return rows[0] ? { isOpen: rows[0].is_open, revision: rows[0].revision, quiz: isoQuiz(rows[0].quiz) } : null;
+  const r = rows[0];
+  return r ? { isOpen: r.is_open, revision: r.revision, showResults: r.show_results, quiz: isoQuiz(r.quiz) } : null;
 }
 
 /** `null` when the session does not exist. */
@@ -152,11 +154,12 @@ export async function saveVote(v: VoteInput): Promise<VoteOutcome> {
  */
 export async function getResults(
   code: string,
-  access: { dashboardKey?: string | null; ownerId?: string | null },
+  access: { dashboardKey?: string | null; ownerId?: string | null; audience?: boolean },
 ): Promise<ResultsPayload | null> {
   const key = access.dashboardKey ?? null;
   const owner = access.ownerId ?? null;
-  if (!key && !owner) return null;
+  const audience = access.audience === true;
+  if (!key && !owner && !audience) return null;
   const rows = (await sql`
     select s.is_open, s.revision,
       (select count(*)::int from (
@@ -202,9 +205,9 @@ export async function getResults(
                 from (select focus_id, value, count(*)::int as n
                         from number_answers where session_id = s.id
                        group by focus_id, value) x), '[]'::json) as numbers,
-      coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'text', x.body, 'at', x.updated_at)
+      coalesce((select json_agg(json_build_object('id', x.id, 'focusId', x.focus_id, 'text', x.body, 'hidden', x.hidden, 'at', x.updated_at)
                                 order by x.updated_at desc)
-                from (select focus_id, body, updated_at,
+                from (select id, focus_id, body, hidden, updated_at,
                              row_number() over (partition by focus_id order by updated_at desc) as rk
                         from text_answers where session_id = s.id) x
                where x.rk <= 200), '[]'::json) as texts,
@@ -250,7 +253,7 @@ export async function getResults(
       ${liveQuizJson()} as quiz
     from live_sessions s
     where s.code = ${code}
-      and (s.dashboard_key = ${key}::text or s.owner_id = ${owner}::uuid)
+      and (s.dashboard_key = ${key}::text or s.owner_id = ${owner}::uuid or (${audience}::boolean and s.show_results))
   `) as {
     is_open: boolean;
     revision: number;
@@ -295,7 +298,7 @@ export async function getResults(
 
 export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> {
   const rows = (await sql`
-    select s.code, s.title, s.is_open, s.created_at, s.expires_at, s.dashboard_key,
+    select s.code, s.title, s.is_open, s.show_results, s.ai_enabled, s.created_at, s.expires_at, s.dashboard_key,
       (select count(*)::int from focus_topics f where f.session_id = s.id) as focus_count,
       (select count(*)::int from topics t where t.session_id = s.id)   as topic_count,
       (select count(*)::int from criteria c where c.session_id = s.id) as criterion_count,
@@ -322,6 +325,8 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     code: string;
     title: string;
     is_open: boolean;
+    show_results: boolean;
+    ai_enabled: boolean;
     created_at: Date | string;
     expires_at: Date | string | null;
     dashboard_key: string;
@@ -335,6 +340,8 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     code: r.code,
     title: r.title,
     isOpen: r.is_open,
+    showResults: r.show_results,
+    aiEnabled: r.ai_enabled,
     createdAt: new Date(r.created_at).toISOString(),
     expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
     focusCount: r.focus_count,
@@ -405,6 +412,17 @@ export async function createSession(
 }
 
 /** `false` when the session does not exist. */
+/** Owner settings; only the ones given change. */
+export async function setSessionSettings(code: string, change: { isOpen?: boolean; showResults?: boolean; aiEnabled?: boolean }): Promise<void> {
+  await sql`
+    update sessions
+       set is_open = coalesce(${change.isOpen ?? null}::boolean, is_open),
+           show_results = coalesce(${change.showResults ?? null}::boolean, show_results),
+           ai_enabled = coalesce(${change.aiEnabled ?? null}::boolean, ai_enabled)
+     where code = ${code}
+  `;
+}
+
 export async function setSessionOpen(code: string, isOpen: boolean): Promise<boolean> {
   const rows = await sql`update sessions set is_open = ${isOpen} where code = ${code} returning 1 as ok`;
   return rows.length > 0;
@@ -521,7 +539,7 @@ export async function getRawRows(code: string): Promise<RawRow[]> {
         join topics t on t.id = c.topic_id
       union all
       select x.voter_id, x.created_at, x.updated_at, f.position, 0, 0,
-             f.name, x.body, 'Answer', ''
+             f.name, x.body, case when x.hidden then 'Hidden answer' else 'Answer' end, ''
         from text_answers x
         join s on x.session_id = s.id
         join focus_topics f on f.id = x.focus_id
@@ -935,6 +953,18 @@ export async function moderateQuestion(code: string, id: string, change: { hidde
   return rows.length > 0;
 }
 
+/** Owner moderation of an open answer. The caller checks ownership. */
+export async function moderateText(code: string, id: string, hidden: boolean): Promise<boolean> {
+  const rows = await sql`
+    update text_answers a
+       set hidden = ${hidden}
+      from live_sessions s
+     where s.id = a.session_id and s.code = ${code} and a.id = ${id}::uuid
+    returning 1 as ok
+  `;
+  return rows.length > 0;
+}
+
 export interface ChoiceSummaryRow {
   focus: string;
   label: string;
@@ -946,6 +976,7 @@ export interface ChoiceSummaryRow {
     | "Average"
     | "Middle value"
     | "Answer"
+    | "Hidden answer"
     | "Audience question"
     | "Answered question"
     | "Hidden question"
@@ -992,7 +1023,8 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
         cross join lateral (values (0::float8, 'Average', x.mean), (1::float8, 'Middle value', x.median)) as m(ord, kind, value)
        where s.code = ${code}
       union all
-      select f.position, extract(epoch from a.updated_at)::float8, f.name, a.body, 'Answer', null, 1
+      select f.position, extract(epoch from a.updated_at)::float8 + case when a.hidden then 1e12 else 0 end, f.name, a.body,
+             case when a.hidden then 'Hidden answer' else 'Answer' end, null, 1
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'text'
         join text_answers a on a.focus_id = f.id
@@ -1260,4 +1292,56 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
         from jsonb_to_recordset(${rows(crit.filter((c) => c.isNew))}::jsonb) as x(id uuid, name text, pos int)`,
   ]);
   return "ok";
+}
+
+// ---------------------------------------------------------------- AI insights
+
+/** Takes one of today's AI uses for the account; false when the day's allowance is used up. */
+export async function takeAiCredit(userId: string, limit: number): Promise<boolean> {
+  const rows = await sql`
+    insert into ai_usage (user_id, day, n) values (${userId}::uuid, (now() at time zone 'utc')::date, 1)
+    on conflict (user_id, day) do update set n = ai_usage.n + 1 where ai_usage.n < ${limit}
+    returning n
+  `;
+  return rows.length > 0;
+}
+
+/** Gives back a use when the AI request failed. */
+export async function refundAiCredit(userId: string): Promise<void> {
+  await sql`
+    update ai_usage set n = greatest(0, n - 1)
+     where user_id = ${userId}::uuid and day = (now() at time zone 'utc')::date
+  `;
+}
+
+export async function aiCreditsUsed(userId: string): Promise<number> {
+  const rows = (await sql`
+    select n from ai_usage where user_id = ${userId}::uuid and day = (now() at time zone 'utc')::date
+  `) as { n: number }[];
+  return rows[0]?.n ?? 0;
+}
+
+export async function getSessionAiEnabled(code: string): Promise<boolean> {
+  const rows = (await sql`select ai_enabled from live_sessions where code = ${code}`) as { ai_enabled: boolean }[];
+  return rows[0]?.ai_enabled === true;
+}
+
+/** What the AI may read for one question: its wording and the answers people can see (hidden ones left out). */
+export async function getAiSource(
+  code: string,
+  focusId: string,
+): Promise<{ kind: string; name: string; texts: string[]; questions: { id: string; text: string }[] } | null> {
+  const rows = (await sql`
+    select f.kind, f.name,
+      coalesce((select json_agg(a.body order by a.updated_at desc)
+                  from (select body, updated_at from text_answers
+                         where focus_id = f.id and not hidden order by updated_at desc limit 300) a), '[]'::json) as texts,
+      coalesce((select json_agg(json_build_object('id', q.id, 'text', q.body) order by q.created_at)
+                  from (select id, body, created_at from qa_questions
+                         where focus_id = f.id and not hidden order by created_at desc limit 200) q), '[]'::json) as questions
+    from live_sessions s
+    join focus_topics f on f.session_id = s.id and f.id = ${focusId}::uuid
+    where s.code = ${code}
+  `) as { kind: string; name: string; texts: string[]; questions: { id: string; text: string }[] }[];
+  return rows[0] ?? null;
 }

@@ -347,3 +347,25 @@ create index if not exists quiz_answers_session_idx on quiz_answers(session_id, 
 -- Recreate the view so it includes the quiz columns added above (a view keeps the columns it had when made).
 create or replace view live_sessions as
   select * from sessions where expires_at is null or expires_at > now();
+
+-- Open answers: the owner can hide one from the big screen (like Audience Q&A). The id names an
+-- answer without revealing who wrote it.
+alter table text_answers add column if not exists id uuid not null default gen_random_uuid();
+alter table text_answers add column if not exists hidden boolean not null default false;
+create unique index if not exists text_answers_id_idx on text_answers(id);
+
+-- Owner settings per presentation: show live results on voters' phones, and AI insights
+-- (accounts only; nothing is sent to the AI provider unless this is on).
+alter table sessions add column if not exists show_results boolean not null default false;
+alter table sessions add column if not exists ai_enabled boolean not null default false;
+-- Recreate the view so it includes the columns above.
+create or replace view live_sessions as
+  select * from sessions where expires_at is null or expires_at > now();
+
+-- AI insights: how many AI requests each account made per day (UTC), for the daily cap.
+create table if not exists ai_usage (
+  user_id  uuid not null references users(id) on delete cascade,
+  day      date not null,
+  n        int  not null default 0,
+  primary key (user_id, day)
+);

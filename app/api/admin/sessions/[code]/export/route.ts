@@ -1,4 +1,5 @@
-import { getChoiceSummaryRows, getRawRows, getSummaryRows } from "@/lib/queries";
+import { getChoiceSummaryRows, getRawRows, getSession, getSummaryRows } from "@/lib/queries";
+import { toMarkdown } from "@/lib/markdown";
 import { badRequest, logDbError, unavailable } from "@/lib/http";
 import { requireOwnedSession } from "@/lib/owned";
 import { exportTypeSchema } from "@/lib/validation";
@@ -13,6 +14,12 @@ export async function GET(req: Request, ctx: RouteContext<"/api/admin/sessions/[
     const code = { data: s.code };
     const type = exportTypeSchema.safeParse(new URL(req.url).searchParams.get("type") ?? "summary");
     if (!type.success) return badRequest();
+
+    if (type.data === "markdown") {
+      const session = await getSession(s.code);
+      const md = toMarkdown(session?.session.title ?? s.code, await getSummaryRows(s.code), await getChoiceSummaryRows(s.code));
+      return new Response(md, { headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "no-store" } });
+    }
 
     let csv: string;
     if (type.data === "summary") {

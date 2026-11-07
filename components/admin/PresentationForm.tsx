@@ -12,6 +12,7 @@ import {
 } from "@/lib/validation";
 import { KIND_INFO } from "@/lib/kinds";
 import { PRESETS, matchingPreset } from "@/lib/presets";
+import { TEMPLATES, type PresentationPlan } from "@/lib/templates";
 import {
   duplicateIndexes,
   filledItems,
@@ -110,6 +111,23 @@ const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
   seconds: 20,
 });
 
+/** Builder questions for a template or AI-drafted plan. */
+function draftsFromPlan(plan: PresentationPlan, firstKey: number): QuestionDraft[] {
+  return plan.questions.map((q, i) => {
+    const d = blank(firstKey + i, q.kind);
+    const options = (q.options ?? []).map((name) => ({ name }));
+    return {
+      ...d,
+      name: q.name,
+      items: hasOptions(q.kind) && options.length ? options : d.items,
+      min: q.kind === "number" ? String(q.min ?? 0) : d.min,
+      max: q.kind === "number" ? String(q.max ?? 100) : d.max,
+      unit: q.kind === "number" ? (q.unit ?? "") : d.unit,
+      correct: q.kind === "quiz" ? (q.options?.[0] ?? "") : d.correct,
+    };
+  });
+}
+
 /** A typed number, or null if it isn't one. Commas are allowed as thousands separators. */
 function toNumber(text: string): number | null {
   const t = text.trim().replace(/,/g, "");
@@ -205,12 +223,20 @@ export function PresentationForm({
   onDone,
   onCancel,
   locked = false,
+  guest = false,
+  aiAvailable = false,
+  onNeedAccount,
 }: {
   call: Call;
   mode: FormMode;
   onDone: (code: string) => Promise<void> | void;
   onCancel?: () => void;
   locked?: boolean;
+  /** Guests can't use AI: opening "Write questions with AI" asks them to save their account. */
+  guest?: boolean;
+  /** The site has a Gemini key; without one the AI box doesn't show. */
+  aiAvailable?: boolean;
+  onNeedAccount?: () => void;
 }) {
   const editing = mode.kind === "edit";
   // Rendered only in the browser (after the sign-in check), so reading storage here is safe.
@@ -324,6 +350,38 @@ export function PresentationForm({
     problems.push("“Score each item on” lists the same thing twice.");
   if (hasRating && (!lowLabel.trim() || !highLabel.trim()))
     problems.push("Say what the lowest and highest scores mean.");
+
+  /** Nothing typed yet, so a template can fill the form without losing anything. */
+  const pristine =
+    !editing &&
+    !title.trim() &&
+    focus.every((f) => !f.name.trim() && f.items.every((it) => !it.name.trim()));
+  function applyPlan(plan: PresentationPlan) {
+    setTitle(plan.title);
+    setFocus(draftsFromPlan(plan, nextKey.current));
+    nextKey.current += plan.questions.length;
+  }
+
+  // "Write questions with AI": closed until asked for, so nothing changes for people who don't want it.
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  async function draftWithAi(e?: React.FormEvent) {
+    e?.preventDefault();
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const res = await call("/api/admin/ai/questions", { method: "POST", body: JSON.stringify({ prompt: aiPrompt }) });
+      const { plan } = (await res.json()) as { plan: PresentationPlan };
+      applyPlan(plan);
+      setAiOpen(false);
+    } catch (err) {
+      setAiError((err as Error).message);
+    } finally {
+      setAiBusy(false);
+    }
+  }
 
   const update = (key: number, patch: Partial<QuestionDraft>) =>
     setFocus((list) =>
@@ -454,6 +512,93 @@ export function PresentationForm({
             Changes reach people&rsquo;s phones within about 15 seconds. Answers
             to anything you keep are kept.
           </p>
+        )}
+
+        {pristine && (
+          <section aria-labelledby="templates-heading" className="mt-5">
+            <h3 id="templates-heading" className="font-semibold">Start from a template</h3>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => applyPlan(t.plan)}
+                  className="rounded-lg border border-line-strong bg-white px-3 py-2.5 text-left hover:bg-canvas"
+                >
+                  <span className="block font-bold">{t.label}</span>
+                  <span className="block text-sm text-ink-soft">{t.blurb}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-sm text-ink-soft">You can change anything after you pick one. Or start from scratch below.</p>
+
+            {!aiAvailable ? null : !aiOpen ? (
+              <button
+                type="button"
+                onClick={() => setAiOpen(true)}
+                aria-expanded={false}
+                className="mt-3 rounded-lg border border-dashed border-line-strong bg-white px-3 py-2 text-sm font-bold hover:bg-canvas"
+              >
+                Write questions with AI
+              </button>
+            ) : guest ? (
+              <div role="alert" className="mt-3 rounded-lg bg-sun px-4 py-3 text-sm">
+                <p className="font-semibold">AI features need an account.</p>
+                <p className="mt-0.5">Save your guest account with an email and password (it&rsquo;s free and keeps your presentations), or log in to an account you already have.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiOpen(false);
+                      onNeedAccount?.();
+                    }}
+                    className="key rounded-lg bg-white px-3 py-1.5 font-bold"
+                  >
+                    Save my account
+                  </button>
+                  <button type="button" onClick={() => setAiOpen(false)} className="rounded-lg px-3 py-1.5 font-semibold underline underline-offset-4">
+                    Not now
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-lg border border-line-strong p-3">
+                <label className="block text-sm font-semibold">
+                  What&rsquo;s it for?
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey && aiPrompt.trim().length >= 3 && !aiBusy) {
+                        e.preventDefault();
+                        void draftWithAi();
+                      }
+                    }}
+                    maxLength={500}
+                    rows={2}
+                    autoFocus
+                    placeholder="e.g. Retro for sprint 12 of the payments team"
+                    className={`${field} text-base`}
+                  />
+                </label>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void draftWithAi()}
+                    disabled={aiBusy || aiPrompt.trim().length < 3}
+                    className="key rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    {aiBusy ? "Writing…" : "Write questions"}
+                  </button>
+                  <button type="button" onClick={() => setAiOpen(false)} className="px-2 py-2 text-sm font-semibold underline underline-offset-4">
+                    Cancel
+                  </button>
+                </div>
+                {aiError && <p role="alert" className="mt-2 text-sm font-semibold text-error">{aiError}</p>}
+                <p className="mt-2 text-xs text-ink-soft">Your description is sent to Google Gemini. Check the questions before you use them.</p>
+              </div>
+            )}
+          </section>
         )}
 
         <label className="mt-5 block font-semibold">

@@ -22,6 +22,12 @@ const MESSAGES: Record<string, string> = {
   verify_email: "Confirm your email address to make presentations.",
   too_many_emails: "We've sent several emails in the last hour. Check your inbox (and spam), or try again later.",
   bad_origin: "Something blocked this. Reload the page and try again.",
+  account_required: "AI features need an account. Save your guest account or log in to use them.",
+  ai_off: "Turn on AI insights for this presentation first.",
+  ai_unavailable: "AI isn't set up on this site yet.",
+  ai_limit: "You've used today's AI allowance. It resets at midnight (UTC).",
+  ai_failed: "The AI couldn't do that just now. Try again in a moment. This didn't use up your allowance.",
+  too_few_answers: "Wait for at least 3 answers first.",
 };
 
 /** Same-origin fetch (sends the session cookie). Throws UnauthorizedError on 401, Error otherwise. */

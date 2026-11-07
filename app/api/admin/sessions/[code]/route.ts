@@ -1,4 +1,4 @@
-import { deleteSession, getAnswerCounts, getSession, setSessionOpen, updateSession } from "@/lib/queries";
+import { deleteSession, getAnswerCounts, getSession, setSessionSettings, updateSession } from "@/lib/queries";
 import { badRequest, json, logDbError, readJson, unavailable } from "@/lib/http";
 import { requireOwnedSession } from "@/lib/owned";
 import { editSessionSchema, patchSessionSchema } from "@/lib/validation";
@@ -45,8 +45,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (s instanceof Response) return s;
     const body = patchSessionSchema.safeParse(await readJson(req));
     if (!body.success) return badRequest();
-    await setSessionOpen(s.code, body.data.isOpen);
-    return json({ ok: true, isOpen: body.data.isOpen });
+    // AI insights are for accounts: a guest is asked to sign in or create one.
+    if (body.data.aiEnabled && s.isGuest) return json({ error: "account_required" }, 403);
+    await setSessionSettings(s.code, body.data);
+    return json({ ok: true, ...body.data });
   } catch (err) {
     logDbError("admin:patch", err);
     return unavailable();
