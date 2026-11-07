@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { JoinForm } from "@/components/JoinForm";
-import { HowToDemo } from "@/components/HowToDemo";
 import { LiveDemo } from "@/components/LiveDemo";
 import { Logo } from "@/components/Logo";
 import { WarmUp } from "@/components/WarmUp";
@@ -70,23 +69,6 @@ export default function Home() {
           </div>
           <div className="min-w-0">
             <LiveDemo />
-          </div>
-        </section>
-
-        <section className="border-t border-line py-20" aria-labelledby="demo-h">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-start">
-            <div>
-              <h2 id="demo-h" className="font-display text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
-                See how to make a question
-              </h2>
-              <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft">
-                Pick a question type to watch it being made, answered on a phone and shown on screen. It takes about 20 seconds.
-              </p>
-              <Link href="/admin" className="key mt-6 inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-bold text-white">
-                Try it as a guest
-              </Link>
-            </div>
-            <HowToDemo />
           </div>
         </section>
 

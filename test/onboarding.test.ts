@@ -109,8 +109,7 @@ describe("home page: start as a guest is the headline, before joining with a cod
     expect(hero.indexOf("Create a presentation")).toBeLessThan(hero.indexOf("<JoinForm"));
   });
 
-  it("has the walkthrough demo and lists all 9 question types", () => {
-    expect(src).toContain("<HowToDemo");
+  it("lists all 9 question types (the walkthrough moved to the create page)", () => {
     expect(src).not.toMatch(/Three kinds of question/);
     expect(src).toContain("KIND_INFO");
   });

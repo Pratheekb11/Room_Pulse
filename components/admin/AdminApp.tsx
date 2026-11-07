@@ -7,6 +7,7 @@ import { Logo } from "../Logo";
 import { LoadingScreen } from "../StatusScreens";
 import { apiFetch, UnauthorizedError } from "./api";
 import { AuthScreen } from "./AuthScreen";
+import { BuilderSide } from "./BuilderSide";
 import { PresentationForm } from "./PresentationForm";
 import { SessionCard } from "./SessionCard";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -18,7 +19,8 @@ type Account = { email: string | null; guest: boolean; emailVerified: boolean; v
 type Auth = { kind: "checking" } | { kind: "signed_out" } | ({ kind: "signed_in" } & Account);
 type Me = { user: { email: string | null; guest: boolean; emailVerified: boolean }; verificationRequired: boolean };
 
-export function AdminApp() {
+/** `siteAi`: the site has AI switched on (a Gemini key), so the feature list can mention it. */
+export function AdminApp({ siteAi = false }: { siteAi?: boolean }) {
   const [auth, setAuth] = useState<Auth>({ kind: "checking" });
 
   /** Reads the signed-in account (after load, sign-in, guest start or saving a guest). */
@@ -50,7 +52,7 @@ export function AdminApp() {
   const expired = useCallback(() => setAuth({ kind: "signed_out" }), []);
 
   if (auth.kind === "checking") return <LoadingScreen label="Checking your sign-in" />;
-  if (auth.kind === "signed_out") return <AuthScreen onSignedIn={() => void loadMe()} />;
+  if (auth.kind === "signed_out") return <AuthScreen onSignedIn={() => void loadMe()} siteAi={siteAi} />;
   return (
     <Console
       // Remount (and reload the list) when the account changes, e.g. a guest saving their account.
@@ -60,6 +62,7 @@ export function AdminApp() {
       onAccountChanged={() => void loadMe()}
       onSignOut={signOut}
       onExpired={expired}
+      siteAi={siteAi}
     />
   );
 }
@@ -70,7 +73,9 @@ function Console({
   onAccountChanged,
   onSignOut,
   onExpired,
+  siteAi,
 }: {
+  siteAi: boolean;
   account: Account;
   onVerified: () => void;
   onAccountChanged: () => void;
@@ -180,7 +185,8 @@ function Console({
       )}
 
       {sessions !== null && (sessions.length === 0 || formOpen) && (
-        <div className="mx-auto mt-8 max-w-2xl">
+        <div className="mx-auto mt-8 grid max-w-2xl gap-10 lg:max-w-none lg:grid-cols-[minmax(0,42rem)_minmax(0,1fr)] lg:items-start">
+          <div className="min-w-0">
           {sessions.length === 0 && (
             <p className="mb-4 text-ink-soft">Write your questions below. When you&rsquo;re done you&rsquo;ll get a QR code to show your audience.</p>
           )}
@@ -199,6 +205,11 @@ function Console({
             aiAvailable={aiAvailable}
             onNeedAccount={askForAccount}
           />
+          </div>
+          {/* Desktop: the walkthrough and features fill the space beside the builder (phones use "Show me how"). */}
+          <aside className="hidden lg:sticky lg:top-4 lg:block">
+            <BuilderSide ai={siteAi} />
+          </aside>
         </div>
       )}
 
