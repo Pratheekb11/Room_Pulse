@@ -334,6 +334,11 @@ function Stage({
           )}
 
           <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
+          {group?.focus.description && (
+            <p className="mb-[clamp(0.6rem,1.4vh,1.25rem)] max-w-[70ch] text-[clamp(1rem,1.3vw,1.5rem)] leading-snug text-ink-soft break-words">
+              {group.focus.description}
+            </p>
+          )}
           {groups.length === 0 ? (
             <p className="text-xl text-ink-soft">This presentation has no questions yet. Use “Edit questions” to add some.</p>
           ) : !group ? (

@@ -33,11 +33,12 @@ export interface PreviewQuestion {
   max?: number;
   unit?: string | null;
   maxPicks?: number | null;
+  description?: string | null;
 }
 
 /** Builder drafts as preview slides: blank names and option lists get placeholders. */
 export function previewQuestions(
-  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null }[],
+  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null; description?: string | null }[],
 ): PreviewQuestion[] {
   return drafts.map((d, i) => {
     const focusId = `preview-${i}`;

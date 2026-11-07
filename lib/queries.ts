@@ -40,7 +40,7 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
       coalesce((select json_agg(jsonb_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
                   'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end),
                   'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit,
-                  'seconds', f.quiz_seconds)
+                  'seconds', f.quiz_seconds, 'description', f.description)
                   || case when ${withAnswers}::boolean then jsonb_build_object('correct', f.quiz_correct) else '{}'::jsonb end
                   order by f.position)
                 from focus_topics f where f.session_id = s.id), '[]'::json) as focus_topics,
@@ -386,11 +386,11 @@ export async function createSession(
           select e.val, e.ord - 1 as pos
           from jsonb_array_elements(${JSON.stringify(input.focusTopics)}::jsonb) with ordinality as e(val, ord)
         ), f as (
-          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds)
+          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description)
           select s.id, input.val->>'name', input.val->>'kind', input.val->>'chart', input.pos,
                  (input.val->>'maxPicks')::int, (input.val->>'min')::double precision,
                  (input.val->>'max')::double precision, input.val->>'unit',
-                 (input.val->>'correctIndex')::int, (input.val->>'seconds')::int
+                 (input.val->>'correctIndex')::int, (input.val->>'seconds')::int, input.val->>'description'
           from s, input
           returning id, position
         ), t as (
@@ -1275,14 +1275,14 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
     sql`delete from criteria where session_id = ${sid}::uuid and not (id = any(${keepCriteria}::uuid[]))`,
     sql`update focus_topics f set name = x.name, chart = x.chart, position = x.pos,
           max_picks = x."maxPicks", num_min = x.min, num_max = x.max, num_unit = x.unit,
-          quiz_correct = x."correctIndex", quiz_seconds = x.seconds
+          quiz_correct = x."correctIndex", quiz_seconds = x.seconds, description = x.description
         from jsonb_to_recordset(${rows(focus.filter((f) => !f.isNew))}::jsonb)
-          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int)
+          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text)
         where f.id = x.id and f.session_id = ${sid}::uuid`,
-    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds)
-        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit, x."correctIndex", x.seconds
+    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description)
+        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit, x."correctIndex", x.seconds, x.description
         from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb)
-          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int)`,
+          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text)`,
     sql`update topics t set name = x.name, position = x.pos
         from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int)
         where t.id = x.id and t.session_id = ${sid}::uuid`,

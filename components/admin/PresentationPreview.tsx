@@ -41,6 +41,7 @@ function ScreenSlide({ title, q, voters, doodle }: { title: string; q: PreviewQu
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-soft">{title || "Your presentation"}</p>
           <h3 className="font-display mt-1 text-[clamp(1.4rem,3vw,2.6rem)] leading-[1.05] break-words">{q.name}</h3>
+          {q.description && <p className="mt-1.5 max-w-[60ch] text-[clamp(0.9rem,1.3vw,1.2rem)] leading-snug text-ink-soft break-words">{q.description}</p>}
         </div>
         <span className="flex shrink-0 flex-col items-end gap-2">
           <span className="rounded-full border border-line-strong bg-white px-3 py-1 text-sm font-bold">{voters} people voted</span>
@@ -117,6 +118,7 @@ function PhoneSlide({
           {index} / {total} done
         </span>
       </div>
+      {q.description && <p className="-mb-2 rounded-lg bg-white px-3 py-2 text-[15px] leading-snug break-words">{q.description}</p>}
       {q.kind === "rating" ? (
         <TopicCard
           topic={q.options[0]}

@@ -381,3 +381,6 @@ alter table sessions add column if not exists decor boolean not null default tru
 -- Recreate the view so it includes the columns above.
 create or replace view live_sessions as
   select * from sessions where expires_at is null or expires_at > now();
+
+-- Optional description under a question (extra instructions or context), shown on phones and the big screen.
+alter table focus_topics add column if not exists description text check (length(description) <= 200);

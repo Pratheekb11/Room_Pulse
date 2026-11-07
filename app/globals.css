@@ -215,6 +215,19 @@ body,
 .stagger > *:nth-child(7) { animation-delay: 360ms; }
 .stagger > *:nth-child(n + 8) { animation-delay: 420ms; }
 
+/* "Show me how" walkthrough (components/HowToDemo.tsx) */
+.demo-click { animation: demo-click 600ms var(--ease-out-soft) forwards; }
+@keyframes demo-click {
+  from { opacity: 0.9; scale: 0.4; }
+  to { opacity: 0; scale: 1.6; }
+}
+.demo-rise { display: inline-block; animation: rise 480ms var(--ease-out-soft) both; }
+.demo-pop { animation: pop 320ms var(--ease-spring); }
+.demo-grow { animation: demo-grow 900ms var(--ease-out-soft) both; transform-origin: left; }
+@keyframes demo-grow {
+  from { scale: 0 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 1ms !important;

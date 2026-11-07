@@ -18,7 +18,8 @@ const PORT = Number(process.env.PORT ?? 4444);
 const dir = new URL("../.local-db", import.meta.url).pathname;
 const fresh = !existsSync(dir);
 const db = new PGlite(dir, { extensions: { pgcrypto } });
-if (fresh) await db.exec(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
+// db/schema.sql is idempotent: apply it on every start so new columns reach an existing local database.
+await db.exec(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
 
 const toText = (v) =>
   v === null || v === undefined ? null

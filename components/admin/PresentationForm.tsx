@@ -7,6 +7,7 @@ import {
   hasOptions,
   MAX_ABS_NUMBER,
   MAX_CRITERIA,
+  MAX_DESCRIPTION,
   MAX_FOCUS_TOPICS,
   MAX_TOPICS_PER_FOCUS,
 } from "@/lib/validation";
@@ -27,6 +28,8 @@ import { ThemePicker } from "./ThemePicker";
 import { PresentationPreview } from "./PresentationPreview";
 import { isThemeId, recommendTheme, type ThemeId } from "@/lib/themes";
 import { previewQuestions } from "@/lib/preview";
+import { scoringHost } from "@/lib/scoring";
+import { HowToDialog } from "./HowToDialog";
 
 type Call = (path: string, init?: RequestInit) => Promise<Response>;
 type Kind = QuestionKind;
@@ -49,6 +52,8 @@ interface QuestionDraft {
   /** Quiz: the right option's text, and seconds to answer. */
   correct: string;
   seconds: number;
+  /** Optional extra words under the question; `null` = the box is closed. */
+  description: string | null;
 }
 
 export type FormMode =
@@ -113,6 +118,7 @@ const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
   unit: "",
   correct: "",
   seconds: 20,
+  description: null,
 });
 
 /** Builder questions for a template or AI-drafted plan. */
@@ -225,6 +231,7 @@ function fromSession(s: SessionPayload): Draft {
           ? (s.topics.filter((t) => t.focusId === f.id)[f.correct]?.name ?? "")
           : "",
       seconds: f.seconds ?? 20,
+      description: f.description ?? null,
     })),
     criteria: rowsFrom(s.criteria),
     theme: isThemeId(s.session.theme) ? s.session.theme : "paper",
@@ -281,6 +288,7 @@ export function PresentationForm({
    */
   const [start, setStart] = useState<StartChoice>(initial?.start ?? null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [howOpen, setHowOpen] = useState(false);
   const counts = mode.kind === "edit" ? mode.counts : {};
   const scaleLocked = mode.kind === "edit" && mode.scaleLocked;
 
@@ -334,8 +342,81 @@ export function PresentationForm({
     unit: f.kind === "number" && f.unit.trim() ? f.unit.trim() : null,
     correct: f.kind === "quiz" && f.correct.trim() ? f.correct.trim() : null,
     seconds: f.kind === "quiz" ? f.seconds : null,
+    description: f.description?.trim() || null,
   });
   const hasRating = parsed.some((f) => f.kind === "rating");
+
+  // Shared by every Score items question; shown inside the first one, where people look for it.
+  const scoringKey = scoringHost(parsed);
+  const scoringNumber = parsed.findIndex((f) => f.key === scoringKey) + 1;
+  const scoring = (
+    <section className="mt-3 rounded-lg bg-canvas p-3" aria-labelledby="scoring-h">
+      <h4 id="scoring-h" className="text-sm font-semibold">
+        How people score
+      </h4>
+      <p id="scale-h" className="mt-2 text-sm font-semibold">
+        Scores go from
+      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <div role="radiogroup" aria-labelledby="scale-h" className="flex gap-1.5">
+          {[5, 10].map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={scaleMax === n}
+              disabled={scaleLocked}
+              onClick={() => setScaleMax(n)}
+              className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold disabled:opacity-60 ${scaleMax === n ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
+            >
+              1 to {n}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-1.5 text-sm text-ink-soft">
+          or 1 to
+          <input
+            type="number"
+            min={3}
+            max={10}
+            value={scaleMax}
+            disabled={scaleLocked}
+            aria-label="Highest score"
+            onChange={(e) => setScaleMax(Math.min(10, Math.max(3, Number(e.target.value) || 5)))}
+            className="w-16 rounded-lg border border-line-strong bg-white px-2 py-1 text-base text-ink disabled:bg-canvas disabled:text-ink-soft"
+          />
+        </label>
+      </div>
+      {scaleLocked && (
+        <p className="mt-1.5 text-xs text-ink-soft">
+          People have already given scores, so the range is locked. Reset the votes to change it.
+        </p>
+      )}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm font-semibold">
+          1 means
+          <input value={lowLabel} onChange={(e) => setLowLabel(e.target.value)} maxLength={30} placeholder="Low" className={field} />
+        </label>
+        <label className="block text-sm font-semibold">
+          {scaleMax} means
+          <input value={highLabel} onChange={(e) => setHighLabel(e.target.value)} maxLength={30} placeholder="High" className={field} />
+        </label>
+      </div>
+      <ListEditor
+        label="Score each item on"
+        hint="For example Impact or Effort. People give every item a score for each of these."
+        noun="measure"
+        items={criteriaRows}
+        onChange={setCriteriaRows}
+        max={MAX_CRITERIA}
+        maxLength={60}
+        answers={counts}
+      />
+      {parsed.filter((f) => f.kind === "rating").length > 1 && (
+        <p className="mt-2 text-xs text-ink-soft">Every &ldquo;Score items&rdquo; question uses these settings.</p>
+      )}
+    </section>
+  );
   const criteria = hasRating ? filledItems(criteriaRows) : [];
   const scoreCount =
     parsed
@@ -356,6 +437,7 @@ export function PresentationForm({
         max: toNumber(f.max) ?? 100,
         unit: f.unit.trim() || null,
         maxPicks: f.maxPicks,
+        description: f.description?.trim() || null,
       })),
     );
 
@@ -726,7 +808,10 @@ export function PresentationForm({
             </span>
           </legend>
           <p className="text-sm text-ink-soft">
-            People answer these one at a time on their phones.
+            People answer these one at a time on their phones.{" "}
+            <button type="button" onClick={() => setHowOpen(true)} className="font-semibold text-ink underline underline-offset-4">
+              Show me how
+            </button>
           </p>
 
           <ol className="mt-3 flex flex-col gap-4">
@@ -838,6 +923,44 @@ export function PresentationForm({
                       className={`${field} text-base`}
                     />
                   </label>
+                  {f.description === null ? (
+                    <button
+                      type="button"
+                      onClick={() => update(f.key, { description: "" })}
+                      className="mt-1.5 text-sm font-semibold text-ink-soft underline underline-offset-4 hover:text-ink"
+                    >
+                      + Add a description (optional)
+                    </button>
+                  ) : (
+                    <div className="mt-3">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <label htmlFor={`desc-${f.key}`} className="text-sm font-semibold">
+                          Description <span className="font-normal text-ink-soft">(optional)</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => update(f.key, { description: null })}
+                          aria-label={`Remove the description of question ${i + 1}`}
+                          className="text-xs font-semibold text-ink-soft underline underline-offset-4"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <textarea
+                        id={`desc-${f.key}`}
+                        aria-describedby={`desc-${f.key}-hint`}
+                        value={f.description}
+                        onChange={(e) => update(f.key, { description: e.target.value })}
+                        maxLength={MAX_DESCRIPTION}
+                        rows={2}
+                        placeholder="e.g. Think about the last two weeks. Answers are anonymous."
+                        className={`${field} text-base`}
+                      />
+                      <p id={`desc-${f.key}-hint`} className="mt-0.5 text-xs text-ink-soft">
+                        Shown under the question on phones and on the big screen. {MAX_DESCRIPTION - f.description.length} characters left.
+                      </p>
+                    </div>
+                  )}
 
                   {hasOptions(f.kind) && (
                     <ListEditor
@@ -851,6 +974,15 @@ export function PresentationForm({
                       answers={counts}
                     />
                   )}
+
+                  {f.kind === "rating" &&
+                    (f.key === scoringKey ? (
+                      scoring
+                    ) : (
+                      <p className="mt-2 text-xs text-ink-soft">
+                        Scored the same way as question {scoringNumber} (1 to {scaleMax}).
+                      </p>
+                    ))}
 
                   {f.kind === "multi" && (
                     <label className="mt-3 block text-sm font-semibold">
@@ -1036,75 +1168,6 @@ export function PresentationForm({
           </label>
         </section>
 
-        {hasRating && (
-          <section
-            className="mt-6 rounded-xl border border-line-strong p-4"
-            aria-labelledby="scoring-h"
-          >
-            <h3 id="scoring-h" className="font-semibold">
-              How people score items
-            </h3>
-            <p className="text-sm text-ink-soft">
-              This applies to every &ldquo;Score items&rdquo; question.
-            </p>
-            <ListEditor
-              label="Score each item on"
-              hint="For example Impact or Effort. People give every item a score for each of these."
-              noun="measure"
-              items={criteriaRows}
-              onChange={setCriteriaRows}
-              max={MAX_CRITERIA}
-              maxLength={60}
-              answers={counts}
-            />
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <label className="block text-sm font-semibold">
-                Scores go from 1 to
-                <input
-                  type="number"
-                  min={3}
-                  max={10}
-                  value={scaleMax}
-                  disabled={scaleLocked}
-                  onChange={(e) =>
-                    setScaleMax(
-                      Math.min(10, Math.max(3, Number(e.target.value) || 5)),
-                    )
-                  }
-                  className={`${field} disabled:bg-canvas disabled:text-ink-soft`}
-                />
-              </label>
-              <label className="block text-sm font-semibold">
-                1 means
-                <input
-                  value={lowLabel}
-                  onChange={(e) => setLowLabel(e.target.value)}
-                  maxLength={30}
-                  placeholder="Low"
-                  className={field}
-                />
-              </label>
-              <label className="block text-sm font-semibold">
-                {scaleMax} means
-                <input
-                  value={highLabel}
-                  onChange={(e) => setHighLabel(e.target.value)}
-                  maxLength={30}
-                  placeholder="High"
-                  className={field}
-                />
-              </label>
-            </div>
-            {scaleLocked && (
-              <p className="mt-2 text-xs text-ink-soft">
-                People have already given scores, so the range is locked. Reset
-                the votes to change it.
-              </p>
-            )}
-          </section>
-        )}
-
         <p
           className="mt-5 rounded-lg bg-canvas px-3 py-2 text-sm"
           aria-live="polite"
@@ -1192,6 +1255,7 @@ export function PresentationForm({
           onCancel={() => setConfirmRestart(false)}
         />
       )}
+      {howOpen && <HowToDialog kind={focus[focus.length - 1]?.kind ?? "rating"} onClose={() => setHowOpen(false)} />}
       {previewOpen && (
         <PresentationPreview
           title={title}

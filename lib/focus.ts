@@ -4,7 +4,7 @@ import { hasOptions } from "./validation";
 import type { FocusItem, NamedItem, QuestionKind, TopicItem } from "./types";
 
 export interface FocusGroup {
-  focus: NamedItem;
+  focus: NamedItem & { description: string | null };
   kind: QuestionKind;
   /** Pick several: most picks allowed (null = any). */
   maxPicks: number | null;
@@ -31,7 +31,7 @@ export function groupByFocus(
       return [
         f.id,
         {
-          focus: { id: f.id, name: f.name },
+          focus: { id: f.id, name: f.name, description: f.description ?? null },
           kind,
           chart: f.chart ?? defaultChart(kind),
           maxPicks: f.maxPicks ?? null,
@@ -45,7 +45,7 @@ export function groupByFocus(
     }),
   );
   const loose: FocusGroup = {
-    focus: { id: "", name: "Topics" },
+    focus: { id: "", name: "Topics", description: null },
     kind: "rating",
     chart: "heatmap",
     maxPicks: null,

@@ -6,6 +6,7 @@ import { cellKey } from "@/lib/stats";
 import { groupByFocus } from "@/lib/focus";
 import { getVoterId, readJSON, writeJSON } from "@/lib/storage";
 import type { LiveQuiz, QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
+import { showStepDots } from "@/lib/progress";
 import { VoteQueue, type SaveStatus } from "@/lib/vote-queue";
 import { Confetti } from "./Confetti";
 import { Logo } from "./Logo";
@@ -598,6 +599,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                 {here.kind === "rating" ? `: ${group.focus.name}` : ""}
               </p>
             )}
+            {group.focus.description && (
+              <p className="mt-1 mb-2 rounded-lg bg-white px-3 py-2 text-[15px] leading-snug text-ink break-words">{group.focus.description}</p>
+            )}
             <div
               key={here.kind === "rating" ? here.item.id : group.focus.id}
               className={direction === 1 ? "animate-[slide-in-right_260ms_ease-out]" : "animate-[slide-in-left_260ms_ease-out]"}
@@ -719,7 +723,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
               >
                 ← Back
               </button>
-              {steps.length > 12 ? (
+              {!showStepDots(steps.length) ? (
                 <span className="font-display text-base font-bold tabular-nums text-ink-soft">
                   {current + 1} / {steps.length}
                 </span>

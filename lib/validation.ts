@@ -49,6 +49,8 @@ export const hasOptions = (kind: Kind) => KINDS_WITH_OPTIONS.includes(kind);
 /** Largest number a number question may ask for (keeps answers exact in a double). */
 export const MAX_ABS_NUMBER = 1e12;
 export const MAX_TEXT_ANSWER = 280;
+/** Longest optional description under a question. */
+export const MAX_DESCRIPTION = 200;
 const boundedNumber = z.number().finite().min(-MAX_ABS_NUMBER).max(MAX_ABS_NUMBER);
 
 /** Settings some question types have; normalised to null for the others. */
@@ -60,11 +62,13 @@ const settingsShape = {
   /** Quiz: the right option, by its text. */
   correct: z.string().max(480).nullish(),
   seconds: z.number().int().min(5, "Give at least 5 seconds").max(120, "Give at most 2 minutes").nullish(),
+  /** Any type: extra words under the question. Blank = none. */
+  description: z.string().trim().max(MAX_DESCRIPTION, `Keep the description under ${MAX_DESCRIPTION} characters`).nullish(),
 };
 
 export const QUIZ_SECONDS_DEFAULT = 20;
 
-type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null };
+type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null };
 const topicName = (t: unknown) => cleanName(typeof t === "string" ? t : (t as { name: string }).name);
 
 function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] } & Settings>(f: T) {
@@ -80,6 +84,7 @@ function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] 
     max: isNumber ? (f.max ?? 100) : null,
     unit: isNumber && f.unit ? f.unit : null,
     seconds: isQuiz ? (f.seconds ?? QUIZ_SECONDS_DEFAULT) : null,
+    description: f.description ? f.description : null,
     // the right option's index; -1 = missing or not one of the options
     correctIndex: isQuiz ? (correct ? f.topics.map(topicName).indexOf(cleanName(correct)) : -1) : null,
   };

@@ -1,29 +1,14 @@
 import Link from "next/link";
 import { JoinForm } from "@/components/JoinForm";
+import { HowToDemo } from "@/components/HowToDemo";
 import { LiveDemo } from "@/components/LiveDemo";
 import { Logo } from "@/components/Logo";
 import { WarmUp } from "@/components/WarmUp";
+import { KIND_INFO } from "@/lib/kinds";
 
-const FEATURES = [
-  {
-    title: "Score a list of ideas",
-    body: "People give each idea a score, like 1 to 5, on things such as impact and effort. You see which idea wins.",
-    pill: "Score items",
-    color: "bg-peach",
-  },
-  {
-    title: "Run a quick poll",
-    body: "People pick one option with a single tap. The bar or pie chart updates as the votes come in.",
-    pill: "Poll",
-    color: "bg-sky",
-  },
-  {
-    title: "Collect words",
-    body: "People type up to three words. The words used most show up biggest on your screen.",
-    pill: "Word cloud",
-    color: "bg-lavender",
-  },
-];
+const TYPE_COLORS = ["bg-peach", "bg-sky", "bg-mint", "bg-lavender"];
+
+const GUEST_POINTS = ["No sign-up or email", "Free", "Your audience needs no app"];
 
 const STEPS = [
   { title: "Write your questions", body: "Make a presentation with up to 10 questions. It takes a couple of minutes." },
@@ -56,13 +41,52 @@ export default function Home() {
               <span className="block text-ink-soft">Right now.</span>
             </h1>
             <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink-soft">
-              Ask your audience questions. They answer on their phones, and the results show up on your screen straight away. Nobody needs an app or an account to answer.
+              Ask your audience questions. They answer on their phones, and the results show up on your screen straight away.
             </p>
-            <JoinForm />
-            <p className="mt-3 text-sm text-muted">Joining someone else&rsquo;s presentation? Type the code shown on their screen.</p>
+
+            <div className="mt-8 max-w-md rounded-xl border border-line-strong bg-white p-4 sm:p-5">
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-mint px-2.5 py-1 text-xs font-bold text-ink">
+                <span aria-hidden>✓</span> Guest mode: no sign-up needed
+              </p>
+              <Link href="/admin" className="key mt-3 flex h-12 items-center justify-center rounded-lg bg-primary px-5 text-base font-bold text-white">
+                Create a presentation
+              </Link>
+              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft">
+                {GUEST_POINTS.map((p) => (
+                  <li key={p} className="flex items-center gap-1.5">
+                    <span aria-hidden className="text-success">✓</span>
+                    {p}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-muted">Start as a guest in one tap. Save an account later if you want to keep your presentations.</p>
+            </div>
+
+            <div className="mt-8 max-w-md">
+              <p className="text-sm font-semibold text-ink">Joining someone else&rsquo;s presentation?</p>
+              <p className="text-sm text-muted">Type the code shown on their screen.</p>
+              <JoinForm />
+            </div>
           </div>
           <div className="min-w-0">
             <LiveDemo />
+          </div>
+        </section>
+
+        <section className="border-t border-line py-20" aria-labelledby="demo-h">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-start">
+            <div>
+              <h2 id="demo-h" className="font-display text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
+                See how to make a question
+              </h2>
+              <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft">
+                Pick a question type to watch it being made, answered on a phone and shown on screen. It takes about 20 seconds.
+              </p>
+              <Link href="/admin" className="key mt-6 inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-bold text-white">
+                Try it as a guest
+              </Link>
+            </div>
+            <HowToDemo />
           </div>
         </section>
 
@@ -83,17 +107,18 @@ export default function Home() {
           </ol>
         </section>
 
-        <section className="border-t border-line py-20">
-          <h2 className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">Three kinds of question</h2>
-          <div className="stagger mt-10 grid gap-4 md:grid-cols-3">
-            {FEATURES.map((f) => (
-              <article key={f.title} className="rounded-xl border border-line bg-white p-6">
-                <span className={`${f.color} rounded-full px-2.5 py-1 text-xs font-semibold text-ink`}>{f.pill}</span>
-                <h3 className="mt-5 text-lg font-semibold text-ink">{f.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{f.body}</p>
-              </article>
+        <section className="border-t border-line py-20" aria-labelledby="types-h">
+          <h2 id="types-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
+            {KIND_INFO.length} kinds of question
+          </h2>
+          <ul className="stagger mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {KIND_INFO.map((k, i) => (
+              <li key={k.id} className="rounded-xl border border-line bg-white p-5">
+                <span className={`${TYPE_COLORS[i % TYPE_COLORS.length]} rounded-full px-2.5 py-1 text-xs font-semibold text-ink`}>{k.label}</span>
+                <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">{k.hint}</p>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
         <section className="border-t border-line py-24 text-center">
@@ -101,7 +126,7 @@ export default function Home() {
           <Link href="/admin" className="key mt-8 inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-white">
             Create a presentation
           </Link>
-          <p className="mt-3 text-sm text-muted">Free. You can start as a guest without signing up.</p>
+          <p className="mt-3 text-sm text-muted">Free. Start as a guest: no sign-up, no email.</p>
         </section>
       </main>
 

@@ -34,6 +34,8 @@ export interface FocusItem extends NamedItem {
   unit?: string | null;
   /** Quiz: seconds to answer. */
   seconds?: number | null;
+  /** Optional extra words under the question. */
+  description?: string | null;
   /** Quiz: index of the right option. Only in the owner's copy, never sent to voters. */
   correct?: number | null;
 }

@@ -27,7 +27,7 @@ describe("groupByFocus", () => {
   it("puts topics without a focus (older sessions) in one group and drops empty focus topics", () => {
     const g = groupByFocus([{ id: "f9", name: "Empty" }], [{ id: "a", name: "A", focusId: null }]);
     expect(g).toHaveLength(1);
-    expect(g[0].focus).toEqual({ id: "", name: "Topics" });
+    expect(g[0].focus).toEqual({ id: "", name: "Topics", description: null });
     expect(g[0].topics.map((t) => t.item.id)).toEqual(["a"]);
   });
 });
