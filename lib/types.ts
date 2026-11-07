@@ -16,12 +16,18 @@ export interface NamedItem {
   name: string;
 }
 
-export type QuestionKind = "rating" | "poll" | "words";
+export type QuestionKind = "rating" | "poll" | "words" | "multi" | "text" | "rank" | "number";
 
 export interface FocusItem extends NamedItem {
   kind: QuestionKind;
   /** Chart the dashboard opens on (see CHARTS in lib/charts.ts). */
   chart: string;
+  /** Pick several: most options one person may pick (null = any number). */
+  maxPicks?: number | null;
+  /** Number questions: allowed range and an optional unit like "%" or "users". */
+  min?: number | null;
+  max?: number | null;
+  unit?: string | null;
 }
 
 export interface TopicItem extends NamedItem {
@@ -63,13 +69,47 @@ export interface WordCount {
   n: number;
 }
 
+/** How many people put an option in a place (1 = first) of a ranking question. */
+export interface RankCount {
+  focusId: string;
+  topicId: string;
+  rank: number;
+  n: number;
+}
+
+/** How many people answered a number question with this exact value. */
+export interface NumberCount {
+  focusId: string;
+  value: number;
+  n: number;
+}
+
+export interface TextAnswer {
+  focusId: string;
+  text: string;
+  /** ISO time of the latest change. */
+  at: string;
+}
+
+/** People who answered a question (pick several, open answer, ranking, number). */
+export interface RespondentCount {
+  focusId: string;
+  n: number;
+}
+
 export interface ResultsPayload {
   isOpen: boolean;
   voterCount: number;
   cells: ResultCell[];
   dist: ScoreBucket[];
+  /** Poll and pick-several choices. */
   polls: PollCount[];
   words: WordCount[];
+  ranks: RankCount[];
+  numbers: NumberCount[];
+  /** Newest first, up to 200 per question. */
+  texts: TextAnswer[];
+  respondents: RespondentCount[];
   /** Bumped whenever the presenter edits the questions. */
   revision: number;
 }

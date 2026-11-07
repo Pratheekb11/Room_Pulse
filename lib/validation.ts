@@ -38,7 +38,51 @@ export const MAX_FOCUS_TOPICS = 10;
 export const MAX_TOPICS_PER_FOCUS = 10;
 export const MAX_CRITERIA = 10;
 
-export const QUESTION_KINDS = ["rating", "poll", "words"] as const;
+export const QUESTION_KINDS = ["rating", "poll", "words", "multi", "text", "rank", "number"] as const;
+type Kind = (typeof QUESTION_KINDS)[number];
+
+/** Question types whose answers are picked from a list of options (topics). */
+export const KINDS_WITH_OPTIONS: readonly Kind[] = ["rating", "poll", "multi", "rank"];
+export const hasOptions = (kind: Kind) => KINDS_WITH_OPTIONS.includes(kind);
+
+/** Largest number a number question may ask for (keeps answers exact in a double). */
+export const MAX_ABS_NUMBER = 1e12;
+export const MAX_TEXT_ANSWER = 280;
+const boundedNumber = z.number().finite().min(-MAX_ABS_NUMBER).max(MAX_ABS_NUMBER);
+
+/** Settings some question types have; normalised to null for the others. */
+const settingsShape = {
+  maxPicks: z.number().int().min(1).max(MAX_TOPICS_PER_FOCUS).nullish(),
+  min: boundedNumber.nullish(),
+  max: boundedNumber.nullish(),
+  unit: z.string().trim().max(20, "Keep the unit under 20 characters").nullish(),
+};
+
+function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[]; maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null }>(f: T) {
+  const isNumber = f.kind === "number";
+  return {
+    ...f,
+    topics: hasOptions(f.kind) ? f.topics : [],
+    chart: f.chart ?? defaultChart(f.kind),
+    maxPicks: f.kind === "multi" ? (f.maxPicks ?? null) : null,
+    min: isNumber ? (f.min ?? 0) : null,
+    max: isNumber ? (f.max ?? 100) : null,
+    unit: isNumber && f.unit ? f.unit : null,
+  };
+}
+
+/** Checks shared by creating and editing a question. */
+function checkQuestion(
+  f: { name: string; kind: Kind; chart: string; topics: unknown[]; min: number | null; max: number | null },
+  ctx: z.RefinementCtx,
+) {
+  if (!isChartFor(f.kind, f.chart)) ctx.addIssue({ code: "custom", message: `“${f.chart}” isn't a chart for ${f.kind} questions` });
+  if (f.kind === "rating" && f.topics.length < 1) ctx.addIssue({ code: "custom", message: `Add at least 1 thing to rate to “${f.name}”` });
+  if ((f.kind === "poll" || f.kind === "multi" || f.kind === "rank") && f.topics.length < 2)
+    ctx.addIssue({ code: "custom", message: `Give “${f.name}” at least 2 options` });
+  if (f.kind === "number" && !((f.min ?? 0) < (f.max ?? 0)))
+    ctx.addIssue({ code: "custom", message: `In “${f.name}”, the lowest number must be below the highest` });
+}
 
 const focusTopicSchema = z
   .object({
@@ -48,16 +92,10 @@ const focusTopicSchema = z
     topics: listOf(120)
       .pipe(z.array(z.string()).max(MAX_TOPICS_PER_FOCUS, `At most ${MAX_TOPICS_PER_FOCUS} topics or options per focus topic`))
       .default([]),
+    ...settingsShape,
   })
-  .transform((f) => ({ ...f, topics: f.kind === "words" ? [] : f.topics, chart: f.chart ?? defaultChart(f.kind) }))
-  .superRefine((f, ctx) => {
-    if (!isChartFor(f.kind, f.chart))
-      ctx.addIssue({ code: "custom", message: `“${f.chart}” isn't a chart for ${f.kind} questions` });
-    if (f.kind === "rating" && f.topics.length < 1)
-      ctx.addIssue({ code: "custom", message: `Add at least 1 topic to “${f.name}”` });
-    if (f.kind === "poll" && f.topics.length < 2)
-      ctx.addIssue({ code: "custom", message: `Give the poll “${f.name}” at least 2 options` });
-  });
+  .transform(withSettings)
+  .superRefine(checkQuestion);
 export type FocusTopicInput = z.infer<typeof focusTopicSchema>;
 
 export const createSessionSchema = z.object({
@@ -100,12 +138,11 @@ const editFocusSchema = z
     kind: z.enum(QUESTION_KINDS),
     chart: z.string().max(20).optional(),
     topics: z.array(itemSchema(120)).max(MAX_TOPICS_PER_FOCUS, `At most ${MAX_TOPICS_PER_FOCUS} per question`).default([]),
+    ...settingsShape,
   })
-  .transform((f) => ({ ...f, topics: f.kind === "words" ? [] : f.topics, chart: f.chart ?? defaultChart(f.kind) }))
+  .transform(withSettings)
   .superRefine((f, ctx) => {
-    if (!isChartFor(f.kind, f.chart)) ctx.addIssue({ code: "custom", message: `“${f.chart}” isn't a chart for ${f.kind} questions` });
-    if (f.kind === "rating" && f.topics.length < 1) ctx.addIssue({ code: "custom", message: `Add at least 1 thing to rate to “${f.name}”` });
-    if (f.kind === "poll" && f.topics.length < 2) ctx.addIssue({ code: "custom", message: `Give the poll “${f.name}” at least 2 options` });
+    checkQuestion(f, ctx);
     if (!noRepeats(f.topics)) ctx.addIssue({ code: "custom", message: `“${f.name}” lists the same thing twice` });
   });
 
@@ -180,6 +217,44 @@ export const answerSchema = z.discriminatedUnion("kind", [
       .array(word)
       .max(3, "Up to 3 answers")
       .transform((ws) => [...new Set(ws)]),
+  }),
+  z.object({
+    kind: z.literal("multi"),
+    code: codeSchema,
+    focusId: z.uuid(),
+    voterId: z.uuid(),
+    // empty = clear the answer
+    topicIds: z.array(z.uuid()).max(MAX_TOPICS_PER_FOCUS).refine((ids) => new Set(ids).size === ids.length, "Pick each option once"),
+  }),
+  z.object({
+    kind: z.literal("rank"),
+    code: codeSchema,
+    focusId: z.uuid(),
+    voterId: z.uuid(),
+    /** Every option, first place first. */
+    topicIds: z
+      .array(z.uuid())
+      .min(2)
+      .max(MAX_TOPICS_PER_FOCUS)
+      .refine((ids) => new Set(ids).size === ids.length, "Place each option once"),
+  }),
+  z.object({
+    kind: z.literal("number"),
+    code: codeSchema,
+    focusId: z.uuid(),
+    voterId: z.uuid(),
+    value: boundedNumber,
+  }),
+  z.object({
+    kind: z.literal("text"),
+    code: codeSchema,
+    focusId: z.uuid(),
+    voterId: z.uuid(),
+    text: z
+      .string()
+      .max(MAX_TEXT_ANSWER * 4)
+      .transform((t) => t.trim().replace(/\s+/g, " "))
+      .pipe(z.string().min(1, "Empty answer").max(MAX_TEXT_ANSWER, `Keep it under ${MAX_TEXT_ANSWER} characters`)),
   }),
 ]);
 export type AnswerInput = z.infer<typeof answerSchema>;

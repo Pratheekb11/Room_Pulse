@@ -8,7 +8,7 @@ const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], 
 
 export const metadata: Metadata = {
   title: "LiveRate",
-  description: "Ask the room. Watch the answer form, live.",
+  description: "Know what the room thinks, right now. Your audience answers on their phones and the results show up live.",
 };
 
 export const viewport: Viewport = {
@@ -24,7 +24,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${inter.variable} ${mono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <div className="flex-1">{children}</div>
-        <footer className="px-5 py-4 text-center text-xs text-ink-soft">
+        <footer className="px-5 py-5 text-center text-[13.5px] text-ink-soft">
           Built and maintained by{" "}
           <a href="https://github.com/Pratheekb11" className="font-semibold text-ink underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
             Pratheek

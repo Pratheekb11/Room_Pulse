@@ -220,3 +220,64 @@ alter table users add column if not exists guest_pin_hash text;
 -- Replaces the older PIN + presentation code sign-in.
 alter table users add column if not exists guest_code_hash text;
 create unique index if not exists users_guest_code_idx on users(guest_code_hash) where guest_code_hash is not null;
+
+-- More question types:
+--   multi  = pick several options (up to max_picks; null = any number)
+--   text   = open answer, one short text per person
+--   rank   = put every option in order
+--   number = answer with a number between num_min and num_max
+alter table focus_topics drop constraint if exists focus_topics_kind_check;
+alter table focus_topics add constraint focus_topics_kind_check
+  check (kind in ('rating', 'poll', 'words', 'multi', 'text', 'rank', 'number'));
+alter table focus_topics add column if not exists max_picks int check (max_picks between 1 and 10);
+alter table focus_topics add column if not exists num_min double precision;
+alter table focus_topics add column if not exists num_max double precision;
+alter table focus_topics add column if not exists num_unit text check (length(num_unit) <= 20);
+
+-- Pick several: one row per option a voter picked
+create table if not exists choice_answers (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  topic_id    uuid not null references topics(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  primary key (focus_id, voter_id, topic_id)
+);
+create index if not exists choice_answers_session_idx on choice_answers(session_id, voter_id);
+
+-- Open answer: one text per voter per question
+create table if not exists text_answers (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  body        text not null check (length(body) between 1 and 280),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  primary key (focus_id, voter_id)
+);
+create index if not exists text_answers_session_idx on text_answers(session_id, voter_id);
+create index if not exists text_answers_recent_idx on text_answers(focus_id, updated_at desc);
+
+-- Ranking: the place (1 = first) a voter gave each option
+create table if not exists rank_answers (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  topic_id    uuid not null references topics(id) on delete cascade,
+  place       int  not null check (place between 1 and 10),
+  created_at  timestamptz not null default now(),
+  primary key (focus_id, voter_id, topic_id)
+);
+create index if not exists rank_answers_session_idx on rank_answers(session_id, voter_id);
+
+-- Number: one number per voter per question
+create table if not exists number_answers (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  focus_id    uuid not null references focus_topics(id) on delete cascade,
+  voter_id    uuid not null,
+  value       double precision not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  primary key (focus_id, voter_id)
+);
+create index if not exists number_answers_session_idx on number_answers(session_id, voter_id);

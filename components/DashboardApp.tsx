@@ -12,7 +12,10 @@ import { ExecSummary } from "./ExecSummary";
 import { FocusOverview } from "./FocusOverview";
 import { TopicDistribution } from "./TopicDistribution";
 import { groupByFocus } from "@/lib/focus";
-import { pollTally, wordWeights } from "@/lib/answers";
+import { numberStats, pollTally, rankTally, wordWeights } from "@/lib/answers";
+import { RankList, RankPlaces } from "./results/RankResults";
+import { NumberHistogram, NumberSummary } from "./results/NumberResults";
+import { TextSpotlight, TextWall } from "./results/TextResults";
 import { PollBars, PollColumns, PollPie } from "./PollResults";
 import { WordCloud, WordList } from "./WordCloud";
 import { CHARTS, isChartFor } from "@/lib/charts";
@@ -58,7 +61,19 @@ export function DashboardApp({ code }: { code: string }) {
   return <Stage code={code} info={session.data} results={poll.data} lastOkAt={poll.lastOkAt} flash={poll.flash} />;
 }
 
-const EMPTY: ResultsPayload = { isOpen: true, voterCount: 0, cells: [], dist: [], polls: [], words: [], revision: 0 };
+const EMPTY: ResultsPayload = {
+  isOpen: true,
+  voterCount: 0,
+  cells: [],
+  dist: [],
+  polls: [],
+  words: [],
+  ranks: [],
+  numbers: [],
+  texts: [],
+  respondents: [],
+  revision: 0,
+};
 
 function Stage({
   code,
@@ -74,7 +89,8 @@ function Stage({
   flash: Record<string, number>;
 }) {
   const { session, topics, criteria } = info;
-  const r = results ?? { ...EMPTY, isOpen: session.isOpen };
+  // Fill in fields an older server version may not send.
+  const r: ResultsPayload = { ...EMPTY, isOpen: session.isOpen, ...(results ?? {}) };
   const groups = useMemo(() => groupByFocus(info.focusTopics ?? [], topics), [info.focusTopics, topics]);
   const single = groups.length <= 1;
 
@@ -210,7 +226,7 @@ function Stage({
                     onClick={() => setView(c.id)}
                     className={`shrink-0 rounded-full px-3 py-1 whitespace-nowrap ${view === c.id ? "bg-ink text-white" : "hover:bg-canvas"}`}
                   >
-                    {c.id === "summary" ? "Summary" : c.label}
+                    {c.label}
                   </button>
                 ))}
               </div>
@@ -280,7 +296,7 @@ function Stage({
           )}
 
           <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
-          {topics.length === 0 || criteria.length === 0 ? (
+          {groups.length === 0 ? (
             <p className="text-xl text-ink-soft">This presentation has no questions yet. Use “Edit questions” to add some.</p>
           ) : !group ? (
             <FocusOverview
@@ -288,8 +304,7 @@ function Stage({
               criteria={criteria}
               cells={cells}
               scaleMax={session.scaleMax}
-              polls={r.polls ?? []}
-              words={r.words ?? []}
+              results={r}
               onOpen={setFocusIndex}
             />
           ) : group.kind === "poll" ? (
@@ -305,6 +320,57 @@ function Stage({
                 return <PollBars tally={tally} />;
               })()}
             </section>
+          ) : group.kind === "multi" ? (
+            <ResultCard title={group.focus.name}>
+              {(() => {
+                const people = r.respondents.find((x) => x.focusId === group.focus.id)?.n ?? 0;
+                const tally = pollTally(group.topics.map((t) => t.item), r.polls, group.focus.id, people);
+                const noun: [string, string] = ["person", "people"];
+                return (
+                  <>
+                    <p className="-mt-2 mb-4 text-[clamp(0.95rem,1.2vw,1.35rem)] font-semibold text-ink-soft">
+                      Share of the {people} {people === 1 ? "person" : "people"} who answered
+                      {group.maxPicks ? ` (each could pick up to ${group.maxPicks})` : ""}
+                    </p>
+                    {view === "columns" ? <PollColumns tally={tally} noun={noun} /> : <PollBars tally={tally} noun={noun} />}
+                  </>
+                );
+              })()}
+            </ResultCard>
+          ) : group.kind === "rank" ? (
+            <ResultCard title={group.focus.name}>
+              {(() => {
+                const tally = rankTally(group.topics.map((t) => t.item), r.ranks, group.focus.id);
+                return (
+                  <>
+                    <p className="-mt-2 mb-4 text-[clamp(0.95rem,1.2vw,1.35rem)] font-semibold text-ink-soft">
+                      {tally.people} {tally.people === 1 ? "person" : "people"} put these in order
+                    </p>
+                    {view === "places" ? <RankPlaces tally={tally} /> : <RankList tally={tally} />}
+                  </>
+                );
+              })()}
+            </ResultCard>
+          ) : group.kind === "number" ? (
+            <ResultCard title={group.focus.name}>
+              {(() => {
+                const min = group.min ?? 0;
+                const max = group.max ?? 100;
+                const stats = numberStats(r.numbers, group.focus.id, min, max);
+                return view === "summary" ? (
+                  <NumberSummary stats={stats} unit={group.unit} />
+                ) : (
+                  <NumberHistogram stats={stats} min={min} max={max} unit={group.unit} />
+                );
+              })()}
+            </ResultCard>
+          ) : group.kind === "text" ? (
+            <ResultCard title={group.focus.name}>
+              {(() => {
+                const answers = r.texts.filter((t) => t.focusId === group.focus.id);
+                return view === "spotlight" ? <TextSpotlight answers={answers} /> : <TextWall answers={answers} />;
+              })()}
+            </ResultCard>
           ) : group.kind === "words" ? (
             <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
               <h2 className="font-display text-center text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight">{group.focus.name}</h2>
@@ -362,7 +428,7 @@ function Stage({
           </div>
           {voters === 0 && (
             <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">
-              No scores yet. Ask people to scan the QR code.
+              No answers yet. Ask people to scan the QR code.
             </p>
           )}
         </main>
@@ -389,6 +455,15 @@ function Stage({
         />
       )}
     </div>
+  );
+}
+
+function ResultCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
+      <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight break-words">{title}</h2>
+      {children}
+    </section>
   );
 }
 

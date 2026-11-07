@@ -4,7 +4,11 @@ import { CountUp } from "./CountUp";
 
 const LETTERS = "ABCDEFGHIJ";
 
-export function PollBars({ tally }: { tally: PollTally }) {
+/** Words for the count next to each option, e.g. ["vote", "votes"] or ["person", "people"]. */
+type Noun = [string, string];
+const VOTES: Noun = ["vote", "votes"];
+
+export function PollBars({ tally, noun = VOTES }: { tally: PollTally; noun?: Noun }) {
   return (
     <ol className="flex flex-col gap-[clamp(0.6rem,1.6vh,1.2rem)]" aria-label="Poll results">
       {tally.rows.map((r) => {
@@ -13,26 +17,26 @@ export function PollBars({ tally }: { tally: PollTally }) {
         return (
           <li key={r.id} className="flex items-center gap-3">
             <span
-              className="font-display flex h-[clamp(2.4rem,4.6vh,3.4rem)] w-[clamp(2.4rem,4.6vh,3.4rem)] shrink-0 items-center justify-center rounded-lg border border-line-strong text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold"
+              className="font-display flex h-[clamp(2rem,4.6vh,3.4rem)] w-[clamp(2rem,4.6vh,3.4rem)] shrink-0 items-center justify-center rounded-lg border border-line-strong text-[clamp(1.1rem,1.5vw,1.7rem)] font-semibold"
               style={{ backgroundColor: c, color: readableOn(c) }}
               aria-hidden
             >
               {LETTERS[r.index]}
             </span>
-            <span className="w-[26%] shrink-0 text-[clamp(1.05rem,1.5vw,1.8rem)] font-bold leading-tight break-words">
+            <span className="w-[34%] shrink-0 text-[clamp(1rem,1.5vw,1.8rem)] sm:w-[26%] font-bold leading-tight break-words">
               {r.name} {lead && <span aria-label="leading">👑</span>}
             </span>
-            <span className="relative h-[clamp(2.4rem,5vh,3.8rem)] flex-1 overflow-hidden rounded-full border border-line-strong bg-white">
+            <span className="relative h-6 sm:h-[clamp(1.5rem,4.6vh,3.8rem)] flex-1 overflow-hidden rounded-full border border-line-strong bg-white">
               <span
                 className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
                 style={{ width: `${r.pct}%`, backgroundColor: c }}
               />
             </span>
-            <span className="font-display w-[4ch] shrink-0 text-right text-[clamp(1.4rem,2.2vw,2.6rem)] font-semibold tabular-nums">
+            <span className="font-display w-[4ch] shrink-0 text-right text-[clamp(1.1rem,2.2vw,2.6rem)] font-semibold tabular-nums">
               <CountUp value={r.pct} />%
             </span>
-            <span className="w-[8ch] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold whitespace-nowrap text-ink-soft">
-              {r.n} {r.n === 1 ? "vote" : "votes"}
+            <span className="hidden w-[8ch] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold whitespace-nowrap text-ink-soft sm:inline">
+              {r.n} {r.n === 1 ? noun[0] : noun[1]}
             </span>
           </li>
         );
@@ -42,7 +46,7 @@ export function PollBars({ tally }: { tally: PollTally }) {
 }
 
 /** Vertical columns, one per option. */
-export function PollColumns({ tally }: { tally: PollTally }) {
+export function PollColumns({ tally, noun = VOTES }: { tally: PollTally; noun?: Noun }) {
   return (
     <div className="flex h-[clamp(16rem,52vh,36rem)] items-end gap-[clamp(0.5rem,1.6vw,2rem)] px-2" role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
       {tally.rows.map((r) => {
@@ -51,7 +55,7 @@ export function PollColumns({ tally }: { tally: PollTally }) {
           <div key={r.id} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
             <span className="font-display text-[clamp(1.4rem,2.4vw,2.8rem)] font-semibold tabular-nums leading-none"><CountUp value={r.pct} />%</span>
             <span className="mb-2 text-[clamp(0.8rem,1vw,1.1rem)] font-semibold text-ink-soft">
-              {r.n} {r.n === 1 ? "vote" : "votes"}
+              {r.n} {r.n === 1 ? noun[0] : noun[1]}
             </span>
             <div
               className="w-full max-w-[9rem] rounded-t-2xl border border-b-0 border-black/10 transition-[height] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"

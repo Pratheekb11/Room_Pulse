@@ -5,7 +5,7 @@ import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
 import { groupByFocus } from "@/lib/focus";
 import { getVoterId, readJSON, writeJSON } from "@/lib/storage";
-import type { SessionPayload, TopicItem } from "@/lib/types";
+import type { QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
 import { VoteQueue, type SaveStatus } from "@/lib/vote-queue";
 import { Confetti } from "./Confetti";
 import { Logo } from "./Logo";
@@ -13,6 +13,10 @@ import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { TopicCard } from "./TopicCard";
 import { PollCard } from "./PollCard";
 import { WordsCard } from "./WordsCard";
+import { MultiCard } from "./vote/MultiCard";
+import { NumberCard } from "./vote/NumberCard";
+import { RankCard } from "./vote/RankCard";
+import { TextCard } from "./vote/TextCard";
 import { useSession } from "./useSession";
 
 export function VoteApp({ code }: { code: string }) {
@@ -30,11 +34,15 @@ export function VoteApp({ code }: { code: string }) {
 
 const STATUS_POLL_MS = 10_000;
 
-type Answer = string | string[]; // poll: chosen option id; word cloud: list of words
+/**
+ * poll: chosen option id · words: list of words · multi: picked option ids ·
+ * rank: option ids, first place first · number: the number · text: the answer
+ */
+type Answer = string | string[] | number;
 
 type Step =
   | { kind: "rating"; gi: number; item: TopicItem; index: number }
-  | { kind: "poll" | "words"; gi: number };
+  | { kind: Exclude<QuestionKind, "rating">; gi: number };
 
 function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload; onRevision: (revision: number) => void }) {
   const { session, topics, criteria } = data;
@@ -51,15 +59,28 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     for (const g of groups) if (g.kind === "rating") for (const t of g.topics) for (const c of criteria) s.add(cellKey(t.item.id, c.id));
     return s;
   }, [groups, criteria]);
+  const byFocus = useMemo(() => new Map(groups.filter((g) => g.kind !== "rating").map((g) => [g.focus.id, g])), [groups]);
   const validAnswer = useMemo(() => {
-    const byFocus = new Map(groups.filter((g) => g.kind !== "rating").map((g) => [g.focus.id, g]));
     return (focusId: string, v: unknown): v is Answer => {
       const g = byFocus.get(focusId);
       if (!g) return false;
-      if (g.kind === "poll") return typeof v === "string" && g.topics.some((t) => t.item.id === v);
-      return Array.isArray(v) && v.length <= 3 && v.every((w) => typeof w === "string");
+      const isOption = (id: unknown) => g.topics.some((t) => t.item.id === id);
+      switch (g.kind) {
+        case "poll":
+          return typeof v === "string" && isOption(v);
+        case "multi":
+          return Array.isArray(v) && v.length <= (g.maxPicks ?? g.topics.length) && v.every(isOption);
+        case "rank":
+          return Array.isArray(v) && v.length === g.topics.length && new Set(v).size === v.length && v.every(isOption);
+        case "number":
+          return typeof v === "number" && v >= (g.min ?? 0) && v <= (g.max ?? 100);
+        case "text":
+          return typeof v === "string" && v.length > 0;
+        default:
+          return Array.isArray(v) && v.length <= 3 && v.every((w) => typeof w === "string");
+      }
     };
-  }, [groups]);
+  }, [byFocus]);
 
   const [ratings, setRatings] = useState<Record<string, number>>(() => {
     const stored = readJSON<Record<string, number>>(ratingsKey, {});
@@ -104,8 +125,14 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         code,
         voterId,
         endpoint: "/api/answer",
-        toBody: (focusId, v) =>
-          typeof v === "string" ? { kind: "poll", focusId, topicId: v } : { kind: "words", focusId, words: v },
+        toBody: (focusId, v) => {
+          const kind = byFocus.get(focusId)?.kind;
+          if (kind === "poll") return { kind, focusId, topicId: v };
+          if (kind === "multi" || kind === "rank") return { kind, focusId, topicIds: v };
+          if (kind === "number") return { kind, focusId, value: v };
+          if (kind === "text") return { kind, focusId, text: v };
+          return { kind: "words", focusId, words: v };
+        },
         initialPending: Object.fromEntries(
           Object.entries(readJSON<Record<string, unknown>>(answersPendingKey, {})).filter(([k, v]) => validAnswer(k, v)),
         ) as Record<string, Answer>,
@@ -178,9 +205,22 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const stepDone = useCallback(
     (step: Step, r: Record<string, number>, a: Record<string, Answer>) => {
       if (step.kind === "rating") return criteria.every((c) => r[cellKey(step.item.id, c.id)] !== undefined);
-      const v = a[groups[step.gi].focus.id];
-      if (step.kind === "poll") return typeof v === "string";
-      return Array.isArray(v) && (v.length >= 3 || (v.length > 0 && finished.includes(groups[step.gi].focus.id)));
+      const g = groups[step.gi];
+      const v = a[g.focus.id];
+      switch (step.kind) {
+        case "poll":
+        case "text":
+          return typeof v === "string";
+        case "number":
+          return typeof v === "number";
+        case "rank":
+          return Array.isArray(v) && v.length === g.topics.length;
+        case "multi":
+          // done once the limit is reached, or when the voter says they're done
+          return Array.isArray(v) && v.length > 0 && (v.length >= (g.maxPicks ?? g.topics.length) || finished.includes(g.focus.id));
+        default:
+          return Array.isArray(v) && (v.length >= 3 || (v.length > 0 && finished.includes(g.focus.id)));
+      }
     },
     [criteria, groups, finished],
   );
@@ -273,16 +313,17 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       setAnswers(next);
       writeJSON(answersKey, next);
       answerQueue.set(focusId, value);
-      // Polls move on by themselves; word clouds wait so people can add more answers.
-      afterChange(i, ratings, next, wasDone, steps[i].kind === "poll");
+      // Most questions move on once answered; word clouds wait so people can add more answers.
+      afterChange(i, ratings, next, wasDone, steps[i].kind !== "words");
     },
     [answers, ratings, groups, steps, stepDone, answersKey, answerQueue, afterChange, reward],
   );
 
-  const onFinishWords = useCallback(
+  /** "That's all from me" on a word cloud, or "Done" on a pick-several question. */
+  const onFinish = useCallback(
     (gi: number) => {
       const focusId = groups[gi].focus.id;
-      const i = steps.findIndex((s) => s.kind === "words" && s.gi === gi);
+      const i = steps.findIndex((s) => s.kind !== "rating" && s.gi === gi);
       const wasDone = stepDone(steps[i], ratings, answers);
       const next = [...new Set([...finished, focusId])];
       setFinished(next);
@@ -290,7 +331,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       // stepDone reads `finished`, so evaluate the next step with the updated list.
       const v = answers[focusId];
       if (!wasDone && Array.isArray(v) && v.length > 0) {
-        const target = steps.findIndex((s, j) => j !== i && !stepDone(s, ratings, answers) && !(s.kind === "words" && next.includes(groups[s.gi].focus.id)));
+        const target = steps.findIndex((s, j) => j !== i && !stepDone(s, ratings, answers) && !((s.kind === "words" || s.kind === "multi") && next.includes(groups[s.gi].focus.id)));
         if (target !== -1) {
           cancelAdvance();
           advanceTimer.current = setTimeout(() => goTo(target), 450);
@@ -462,6 +503,50 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   disabled={!isOpen}
                   onPick={(id) => onAnswer(here.gi, id)}
                 />
+              ) : here.kind === "multi" ? (
+                <MultiCard
+                  question={group.focus.name}
+                  options={group.topics.map((t) => t.item)}
+                  color={topicColor(here.gi)}
+                  maxPicks={group.maxPicks}
+                  value={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : undefined}
+                  status={statuses[group.focus.id]}
+                  disabled={!isOpen}
+                  finished={finished.includes(group.focus.id)}
+                  onChange={(ids) => onAnswer(here.gi, ids)}
+                  onFinish={() => onFinish(here.gi)}
+                />
+              ) : here.kind === "rank" ? (
+                <RankCard
+                  question={group.focus.name}
+                  options={group.topics.map((t) => t.item)}
+                  color={topicColor(here.gi)}
+                  value={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : undefined}
+                  status={statuses[group.focus.id]}
+                  disabled={!isOpen}
+                  onRank={(order) => onAnswer(here.gi, order)}
+                />
+              ) : here.kind === "number" ? (
+                <NumberCard
+                  question={group.focus.name}
+                  color={topicColor(here.gi)}
+                  min={group.min ?? 0}
+                  max={group.max ?? 100}
+                  unit={group.unit}
+                  value={typeof answers[group.focus.id] === "number" ? (answers[group.focus.id] as number) : undefined}
+                  status={statuses[group.focus.id]}
+                  disabled={!isOpen}
+                  onSend={(n) => onAnswer(here.gi, n)}
+                />
+              ) : here.kind === "text" ? (
+                <TextCard
+                  question={group.focus.name}
+                  color={topicColor(here.gi)}
+                  value={typeof answers[group.focus.id] === "string" ? (answers[group.focus.id] as string) : undefined}
+                  status={statuses[group.focus.id]}
+                  disabled={!isOpen}
+                  onSend={(text) => onAnswer(here.gi, text)}
+                />
               ) : (
                 <WordsCard
                   question={group.focus.name}
@@ -471,7 +556,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   disabled={!isOpen}
                   finished={finished.includes(group.focus.id)}
                   onSend={(words) => onAnswer(here.gi, words)}
-                  onFinish={() => onFinishWords(here.gi)}
+                  onFinish={() => onFinish(here.gi)}
                 />
               )}
             </div>

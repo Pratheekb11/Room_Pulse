@@ -33,14 +33,15 @@ const STEPS = [
 export default function Home() {
   return (
     <div className="min-h-dvh">
-      <header className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-5 sm:px-8">
+      <header className="mx-auto flex h-[72px] max-w-[1200px] gap-3 items-center justify-between px-5 sm:px-8">
         <Logo />
-        <nav className="flex items-center gap-2 text-sm font-medium">
-          <Link href="/admin" className="rounded-lg px-3 py-2 text-ink hover:bg-line-soft">
+        <nav className="flex items-center gap-2 text-[15px] font-semibold whitespace-nowrap">
+          <Link href="/admin" className="flex h-10 items-center rounded-lg border border-line-strong bg-white px-3.5 text-ink hover:bg-line-soft">
             Log in
           </Link>
-          <Link href="/admin" className="key rounded-lg bg-primary px-4 py-2.5 text-white">
-            Create a presentation
+          <Link href="/admin" className="key flex h-10 items-center rounded-lg bg-primary px-4 text-white">
+            <span className="sm:hidden">Get started</span>
+            <span className="hidden sm:inline">Create a presentation</span>
           </Link>
         </nav>
       </header>
@@ -49,9 +50,8 @@ export default function Home() {
         <section className="stagger grid gap-12 pt-14 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
           <div className="min-w-0">
             <h1 className="font-display text-[clamp(2.5rem,5.6vw,4rem)] leading-[1.04] text-ink">
-              Ask the room.
-              <br />
-              Watch it answer.
+              <span className="block">Know what the room thinks.</span>
+              <span className="block text-ink-soft">Right now.</span>
             </h1>
             <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink-soft">
               Ask your audience questions. They answer on their phones, and the results show up on your screen straight away. Nobody needs an app or an account to answer.

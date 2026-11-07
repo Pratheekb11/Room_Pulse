@@ -32,7 +32,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/admin/sessions/[
         }
         out.push([focus, topic, "All measures", n ? (sum / n).toFixed(2) : "", n]);
       }
-      for (const r of await getChoiceSummaryRows(s.code)) out.push([r.focus, r.label, r.kind, "", r.n]);
+      for (const r of await getChoiceSummaryRows(s.code)) out.push([r.focus, r.label, r.kind, r.average === null ? "" : r.average.toFixed(2), r.n]);
       csv = toCsv(out);
     } else {
       const rows = await getRawRows(code.data);

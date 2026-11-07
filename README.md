@@ -3,7 +3,11 @@
 Anonymous, near-real-time audience voting for live sessions. Presenters start straight away as a guest (no sign-up; they get an 8-character **guest code** like `K7QM-3XPA` to get back in on any device, and guest presentations are deleted after 3 days) or sign up with email and password. A presentation has up to 10 **questions**. Each question is one of:
 
 - **Rate topics:** up to 10 topics, each scored on your criteria (e.g. Impact, Feasibility).
-- **Poll:** pick one of 2–10 options.
+- **Pick one (poll):** pick one of 2–10 options.
+- **Pick several:** tick as many options as the presenter allows (or any number).
+- **Put in order:** tap 2–10 options in order of preference. Results show the average place and how many people put each option in each place.
+- **Number:** answer with a number in the presenter's range, with an optional unit. Results show a spread chart, the average and the middle value.
+- **Open answer:** one short answer (up to 280 characters) per person, shown as a wall of cards or one at a time.
 - **Word cloud:** up to 3 words or short phrases per person.
 
 The audience scans a QR code and answers on their phones: one screen at a time, with emoji rating keys, levels and points. Every tap saves instantly, and the dashboard on the big screen updates about every 1.5 s.
@@ -66,6 +70,7 @@ npm test
 - `test/email-auth.test.ts` covers email verification and password reset: single use, expiry, rate limits, no account discovery, sign-out on reset, and links that can't be redirected via the Host header.
 - `test/auth.test.ts` covers sign-up, log-in, log-out, password hashing, lockout, cross-site blocking and per-account separation.
 - `test/questions.test.ts` covers polls and word clouds: validation, changing answers, closed sessions, reset and exports.
+- `test/question-types.test.ts` covers pick several, open answer, ranking and number questions: settings, validation, replacing answers, closed sessions, reset, people counts, exports and editing.
 - `test/api.test.ts` runs every API route against real Postgres (PGlite) through the real Neon driver. It covers validation, 403/404/503 handling, overwrite-not-double-count, concurrent voters, reset/recalculate/delete, CSV exports, and checks that no voter id ever leaks. After the load tests, `db/check.sql` must return zero rows.
 - `test/vote-queue.test.ts` covers the phone's save queue: 300 ms debounce per cell, latest value wins, retry with back-off from 3 s up to 15 s, flush on `online`, and pending ratings kept while voting is closed.
 - `test/simulate.test.ts` runs the load simulator end to end, including injected 503s.

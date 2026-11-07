@@ -119,16 +119,16 @@ function Console({
     <div className="mx-auto max-w-7xl px-5 pb-20 pt-5">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <Logo />
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-2 text-[15px] whitespace-nowrap">
           {guest ? (
-            <span className="rounded-full border border-line-strong bg-sun px-3 py-1 font-bold">Guest</span>
+            <span className="flex h-10 items-center rounded-lg border border-line-strong bg-sun px-3.5 font-semibold">Guest</span>
           ) : (
             <span className="hidden font-semibold text-ink-soft sm:inline">{email}</span>
           )}
           <button
             type="button"
             onClick={guest ? () => setConfirmLeave(true) : onSignOut}
-            className="rounded-full border border-line-strong bg-white px-4 py-1.5 font-bold"
+            className="flex h-10 items-center rounded-lg border border-line-strong bg-white px-3.5 font-semibold hover:bg-line-soft"
           >
             Log out
           </button>

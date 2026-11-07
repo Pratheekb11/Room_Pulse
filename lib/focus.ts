@@ -1,10 +1,17 @@
 import { avg, cellKey, sumAggs, type Agg } from "./stats";
 import { defaultChart } from "./charts";
-import type { NamedItem, QuestionKind, TopicItem } from "./types";
+import { hasOptions } from "./validation";
+import type { FocusItem, NamedItem, QuestionKind, TopicItem } from "./types";
 
 export interface FocusGroup {
   focus: NamedItem;
   kind: QuestionKind;
+  /** Pick several: most picks allowed (null = any). */
+  maxPicks: number | null;
+  /** Number questions: range and unit. */
+  min: number | null;
+  max: number | null;
+  unit: string | null;
   /** Chart the presenter chose; the dashboard opens on it. */
   chart: string;
   /** `index` is the topic's position in the whole presentation (drives its colour). */
@@ -13,22 +20,43 @@ export interface FocusGroup {
 
 /** Topics grouped under their focus topic, in order. Topics without one go in a "Topics" group. */
 export function groupByFocus(
-  focusTopics: (NamedItem & { kind?: QuestionKind; chart?: string })[],
+  focusTopics: (NamedItem & Partial<Omit<FocusItem, "id" | "name">>)[],
   topics: TopicItem[],
 ): FocusGroup[] {
   const groups = new Map<string, FocusGroup>(
     focusTopics.map((f) => {
       const kind = f.kind ?? "rating";
-      return [f.id, { focus: { id: f.id, name: f.name }, kind, chart: f.chart ?? defaultChart(kind), topics: [] }];
+      return [
+        f.id,
+        {
+          focus: { id: f.id, name: f.name },
+          kind,
+          chart: f.chart ?? defaultChart(kind),
+          maxPicks: f.maxPicks ?? null,
+          min: f.min ?? null,
+          max: f.max ?? null,
+          unit: f.unit ?? null,
+          topics: [],
+        },
+      ];
     }),
   );
-  const loose: FocusGroup = { focus: { id: "", name: "Topics" }, kind: "rating", chart: "heatmap", topics: [] };
+  const loose: FocusGroup = {
+    focus: { id: "", name: "Topics" },
+    kind: "rating",
+    chart: "heatmap",
+    maxPicks: null,
+    min: null,
+    max: null,
+    unit: null,
+    topics: [],
+  };
   topics.forEach((item, index) => {
     const g = (item.focusId && groups.get(item.focusId)) || loose;
     g.topics.push({ item, index });
   });
-  // Word clouds have no topics; other empty groups have nothing to show.
-  return [...groups.values(), loose].filter((g) => g.topics.length > 0 || g.kind === "words");
+  // Word clouds, open answers and numbers have no topics; other empty groups have nothing to show.
+  return [...groups.values(), loose].filter((g) => g.topics.length > 0 || !hasOptions(g.kind));
 }
 
 export interface FocusSummary {

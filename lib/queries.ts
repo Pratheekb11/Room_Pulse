@@ -8,7 +8,11 @@ import type {
   ScoreBucket,
   FocusItem,
   PollCount,
+  NumberCount,
+  RankCount,
+  RespondentCount,
   SessionPayload,
+  TextAnswer,
   TopicItem,
   WordCount,
 } from "./types";
@@ -23,7 +27,8 @@ export async function getSession(code: string): Promise<SessionPayload | null> {
   const rows = (await sql`
     select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open, s.revision,
       coalesce((select json_agg(json_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
-                  'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end))
+                  'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end),
+                  'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit)
                   order by f.position)
                 from focus_topics f where f.session_id = s.id), '[]'::json) as focus_topics,
       coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'focusId', t.focus_id) order by t.position)
@@ -117,7 +122,11 @@ export async function getResults(
       (select count(*)::int from (
           select voter_id from votes where session_id = s.id
           union select voter_id from poll_answers where session_id = s.id
-          union select voter_id from word_answers where session_id = s.id) u) as voter_count,
+          union select voter_id from word_answers where session_id = s.id
+          union select voter_id from choice_answers where session_id = s.id
+          union select voter_id from text_answers where session_id = s.id
+          union select voter_id from rank_answers where session_id = s.id
+          union select voter_id from number_answers where session_id = s.id) u) as voter_count,
       coalesce((select json_agg(json_build_object(
                   'topicId', r.topic_id, 'criterionId', r.criterion_id,
                   'n', r.vote_count, 'sum', r.score_sum))
@@ -132,7 +141,8 @@ export async function getResults(
                        group by v.topic_id, v.criterion_id, v.score) d), '[]'::json) as dist,
       coalesce((select json_agg(json_build_object('focusId', p.focus_id, 'topicId', p.topic_id, 'n', p.n))
                 from (select focus_id, topic_id, count(*)::int as n
-                        from poll_answers where session_id = s.id
+                        from (select focus_id, topic_id from poll_answers where session_id = s.id
+                              union all select focus_id, topic_id from choice_answers where session_id = s.id) a
                        group by focus_id, topic_id) p), '[]'::json) as polls,
       coalesce((select json_agg(json_build_object('focusId', w.focus_id, 'word', w.word, 'n', w.n)
                                 order by w.n desc, w.word)
@@ -140,7 +150,28 @@ export async function getResults(
                              row_number() over (partition by focus_id order by count(*) desc, word) as rk
                         from word_answers where session_id = s.id
                        group by focus_id, word) w
-               where w.rk <= 80), '[]'::json) as words
+               where w.rk <= 80), '[]'::json) as words,
+      coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'topicId', x.topic_id, 'rank', x.place, 'n', x.n))
+                from (select focus_id, topic_id, place, count(*)::int as n
+                        from rank_answers where session_id = s.id
+                       group by focus_id, topic_id, place) x), '[]'::json) as ranks,
+      coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'value', x.value, 'n', x.n))
+                from (select focus_id, value, count(*)::int as n
+                        from number_answers where session_id = s.id
+                       group by focus_id, value) x), '[]'::json) as numbers,
+      coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'text', x.body, 'at', x.updated_at)
+                                order by x.updated_at desc)
+                from (select focus_id, body, updated_at,
+                             row_number() over (partition by focus_id order by updated_at desc) as rk
+                        from text_answers where session_id = s.id) x
+               where x.rk <= 200), '[]'::json) as texts,
+      coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'n', x.n))
+                from (select focus_id, count(distinct voter_id)::int as n
+                        from (select focus_id, voter_id from choice_answers where session_id = s.id
+                              union all select focus_id, voter_id from text_answers where session_id = s.id
+                              union all select focus_id, voter_id from rank_answers where session_id = s.id
+                              union all select focus_id, voter_id from number_answers where session_id = s.id) a
+                       group by focus_id) x), '[]'::json) as respondents
     from live_sessions s
     where s.code = ${code}
       and (s.dashboard_key = ${key}::text or s.owner_id = ${owner}::uuid)
@@ -152,10 +183,26 @@ export async function getResults(
     dist: ScoreBucket[];
     polls: PollCount[];
     words: WordCount[];
+    ranks: RankCount[];
+    numbers: (Omit<NumberCount, "value"> & { value: number | string })[];
+    texts: TextAnswer[];
+    respondents: RespondentCount[];
   }[];
   const r = rows[0];
   if (!r) return null;
-  return { isOpen: r.is_open, voterCount: r.voter_count, cells: r.cells, dist: r.dist, polls: r.polls, words: r.words, revision: r.revision };
+  return {
+    isOpen: r.is_open,
+    voterCount: r.voter_count,
+    cells: r.cells,
+    dist: r.dist,
+    polls: r.polls,
+    words: r.words,
+    ranks: r.ranks,
+    numbers: r.numbers.map((x) => ({ ...x, value: Number(x.value) })),
+    texts: r.texts.map((t) => ({ ...t, at: new Date(t.at).toISOString() })),
+    respondents: r.respondents,
+    revision: r.revision,
+  };
 }
 
 // ---------------------------------------------------------------- admin
@@ -173,7 +220,11 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
       select session_id, count(distinct voter_id)::int as voter_count, count(*)::int as total_votes
         from (select session_id, voter_id from votes
               union all select session_id, voter_id from poll_answers
-              union all select session_id, voter_id from word_answers) a
+              union all select session_id, voter_id from word_answers
+              union all select session_id, voter_id from choice_answers
+              union all select session_id, voter_id from text_answers
+              union all select session_id, voter_id from rank_answers
+              union all select session_id, voter_id from number_answers) a
        group by session_id
     ) v on v.session_id = s.id
     where s.owner_id = ${ownerId}
@@ -235,8 +286,10 @@ export async function createSession(
           select e.val, e.ord - 1 as pos
           from jsonb_array_elements(${JSON.stringify(input.focusTopics)}::jsonb) with ordinality as e(val, ord)
         ), f as (
-          insert into focus_topics (session_id, name, kind, chart, position)
-          select s.id, input.val->>'name', input.val->>'kind', input.val->>'chart', input.pos
+          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit)
+          select s.id, input.val->>'name', input.val->>'kind', input.val->>'chart', input.pos,
+                 (input.val->>'maxPicks')::int, (input.val->>'min')::double precision,
+                 (input.val->>'max')::double precision, input.val->>'unit'
           from s, input
           returning id, position
         ), t as (
@@ -271,6 +324,10 @@ export async function resetSession(code: string): Promise<void> {
   await sql.transaction([
     sql`delete from poll_answers where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from word_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from choice_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from text_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from rank_answers where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from number_answers where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from results where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
   ]);
@@ -327,7 +384,7 @@ export interface RawRow {
   focus: string;
   topic: string;
   criterion: string;
-  /** Rating score as text; empty for poll choices and words. */
+  /** Rating score, ranking place or number as text; empty for choices, words and open answers. */
   score: string;
   updatedAt: string;
 }
@@ -361,6 +418,32 @@ export async function getRawRows(code: string): Promise<RawRow[]> {
         from word_answers w
         join s on w.session_id = s.id
         join focus_topics f on f.id = w.focus_id
+      union all
+      select c.voter_id, c.created_at, c.created_at, f.position, t.position, 0,
+             f.name, t.name, 'Picked', ''
+        from choice_answers c
+        join s on c.session_id = s.id
+        join focus_topics f on f.id = c.focus_id
+        join topics t on t.id = c.topic_id
+      union all
+      select x.voter_id, x.created_at, x.updated_at, f.position, 0, 0,
+             f.name, x.body, 'Answer', ''
+        from text_answers x
+        join s on x.session_id = s.id
+        join focus_topics f on f.id = x.focus_id
+      union all
+      select r.voter_id, r.created_at, r.created_at, f.position, t.position, 0,
+             f.name, t.name, 'Place', r.place::text
+        from rank_answers r
+        join s on r.session_id = s.id
+        join focus_topics f on f.id = r.focus_id
+        join topics t on t.id = r.topic_id
+      union all
+      select x.voter_id, x.created_at, x.updated_at, f.position, 0, 0,
+             f.name, '', 'Number', x.value::text
+        from number_answers x
+        join s on x.session_id = s.id
+        join focus_topics f on f.id = x.focus_id
     ),
     firsts as (select voter_id, min(created_at) as first_at from answers group by voter_id),
     numbered as (select voter_id, row_number() over (order by first_at, voter_id) as rn from firsts)
@@ -466,10 +549,35 @@ export async function getOwnedSessionIsOpen(code: string, ownerId: string): Prom
 
 export type AnswerOutcome = VoteOutcome;
 
-/** Saves a poll choice or a voter's word-cloud answers (replacing earlier ones). */
+/** Saves a poll choice, word-cloud answers, picks, open answer, ranking or number (replacing earlier ones). */
 export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
   let saved: boolean;
-  if (a.kind === "poll") {
+  if (a.kind === "multi" || a.kind === "rank") {
+    saved = await saveOptionList(a.kind, a.code, a.focusId, a.voterId, a.topicIds);
+  } else if (a.kind === "text") {
+    const rows = await sql`
+      insert into text_answers (session_id, focus_id, voter_id, body)
+      select s.id, f.id, ${a.voterId}::uuid, ${a.text}
+      from live_sessions s
+      join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'text'
+      where s.code = ${a.code} and s.is_open
+      on conflict (focus_id, voter_id) do update set body = excluded.body, updated_at = now()
+      returning 1 as ok
+    `;
+    saved = rows.length > 0;
+  } else if (a.kind === "number") {
+    const rows = await sql`
+      insert into number_answers (session_id, focus_id, voter_id, value)
+      select s.id, f.id, ${a.voterId}::uuid, ${a.value}::double precision
+      from live_sessions s
+      join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'number'
+      where s.code = ${a.code} and s.is_open
+        and ${a.value}::double precision between f.num_min and f.num_max
+      on conflict (focus_id, voter_id) do update set value = excluded.value, updated_at = now()
+      returning 1 as ok
+    `;
+    saved = rows.length > 0;
+  } else if (a.kind === "poll") {
     const rows = await sql`
       insert into poll_answers (session_id, focus_id, voter_id, topic_id)
       select s.id, f.id, ${a.voterId}::uuid, t.id
@@ -511,34 +619,95 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
   return "invalid";
 }
 
+/** Limit used when a pick-several question allows any number of picks. */
+const MAX_PICKS_ANY = 10;
+
+/**
+ * Saves a pick-several set or a full ranking, replacing the voter's earlier one.
+ * Every statement repeats the same validity check, so either all apply or none do
+ * (an invalid answer leaves the earlier one in place).
+ */
+async function saveOptionList(kind: "multi" | "rank", code: string, focusId: string, voterId: string, ids: string[]): Promise<boolean> {
+  const valid = sql`
+    select s.id as session_id, f.id as focus_id
+      from live_sessions s
+      join focus_topics f on f.session_id = s.id and f.id = ${focusId}::uuid and f.kind = ${kind}
+     where s.code = ${code} and s.is_open
+       and (select count(*) from topics t where t.focus_id = f.id and t.id = any(${ids}::uuid[])) = cardinality(${ids}::uuid[])
+       and case when f.kind = 'multi' then cardinality(${ids}::uuid[]) <= coalesce(f.max_picks, ${MAX_PICKS_ANY})
+                else cardinality(${ids}::uuid[]) = (select count(*) from topics t where t.focus_id = f.id) end`;
+  const del =
+    kind === "multi"
+      ? sql`delete from choice_answers where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${valid})`
+      : sql`delete from rank_answers where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${valid})`;
+  const ins =
+    kind === "multi"
+      ? sql`insert into choice_answers (session_id, focus_id, voter_id, topic_id)
+            select v.session_id, v.focus_id, ${voterId}::uuid, u.id
+              from (${valid}) v cross join unnest(${ids}::uuid[]) as u(id)
+            returning 1 as ok`
+      : sql`insert into rank_answers (session_id, focus_id, voter_id, topic_id, place)
+            select v.session_id, v.focus_id, ${voterId}::uuid, u.id, u.ord
+              from (${valid}) v cross join unnest(${ids}::uuid[]) with ordinality as u(id, ord)
+            returning 1 as ok`;
+  const [, inserted, allowed] = await sql.transaction([del, ins, valid]);
+  return allowed.length > 0 && inserted.length === ids.length;
+}
+
 export interface ChoiceSummaryRow {
   focus: string;
   label: string;
-  kind: "Poll choice" | "Word";
+  kind: "Poll choice" | "Word" | "Picked" | "Average place" | "Average" | "Middle value" | "Answer";
+  average: number | null;
   n: number;
 }
 
-/** Poll option counts (including options nobody picked) and word counts, in display order. */
+/** Counts for every question that isn't a rating, in display order (options nobody picked included). */
 export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryRow[]> {
   const rows = (await sql`
     select * from (
-      select f.position as fp, t.position as tp, f.name as focus, t.name as label, 'Poll choice' as kind,
-             (select count(*)::int from poll_answers p where p.topic_id = t.id) as n
+      select f.position as fp, t.position::float8 as tp, f.name as focus, t.name as label,
+             case f.kind when 'poll' then 'Poll choice' else 'Picked' end as kind, null::float8 as average,
+             (select count(*)::int from poll_answers p where p.topic_id = t.id)
+               + (select count(*)::int from choice_answers c where c.topic_id = t.id) as n
         from live_sessions s
-        join focus_topics f on f.session_id = s.id and f.kind = 'poll'
+        join focus_topics f on f.session_id = s.id and f.kind in ('poll', 'multi')
         join topics t on t.focus_id = f.id
        where s.code = ${code}
       union all
-      select f.position, -count(*)::int, f.name, w.word, 'Word', count(*)::int
+      select f.position, -count(*)::float8, f.name, w.word, 'Word', null, count(*)::int
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'words'
         join word_answers w on w.focus_id = f.id
        where s.code = ${code}
        group by f.position, f.name, w.word
+      union all
+      select f.position, t.position, f.name, t.name, 'Average place', avg(r.place)::float8, count(r.place)::int
+        from live_sessions s
+        join focus_topics f on f.session_id = s.id and f.kind = 'rank'
+        join topics t on t.focus_id = f.id
+        left join rank_answers r on r.topic_id = t.id
+       where s.code = ${code}
+       group by f.position, t.position, f.name, t.name
+      union all
+      select f.position, m.ord, f.name, '', m.kind, m.value, x.n
+        from live_sessions s
+        join focus_topics f on f.session_id = s.id and f.kind = 'number'
+        cross join lateral (select count(*)::int as n, avg(value)::float8 as mean,
+                                   percentile_cont(0.5) within group (order by value)::float8 as median
+                              from number_answers a where a.focus_id = f.id) x
+        cross join lateral (values (0::float8, 'Average', x.mean), (1::float8, 'Middle value', x.median)) as m(ord, kind, value)
+       where s.code = ${code}
+      union all
+      select f.position, extract(epoch from a.updated_at)::float8, f.name, a.body, 'Answer', null, 1
+        from live_sessions s
+        join focus_topics f on f.session_id = s.id and f.kind = 'text'
+        join text_answers a on a.focus_id = f.id
+       where s.code = ${code}
     ) x
     order by fp, tp, label
-  `) as { focus: string; label: string; kind: "Poll choice" | "Word"; n: number }[];
-  return rows.map((r) => ({ focus: r.focus, label: r.label, kind: r.kind, n: r.n }));
+  `) as { focus: string; label: string; kind: ChoiceSummaryRow["kind"]; average: number | string | null; n: number }[];
+  return rows.map((r) => ({ focus: r.focus, label: r.label, kind: r.kind, average: r.average === null ? null : Number(r.average), n: r.n }));
 }
 
 // ---------------------------------------------------------------- email links
@@ -674,6 +843,17 @@ export async function getAnswerCounts(code: string, ownerId: string): Promise<{ 
       select focus_id, count(*)::int from poll_answers where session_id = (select id from s) group by focus_id
       union all
       select focus_id, count(distinct voter_id)::int from word_answers where session_id = (select id from s) group by focus_id
+      union all
+      select topic_id, count(*)::int from choice_answers where session_id = (select id from s) group by topic_id
+      union all
+      select topic_id, count(*)::int from rank_answers where session_id = (select id from s) group by topic_id
+      union all
+      select focus_id, count(distinct voter_id)::int from (
+        select focus_id, voter_id from choice_answers where session_id = (select id from s)
+        union all select focus_id, voter_id from rank_answers where session_id = (select id from s)
+        union all select focus_id, voter_id from text_answers where session_id = (select id from s)
+        union all select focus_id, voter_id from number_answers where session_id = (select id from s)) a
+      group by focus_id
     )
     select (select count(*) from s)::int as found,
            exists (select 1 from votes where session_id = (select id from s)) as scale_locked,
@@ -741,12 +921,15 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
     sql`delete from focus_topics where session_id = ${sid}::uuid and not (id = any(${keepFocus}::uuid[]))`,
     sql`delete from topics where session_id = ${sid}::uuid and not (id = any(${keepTopics}::uuid[]))`,
     sql`delete from criteria where session_id = ${sid}::uuid and not (id = any(${keepCriteria}::uuid[]))`,
-    sql`update focus_topics f set name = x.name, chart = x.chart, position = x.pos
-        from jsonb_to_recordset(${rows(focus.filter((f) => !f.isNew))}::jsonb) as x(id uuid, name text, chart text, pos int)
+    sql`update focus_topics f set name = x.name, chart = x.chart, position = x.pos,
+          max_picks = x."maxPicks", num_min = x.min, num_max = x.max, num_unit = x.unit
+        from jsonb_to_recordset(${rows(focus.filter((f) => !f.isNew))}::jsonb)
+          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text)
         where f.id = x.id and f.session_id = ${sid}::uuid`,
-    sql`insert into focus_topics (id, session_id, name, kind, chart, position)
-        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos
-        from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb) as x(id uuid, name text, kind text, chart text, pos int)`,
+    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit)
+        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit
+        from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb)
+          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text)`,
     sql`update topics t set name = x.name, position = x.pos
         from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int)
         where t.id = x.id and t.session_id = ${sid}::uuid`,

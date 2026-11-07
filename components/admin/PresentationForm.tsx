@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { CHARTS, defaultChart } from "@/lib/charts";
 import { topicColor } from "@/lib/colors";
 import {
+  hasOptions,
+  MAX_ABS_NUMBER,
   MAX_CRITERIA,
   MAX_FOCUS_TOPICS,
   MAX_TOPICS_PER_FOCUS,
 } from "@/lib/validation";
+import { KIND_INFO } from "@/lib/kinds";
 import {
   duplicateIndexes,
   filledItems,
@@ -15,12 +18,13 @@ import {
   rowsFrom,
   type Row,
 } from "@/lib/list-edit";
-import type { SessionPayload } from "@/lib/types";
+import type { QuestionKind, SessionPayload } from "@/lib/types";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { ListEditor } from "./ListEditor";
 
 type Call = (path: string, init?: RequestInit) => Promise<Response>;
-type Kind = "rating" | "poll" | "words";
+type Kind = QuestionKind;
+type OptionKind = "rating" | "poll" | "multi" | "rank";
 
 interface QuestionDraft {
   key: number;
@@ -30,6 +34,12 @@ interface QuestionDraft {
   chart: string;
   name: string;
   items: Row[];
+  /** Pick several: most picks (null = any). */
+  maxPicks: number | null;
+  /** Number questions, as typed. */
+  min: string;
+  max: string;
+  unit: string;
 }
 
 export type FormMode =
@@ -42,19 +52,7 @@ export type FormMode =
       scaleLocked: boolean;
     };
 
-export const KINDS: { id: Kind; label: string; hint: string }[] = [
-  {
-    id: "rating",
-    label: "Score items",
-    hint: "People give each item a score, like 1 to 5.",
-  },
-  { id: "poll", label: "Poll", hint: "People pick one option." },
-  {
-    id: "words",
-    label: "Word cloud",
-    hint: "People type up to 3 words. Popular words show bigger.",
-  },
-];
+const KINDS = KIND_INFO;
 
 const EXAMPLES: Record<Kind, { name: string; list: string[] }> = {
   rating: {
@@ -66,26 +64,48 @@ const EXAMPLES: Record<Kind, { name: string; list: string[] }> = {
     list: ["Lisbon", "Kyoto", "Cape Town"],
   },
   words: { name: "One word for this year?", list: [] },
+  multi: {
+    name: "Which perks matter most to you?",
+    list: ["Gym", "Free lunch", "Remote days", "Learning budget"],
+  },
+  rank: {
+    name: "Put these goals in order",
+    list: ["Grow revenue", "Hire 5 people", "Launch the app"],
+  },
+  number: { name: "How many customers will we have by December?", list: [] },
+  text: { name: "What should we do differently next time?", list: [] },
 };
 
-const LIST_COPY: Record<
-  Exclude<Kind, "words">,
-  { label: string; noun: string }
-> = {
+const LIST_COPY: Record<OptionKind, { label: string; noun: string }> = {
   rating: { label: "Items to score", noun: "item" },
   poll: { label: "Options", noun: "option" },
+  multi: { label: "Options", noun: "option" },
+  rank: { label: "Options to put in order", noun: "option" },
 };
 
-/** Polls start with two option rows (the minimum); scored questions with one. */
+/** Questions that need 2 options start with two rows; scored questions with one. */
+const needsTwo = (kind: Kind) => kind === "poll" || kind === "multi" || kind === "rank";
 const startRows = (kind: Kind): Row[] =>
-  kind === "poll" ? [{ name: "" }, { name: "" }] : [{ name: "" }];
+  needsTwo(kind) ? [{ name: "" }, { name: "" }] : [{ name: "" }];
 const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
   key,
   kind,
   chart: defaultChart(kind),
   name: "",
   items: startRows(kind),
+  maxPicks: null,
+  min: "0",
+  max: "100",
+  unit: "",
 });
+
+/** A typed number, or null if it isn't one. Commas are allowed as thousands separators. */
+function toNumber(text: string): number | null {
+  const t = text.trim().replace(/,/g, "");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && Math.abs(n) <= MAX_ABS_NUMBER ? n : null;
+}
 const field =
   "mt-1 w-full rounded-lg border border-line-strong bg-white px-3 py-2";
 const plural = (n: number, one: string, many = `${one}s`) =>
@@ -125,6 +145,7 @@ function readDraft(): Draft | null {
     return {
       ...d,
       focus: d.focus.map(({ topicsText, items, ...f }) => ({
+        ...blank(f.key, f.kind),
         ...f,
         id: undefined,
         items: plain(items ?? topicsText),
@@ -148,10 +169,13 @@ function fromSession(s: SessionPayload): Draft {
       kind: f.kind,
       chart: f.chart,
       name: f.name,
-      items:
-        f.kind === "words"
-          ? [{ name: "" }]
-          : rowsFrom(s.topics.filter((t) => t.focusId === f.id)),
+      items: hasOptions(f.kind)
+        ? rowsFrom(s.topics.filter((t) => t.focusId === f.id))
+        : [{ name: "" }],
+      maxPicks: f.maxPicks ?? null,
+      min: String(f.min ?? 0),
+      max: String(f.max ?? 100),
+      unit: f.unit ?? "",
     })),
     criteria: rowsFrom(s.criteria),
   };
@@ -219,8 +243,15 @@ export function PresentationForm({
 
   const parsed = focus.map((f) => ({
     ...f,
-    topics: f.kind === "words" ? [] : filledItems(f.items),
+    topics: hasOptions(f.kind) ? filledItems(f.items) : [],
   }));
+  /** Settings sent to the server for each type (null where they don't apply). */
+  const settings = (f: QuestionDraft) => ({
+    maxPicks: f.kind === "multi" ? f.maxPicks : null,
+    min: f.kind === "number" ? toNumber(f.min) : null,
+    max: f.kind === "number" ? toNumber(f.max) : null,
+    unit: f.kind === "number" && f.unit.trim() ? f.unit.trim() : null,
+  });
   const hasRating = parsed.some((f) => f.kind === "rating");
   const criteria = hasRating ? filledItems(criteriaRows) : [];
   const scoreCount =
@@ -236,10 +267,22 @@ export function PresentationForm({
     if (!f.name.trim()) problems.push(`Write question ${i + 1}.`);
     if (f.kind === "rating" && f.topics.length === 0)
       problems.push(`Add at least 1 item to score in ${label}.`);
-    if (f.kind === "poll" && f.topics.length < 2)
+    if (needsTwo(f.kind) && f.topics.length < 2)
       problems.push(`Add at least 2 options to ${label}.`);
-    if (f.kind !== "words" && duplicateIndexes(f.items).size)
-      problems.push(`${label} has the same ${LIST_COPY[f.kind].noun} twice.`);
+    if (hasOptions(f.kind) && duplicateIndexes(f.items).size)
+      problems.push(
+        `${label} has the same ${LIST_COPY[f.kind as OptionKind].noun} twice.`,
+      );
+    if (f.kind === "number") {
+      const lo = toNumber(f.min);
+      const hi = toNumber(f.max);
+      if (lo === null || hi === null)
+        problems.push(`Give ${label} a lowest and a highest number.`);
+      else if (lo >= hi)
+        problems.push(
+          `In ${label}, the lowest number must be below the highest.`,
+        );
+    }
   });
   const names = parsed.map((f) => f.name.trim().toLowerCase()).filter(Boolean);
   if (new Set(names).size !== names.length)
@@ -264,7 +307,7 @@ export function PresentationForm({
     const keptItems = new Set(
       focus
         .flatMap((f) =>
-          f.kind === "words" ? [] : filledRows(f.items).map((r) => r.id),
+          hasOptions(f.kind) ? filledRows(f.items).map((r) => r.id) : [],
         )
         .filter(Boolean),
     );
@@ -308,7 +351,8 @@ export function PresentationForm({
               name: f.name,
               kind: f.kind,
               chart: f.chart,
-              topics: f.kind === "words" ? [] : filledRows(f.items),
+              ...settings(f),
+              topics: hasOptions(f.kind) ? filledRows(f.items) : [],
             })),
             criteria: hasRating ? filledRows(criteriaRows) : [],
           }),
@@ -327,6 +371,7 @@ export function PresentationForm({
             name: f.name,
             kind: f.kind,
             chart: f.chart,
+            ...settings(f),
             topics: f.topics,
           })),
           criteria,
@@ -454,9 +499,9 @@ export function PresentationForm({
                               update(f.key, {
                                 kind: k.id,
                                 chart: defaultChart(k.id),
-                                // a poll needs 2 options: give it a second empty row when switching
+                                // these need 2 options: give them a second empty row when switching
                                 items:
-                                  k.id === "poll" && f.items.length < 2
+                                  needsTwo(k.id) && f.items.length < 2
                                     ? [...f.items, { name: "" }]
                                     : f.items,
                               })
@@ -484,10 +529,10 @@ export function PresentationForm({
                     />
                   </label>
 
-                  {f.kind !== "words" && (
+                  {hasOptions(f.kind) && (
                     <ListEditor
-                      label={LIST_COPY[f.kind].label}
-                      noun={LIST_COPY[f.kind].noun}
+                      label={LIST_COPY[f.kind as OptionKind].label}
+                      noun={LIST_COPY[f.kind as OptionKind].noun}
                       items={f.items}
                       onChange={(items) => update(f.key, { items })}
                       max={MAX_TOPICS_PER_FOCUS}
@@ -495,6 +540,72 @@ export function PresentationForm({
                       placeholders={EXAMPLES[f.kind].list}
                       answers={counts}
                     />
+                  )}
+
+                  {f.kind === "multi" && (
+                    <label className="mt-3 block text-sm font-semibold">
+                      Each person can pick
+                      <select
+                        value={f.maxPicks ?? ""}
+                        onChange={(e) =>
+                          update(f.key, {
+                            maxPicks: e.target.value
+                              ? Number(e.target.value)
+                              : null,
+                          })
+                        }
+                        className={`${field} text-base`}
+                      >
+                        <option value="">As many as they like</option>
+                        {Array.from(
+                          { length: MAX_TOPICS_PER_FOCUS - 1 },
+                          (_, n) => n + 1,
+                        ).map((n) => (
+                          <option key={n} value={n}>
+                            Up to {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+
+                  {f.kind === "number" && (
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <label className="block text-sm font-semibold">
+                        Lowest answer
+                        <input
+                          inputMode="decimal"
+                          value={f.min}
+                          onChange={(e) =>
+                            update(f.key, { min: e.target.value })
+                          }
+                          className={`${field} text-base`}
+                        />
+                      </label>
+                      <label className="block text-sm font-semibold">
+                        Highest answer
+                        <input
+                          inputMode="decimal"
+                          value={f.max}
+                          onChange={(e) =>
+                            update(f.key, { max: e.target.value })
+                          }
+                          className={`${field} text-base`}
+                        />
+                      </label>
+                      <label className="col-span-2 block text-sm font-semibold sm:col-span-1">
+                        Unit <span className="font-normal text-ink-soft">(optional)</span>
+                        <input
+                          value={f.unit}
+                          maxLength={20}
+                          onChange={(e) =>
+                            update(f.key, { unit: e.target.value })
+                          }
+                          placeholder="e.g. %, users, km"
+                          className={`${field} text-base`}
+                        />
+                      </label>
+                    </div>
                   )}
 
                   <div className="mt-3">

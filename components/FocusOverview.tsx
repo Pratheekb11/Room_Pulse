@@ -1,31 +1,67 @@
 import { scaleColor, topicColor, topicInk } from "@/lib/colors";
 import { summarizeFocus, type FocusGroup } from "@/lib/focus";
 import { avg, cellKey, fmt1, sumAggs, type Agg } from "@/lib/stats";
-import { pollTally, wordWeights } from "@/lib/answers";
-import type { NamedItem, PollCount, WordCount } from "@/lib/types";
+import { formatNumber, numberStats, pollTally, rankTally, wordWeights } from "@/lib/answers";
+import { kindLabel } from "@/lib/kinds";
+import type { NamedItem, ResultsPayload } from "@/lib/types";
 
 interface Props {
   groups: FocusGroup[];
   criteria: NamedItem[];
   cells: Map<string, Agg>;
   scaleMax: number;
-  polls: PollCount[];
-  words: WordCount[];
+  results: ResultsPayload;
   onOpen: (index: number) => void;
 }
 
-const KIND_LABEL = { rating: "Rating", poll: "Poll", words: "Word cloud" } as const;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Bars for the top 3 of a list (poll, pick several, ranking). */
+function TopBars({ rows }: { rows: { id: string; name: string; index: number; pct: number; label: string }[] }) {
+  return (
+    <ol className="mt-4 flex flex-col gap-2">
+      {rows.slice(0, 3).map((r) => (
+        <li key={r.id} className="flex items-center gap-2">
+          <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.name}>
+            {r.name}
+          </span>
+          <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#efeee8]">
+            <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${r.pct}%`, backgroundColor: topicColor(r.index) }} />
+          </span>
+          <span className="font-display w-[4ch] text-right font-semibold tabular-nums">{r.label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 /** One card per question; click to see its details. */
-export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words, onOpen }: Props) {
+export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOpen }: Props) {
+  const { polls, words } = results;
   const cols = groups.length <= 2 ? groups.length : groups.length <= 4 ? 2 : groups.length <= 6 ? 3 : 4;
   return (
-    <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+    // One card per row on phones, at most 2 on tablets, the full count on wide screens.
+    <div
+      className="grid grid-cols-1 gap-[clamp(0.75rem,1.4vw,1.5rem)] sm:[grid-template-columns:var(--cols-sm)] lg:[grid-template-columns:var(--cols)]"
+      style={{
+        ["--cols-sm" as string]: `repeat(${Math.min(cols, 2)}, minmax(0, 1fr))`,
+        ["--cols" as string]: `repeat(${cols}, minmax(0, 1fr))`,
+      }}
+    >
       {groups.map((g, i) => {
         if (g.kind !== "rating") {
-          const tally = g.kind === "poll" ? pollTally(g.topics.map((t) => t.item), polls, g.focus.id) : null;
+          const options = g.topics.map((t) => t.item);
+          const people = results.respondents.find((x) => x.focusId === g.focus.id)?.n ?? 0;
+          const tally = g.kind === "poll" || g.kind === "multi" ? pollTally(options, polls, g.focus.id, g.kind === "multi" ? people : undefined) : null;
+          const ranked = g.kind === "rank" ? rankTally(options, results.ranks, g.focus.id) : null;
+          const stats = g.kind === "number" ? numberStats(results.numbers, g.focus.id, g.min ?? 0, g.max ?? 100) : null;
+          const texts = g.kind === "text" ? results.texts.filter((t) => t.focusId === g.focus.id) : [];
           const cloud = g.kind === "words" ? wordWeights(words, g.focus.id) : [];
-          const count = tally ? tally.total : cloud.reduce((s, w) => s + w.n, 0);
+          const count =
+            g.kind === "poll" && tally ? plural(tally.total, "vote", "votes")
+            : g.kind === "words" ? plural(cloud.reduce((s, w) => s + w.n, 0), "answer", "answers")
+            : g.kind === "text" ? plural(texts.length, "answer", "answers")
+            : plural(people, "person", "people");
           return (
             <button
               key={g.focus.id}
@@ -33,22 +69,29 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
               onClick={() => onOpen(i)}
               className="slab group flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
             >
-              <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">{KIND_LABEL[g.kind]}</p>
+              <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">{kindLabel(g.kind)}</p>
               <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
-              {tally && (
-                <ol className="mt-4 flex flex-col gap-2">
-                  {[...tally.rows].sort((a, b) => b.n - a.n).slice(0, 3).map((r) => (
-                    <li key={r.id} className="flex items-center gap-2">
-                      <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.name}>
-                        {r.name}
-                      </span>
-                      <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#efeee8]">
-                        <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${r.pct}%`, backgroundColor: topicColor(r.index) }} />
-                      </span>
-                      <span className="font-display w-[4ch] text-right font-semibold tabular-nums">{r.pct}%</span>
+              {tally && <TopBars rows={[...tally.rows].sort((a, b) => b.n - a.n).map((r) => ({ ...r, label: `${r.pct}%` }))} />}
+              {ranked && (
+                <TopBars
+                  rows={ranked.rows.map((r, pos) => ({ ...r, pct: r.average === null ? 0 : r.score * 100, label: r.average === null ? "–" : `#${pos + 1}` }))}
+                />
+              )}
+              {stats && (
+                <p className="mt-4 flex items-baseline gap-2">
+                  <span className="font-display text-[clamp(2rem,3.2vw,3.6rem)] leading-none font-semibold tabular-nums">{formatNumber(stats.mean)}</span>
+                  <span className="font-semibold text-ink-soft">{stats.mean === null ? "no answers yet" : `average${g.unit ? ` ${g.unit}` : ""}`}</span>
+                </p>
+              )}
+              {g.kind === "text" && (
+                <ul className="mt-4 flex flex-col gap-1.5">
+                  {texts.slice(0, 3).map((t) => (
+                    <li key={`${t.at}:${t.text}`} className="truncate rounded-lg bg-canvas px-2.5 py-1.5 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={t.text}>
+                      {t.text}
                     </li>
                   ))}
-                </ol>
+                  {texts.length === 0 && <li className="text-ink-soft">No answers yet</li>}
+                </ul>
               )}
               {g.kind === "words" && (
                 <ul className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -61,9 +104,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, polls, words,
                 </ul>
               )}
               <span className="mt-auto flex items-center justify-between pt-4 text-[clamp(0.8rem,0.95vw,1.05rem)] font-bold">
-                <span className="text-ink-soft">
-                  {count} {g.kind === "poll" ? (count === 1 ? "vote" : "votes") : count === 1 ? "answer" : "answers"}
-                </span>
+                <span className="text-ink-soft">{count}</span>
                 <span className="rounded-full bg-ink px-3 py-1 text-white group-hover:bg-primary">See results</span>
               </span>
             </button>

@@ -32,7 +32,7 @@ export function PollCard({ question, options, color, value, status, disabled, on
   return (
     <section className="slab overflow-hidden rounded-xl bg-white" aria-labelledby="poll-q">
       <header className="px-5 py-4" style={{ backgroundColor: color, color: readableOn(color) }}>
-        <p className="text-sm font-semibold opacity-80">Poll: pick one</p>
+        <p className="text-sm font-semibold opacity-80">Pick one</p>
         <h2 id="poll-q" className="font-display text-2xl font-semibold leading-tight break-words">
           {question}
         </h2>

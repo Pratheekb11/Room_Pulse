@@ -94,7 +94,7 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
           const dupe = dupes.has(i);
           const saved = row.id ? (answers?.[row.id] ?? 0) : 0;
           return (
-            <li key={row.id ?? `new-${i}`} className="animate-fade group flex flex-wrap items-center gap-x-1 sm:flex-nowrap">
+            <li key={row.id ?? `new-${i}`} className="animate-fade group flex flex-wrap items-center gap-x-1">
               <label htmlFor={`${id}-${i}`} className="w-full text-xs font-medium text-ink-soft sm:w-[5.75rem] sm:shrink-0 sm:text-sm">
                 {Noun} {i + 1}
               </label>
