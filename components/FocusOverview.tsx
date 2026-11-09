@@ -159,20 +159,19 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
             className="slab group flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
             aria-label={`Open ${g.focus.name}: overall ${fmt1(s.average)}`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">
-                  Score items: {g.topics.length} {g.topics.length === 1 ? "item" : "items"}
-                </p>
-                <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
-              </div>
+            {/* type and score on one row, the title under them at the card's full width */}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">
+                Score items: {g.topics.length} {g.topics.length === 1 ? "item" : "items"}
+              </p>
               <span
-                className="font-display flex aspect-square w-[clamp(3.6rem,5vw,5.4rem)] shrink-0 items-center justify-center rounded-full border border-line-strong text-[clamp(1.3rem,2vw,2.3rem)] font-semibold"
+                className="font-display flex aspect-square w-[clamp(2.8rem,3.8vw,4.2rem)] shrink-0 items-center justify-center rounded-full border border-line-strong text-[clamp(1.05rem,1.6vw,1.8rem)] font-semibold"
                 style={badge ? { backgroundColor: badge.bg, color: badge.fg } : undefined}
               >
                 {fmt1(s.average)}
               </span>
             </div>
+            <h2 className="font-display mt-1 text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
 
             <ol className="mt-4 flex flex-col gap-2">
               {ranked.map((r) => (

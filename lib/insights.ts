@@ -44,30 +44,47 @@ export function takeaways(topics: TopicStat[], criteria: string[], scaleMax: num
   if (!second) return [`${first.name} scores ${f1(first.overall)} out of ${scaleMax}.`];
 
   const out: string[] = [];
-  const margin = first.overall - second.overall;
-  out.push(
-    margin < 0.2
-      ? `${first.name} and ${second.name} are nearly tied at the top (${f1(first.overall)} and ${f1(second.overall)}).`
-      : `${first.name} leads with ${f1(first.overall)} out of ${scaleMax}, ${f1(margin)} ahead of ${second.name}.`,
-  );
+  // Compare what people see (one decimal), so "4.0 and 4.0" is never called anything but a tie.
+  const same = (a: number, b: number) => f1(a) === f1(b);
+  const top = rated.filter((t) => same(t.overall, first.overall));
+  if (top.length > 1) out.push(`${list(top.map((t) => t.name))} are tied at the top (${f1(first.overall)}).`);
+  else {
+    const margin = first.overall - second.overall;
+    out.push(
+      margin < 0.2
+        ? `${first.name} and ${second.name} are nearly tied at the top (${f1(first.overall)} and ${f1(second.overall)}).`
+        : `${first.name} leads with ${f1(first.overall)} out of ${scaleMax}, ${f1(margin)} ahead of ${second.name}.`,
+    );
+  }
 
   const split = rated.filter((t) => t.agreement === "People disagree").map((t) => t.name);
   if (split.length) out.push(`People disagree about ${list(split)}. Talk these through before deciding.`);
 
+  /** The lowest of some scores, or null when it isn't lower than the rest. */
+  const lowest = <T extends { v: number }>(xs: T[]): T | null => {
+    const sorted = [...xs].sort((a, b) => a.v - b.v);
+    return sorted.length > 1 && !same(sorted[0].v, sorted[sorted.length - 1].v) ? sorted[0] : null;
+  };
+
   const last = rated[rated.length - 1];
-  const weakest = last.perCriterion
-    .map((v, i) => ({ v, name: criteria[i] }))
-    .filter((x): x is { v: number; name: string } => x.v !== null)
-    .sort((a, b) => a.v - b.v)[0];
-  if (weakest && criteria.length > 1) out.push(`${last.name} ranks last at ${f1(last.overall)}, weakest on ${weakest.name} (${f1(weakest.v)}).`);
-  else out.push(`${last.name} ranks last at ${f1(last.overall)}.`);
+  const bottom = rated.filter((t) => same(t.overall, last.overall));
+  if (!same(last.overall, first.overall) && bottom.length > 1) {
+    // in the order the items were given (sorting by score keeps it for ties)
+    out.push(`${list(bottom.map((t) => t.name))} rank last at ${f1(last.overall)}.`);
+  } else if (!same(last.overall, first.overall)) {
+    const weakest = lowest(
+      last.perCriterion.map((v, i) => ({ v, name: criteria[i] })).filter((x): x is { v: number; name: string } => x.v !== null),
+    );
+    if (weakest && criteria.length > 1) out.push(`${last.name} ranks last at ${f1(last.overall)}, weakest on ${weakest.name} (${f1(weakest.v)}).`);
+    else out.push(`${last.name} ranks last at ${f1(last.overall)}.`);
+  }
 
   if (criteria.length > 1) {
     const means = criteria.map((name, i) => {
       const vals = rated.map((t) => t.perCriterion[i]).filter((v): v is number => v !== null);
       return { name, v: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
     });
-    const low = means.filter((m): m is { name: string; v: number } => m.v !== null).sort((a, b) => a.v - b.v)[0];
+    const low = lowest(means.filter((m): m is { name: string; v: number } => m.v !== null));
     if (low) out.push(`${low.name} gets the lowest scores overall (${f1(low.v)} on average).`);
   }
   return out;

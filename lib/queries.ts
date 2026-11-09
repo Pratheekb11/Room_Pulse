@@ -217,7 +217,9 @@ export async function getResults(
                where x.rk <= 200), '[]'::json) as texts,
       coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'n', x.n))
                 from (select focus_id, count(distinct voter_id)::int as n
-                        from (select focus_id, voter_id from choice_answers where session_id = s.id
+                        from (select t.focus_id, v.voter_id from votes v join topics t on t.id = v.topic_id
+                               where v.session_id = s.id and t.focus_id is not null
+                              union all select focus_id, voter_id from choice_answers where session_id = s.id
                               union all select focus_id, voter_id from text_answers where session_id = s.id
                               union all select focus_id, voter_id from rank_answers where session_id = s.id
                               union all select focus_id, voter_id from number_answers where session_id = s.id
@@ -465,6 +467,8 @@ export async function deleteSession(code: string): Promise<void> {
 export interface SummaryRow {
   focus: string;
   topic: string;
+  /** The item's optional description. */
+  description: string | null;
   criterion: string;
   n: number;
   sum: number;
@@ -474,7 +478,7 @@ export interface SummaryRow {
 /** Every topic × criterion (including ones with no votes), in display order. */
 export async function getSummaryRows(code: string): Promise<SummaryRow[]> {
   const rows = (await sql`
-    select coalesce(f.name, '') as focus, t.name as topic, c.name as criterion, t.position as topic_position,
+    select coalesce(f.name, '') as focus, t.name as topic, t.description, c.name as criterion, t.position as topic_position,
            coalesce(r.vote_count, 0) as n, coalesce(r.score_sum, 0) as sum
     from live_sessions s
     join topics t   on t.session_id = s.id
@@ -485,10 +489,11 @@ export async function getSummaryRows(code: string): Promise<SummaryRow[]> {
     where s.code = ${code}
       and coalesce(f.kind, 'rating') = 'rating'
     order by t.position, c.position
-  `) as { focus: string; topic: string; criterion: string; topic_position: number; n: number; sum: number }[];
+  `) as { focus: string; topic: string; description: string | null; criterion: string; topic_position: number; n: number; sum: number }[];
   return rows.map((r) => ({
     focus: r.focus,
     topic: r.topic,
+    description: r.description ?? null,
     criterion: r.criterion,
     n: r.n,
     sum: r.sum,

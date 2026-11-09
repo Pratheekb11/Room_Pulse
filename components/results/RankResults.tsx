@@ -2,6 +2,9 @@ import { readableOn, topicColor } from "@/lib/colors";
 import { fmt1 } from "@/lib/stats";
 import type { RankTally } from "@/lib/answers";
 
+/** Dark ink for numbers on the places grid's light tints (the same in every design). */
+const INK = "#26251e";
+
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
 
 /** Options from most to least preferred, with their average place. */
@@ -70,7 +73,11 @@ export function RankPlaces({ tally }: { tally: RankTally }) {
                   <td
                     key={p}
                     className="font-display h-[clamp(2.4rem,5vh,3.6rem)] min-w-[2.8rem] rounded-lg border border-line text-center font-semibold tabular-nums transition-colors duration-500"
-                    style={{ backgroundColor: n ? `color-mix(in srgb, ${topicColor(r.index)} ${Math.round(25 + a * 75)}%, white)` : "white" }}
+                    style={{
+                      // light tint in every design, so the number is always dark ink
+                      backgroundColor: n ? `color-mix(in srgb, ${topicColor(r.index)} ${Math.round(25 + a * 75)}%, #ffffff)` : "var(--color-white, #ffffff)",
+                      color: n ? INK : undefined,
+                    }}
                     aria-label={`${r.name}: ${n} ${n === 1 ? "person" : "people"} put it ${ordinal(p + 1)}`}
                   >
                     {n || ""}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { visibleTexts } from "@/lib/answers";
-import { topicColor } from "@/lib/colors";
+import { onSurface, topicColor } from "@/lib/colors";
 import type { TextAnswer } from "@/lib/types";
 
 const EMPTY = <p className="py-16 text-center text-[clamp(1.2rem,1.8vw,2rem)] font-semibold text-ink-soft">Answers will appear here.</p>;
@@ -97,7 +97,7 @@ export function TextWall({ answers, onHide }: { answers: TextAnswer[]; onHide?: 
         <li
           key={a.id}
           className="animate-pop mb-[clamp(0.6rem,1vw,1.2rem)] break-inside-avoid rounded-xl border border-line-strong p-[clamp(0.8rem,1.2vw,1.4rem)] text-[clamp(1.05rem,1.45vw,1.7rem)] leading-snug font-semibold break-words"
-          style={{ backgroundColor: `color-mix(in srgb, ${topicColor(i)} 30%, white)` }}
+          style={{ backgroundColor: onSurface(topicColor(i), 30) }}
         >
           {a.text}
           {onHide && (

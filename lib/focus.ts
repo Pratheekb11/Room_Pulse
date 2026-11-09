@@ -63,6 +63,19 @@ export function groupByFocus(
   return [...groups.values(), loose].filter((g) => g.topics.length > 0 || !hasOptions(g.kind));
 }
 
+/**
+ * The questions a results screen shows. Voters' phones (audience) never see quizzes:
+ * the whole question goes, its answers too (grouping first keeps them out of a stray "Topics" group).
+ */
+export function resultGroups(
+  focusTopics: (NamedItem & Partial<Omit<FocusItem, "id" | "name">>)[],
+  topics: TopicItem[],
+  audience: boolean,
+): FocusGroup[] {
+  const groups = groupByFocus(focusTopics, topics);
+  return audience ? groups.filter((g) => g.kind !== "quiz") : groups;
+}
+
 export interface FocusSummary {
   n: number;
   sum: number;

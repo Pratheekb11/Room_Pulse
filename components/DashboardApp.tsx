@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useClientValue } from "./useClientValue";
-import { avg, cellKey, indexCells, sumAggs, topicHistograms } from "@/lib/stats";
+import { indexCells, topicHistograms } from "@/lib/stats";
+import { defaultSort, isItemSort, ITEM_SORTS, rateItems, sortItems, type ItemSort } from "@/lib/rank-items";
 import { voterUrl } from "@/lib/site";
 import { readDashboardKey } from "@/lib/dashboard-key";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
 import { Breakdown } from "./Breakdown";
 import { ExecSummary } from "./ExecSummary";
 import { FocusOverview } from "./FocusOverview";
+import { ResultsHeatmap } from "./ResultsHeatmap";
+import { heatRows } from "@/lib/heat";
 import { TopicDistribution } from "./TopicDistribution";
-import { groupByFocus } from "@/lib/focus";
+import { resultGroups } from "@/lib/focus";
 import { numberStats, pollTally, rankTally, wordWeights } from "@/lib/answers";
 import { RankList, RankPlaces } from "./results/RankResults";
 import { NumberHistogram, NumberSummary } from "./results/NumberResults";
@@ -33,7 +36,6 @@ import { useSession } from "./useSession";
 import { useDocumentTheme } from "./useDocumentTheme";
 
 type View = "heatmap" | "ranking" | "breakdown" | "summary";
-type Sort = "order" | "overall";
 
 const VIEWS: { id: View; label: string; key: string }[] = [
   { id: "heatmap", label: "Colour grid", key: "1" },
@@ -112,7 +114,7 @@ function Stage({
   // Fill in fields an older server version may not send.
   const r: ResultsPayload = { ...EMPTY, isOpen: session.isOpen, ...(results ?? {}) };
   const groups = useMemo(
-    () => groupByFocus((info.focusTopics ?? []).filter((f) => !audience || f.kind !== "quiz"), topics),
+    () => resultGroups(info.focusTopics ?? [], topics, audience),
     [info.focusTopics, topics, audience],
   );
   const single = groups.length <= 1;
@@ -126,9 +128,13 @@ function Stage({
     const f = Number(new URLSearchParams(window.location.search).get("focus"));
     return single ? 0 : Number.isInteger(f) && f >= 1 && f <= groups.length ? f - 1 : null;
   });
-  // Index (within the open focus topic) of the topic shown full screen, or null.
-  const [detail, setDetail] = useState<number | null>(null);
-  const [sort, setSort] = useState<Sort>("order");
+  // Id of the item shown full screen, or null. An id, so live re-sorting never swaps it.
+  const [detail, setDetail] = useState<string | null>(null);
+  // Score items: the order picked in "Sort" (null = the view's own default), kept in the URL.
+  const [pickedSort, setPickedSort] = useState<ItemSort | null>(() => {
+    const v = new URLSearchParams(window.location.search).get("sort");
+    return isItemSort(v) ? v : null;
+  });
   const [showQr, setShowQr] = useState(() => !audience && window.matchMedia("(min-width: 1024px)").matches);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const joinUrl = useClientValue(() => voterUrl(code));
@@ -140,10 +146,16 @@ function Stage({
   const cells = useMemo(() => indexCells(r.cells), [r.cells]);
   const histograms = useMemo(() => topicHistograms(r.dist, session.scaleMax), [r.dist, session.scaleMax]);
 
+  // "All questions": cards, or every question's results as one heatmap.
+  const [overviewMode, setOverviewMode] = useState<"cards" | "heatmap">(() =>
+    !new URLSearchParams(window.location.search).get("focus") && urlView === "heatmap" ? "heatmap" : "cards",
+  );
   const group = focusIndex === null ? null : (groups[focusIndex] ?? null);
   const view = group
     ? (viewByFocus[group.focus.id] ?? (urlView && isChartFor(group.kind, urlView) ? urlView : group.chart))
-    : "";
+    : overviewMode === "heatmap"
+      ? "heatmap"
+      : "";
   // Keep the place in the URL so a refresh comes back to the same focus topic and chart.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -151,10 +163,12 @@ function Stage({
     else params.set("focus", String(focusIndex + 1));
     if (view) params.set("view", view);
     else params.delete("view");
+    if (pickedSort) params.set("sort", pickedSort);
+    else params.delete("sort");
     const qs = params.toString();
     // keep the #k=… part: it's what lets this screen read the results
     window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
-  }, [focusIndex, view, single]);
+  }, [focusIndex, view, single, pickedSort]);
 
   const groupId = group?.focus.id;
   const groupKind = group?.kind;
@@ -166,21 +180,25 @@ function Stage({
   );
   const focusTopics = useMemo(() => group?.topics ?? [], [group]);
 
-  const overall: BarDatum[] = useMemo(
-    () =>
-      focusTopics.map(({ item: t, index }) => {
-        const agg = sumAggs(criteria.map((c) => cells.get(cellKey(t.id, c.id))));
-        return { id: t.id, name: t.name, value: avg(agg), n: agg.n, index };
-      }),
-    [focusTopics, criteria, cells],
+  const rated = useMemo(
+    () => rateItems(focusTopics, criteria, cells, histograms, session.scaleMax),
+    [focusTopics, criteria, cells, histograms, session.scaleMax],
   );
-
-  const byOverall = useMemo(
-    () => [...overall].sort((a, b) => (b.value ?? -1) - (a.value ?? -1) || a.index - b.index),
-    [overall],
-  );
-  const sortedBars = sort === "overall" ? byOverall : overall;
-  const sortedTopics = sortedBars.map((d) => topics[d.index]);
+  const sort = pickedSort ?? defaultSort(view);
+  const sortedRows = useMemo(() => sortItems(rated, sort), [rated, sort]);
+  const sortedBars: BarDatum[] = sortedRows.map((r) => ({
+    id: r.item.id,
+    name: r.item.name,
+    description: r.item.description,
+    value: r.value,
+    n: r.n,
+    index: r.index,
+    rank: r.rank,
+  }));
+  const sortedTopics = sortedRows.map((r) => r.item);
+  // Score spread opens an item by its place in this list.
+  const sortedFocusTopics = sortedRows.map((r) => ({ item: r.item, index: r.index }));
+  const detailIndex = detail === null ? -1 : sortedFocusTopics.findIndex((t) => t.item.id === detail);
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -215,6 +233,8 @@ function Stage({
   }, [single, groups.length, setView, groupKind, audience]);
 
   const voters = r.voterCount;
+  /** People who answered one question. */
+  const peopleIn = (focusId: string) => r.respondents.find((x) => x.focusId === focusId)?.n ?? 0;
 
   return (
     <div className="flex min-h-dvh flex-col gap-[clamp(0.75rem,1.6vh,1.5rem)] px-[clamp(1rem,2.2vw,2.75rem)] py-[clamp(0.75rem,2vh,1.75rem)]">
@@ -230,8 +250,29 @@ function Stage({
         }
         controls={
           <>
+            {!group && groups.length > 1 && (
+              <div role="tablist" aria-label="Show all questions as" className="flex rounded-full border border-line-strong bg-white p-0.5">
+                {(
+                  [
+                    ["cards", "Cards"],
+                    ["heatmap", "Heatmap"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    role="tab"
+                    type="button"
+                    aria-selected={overviewMode === id}
+                    onClick={() => setOverviewMode(id)}
+                    className={`shrink-0 rounded-full px-3 py-1 whitespace-nowrap ${overviewMode === id ? "bg-ink text-white" : "hover:bg-canvas"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             {group && CHARTS[group.kind].length > 1 && (
-              <div role="tablist" aria-label="Chart" className="flex max-w-full overflow-x-auto rounded-full border border-line-strong bg-white p-0.5">
+              <div role="tablist" aria-label="Chart" className="flex max-w-full flex-wrap gap-0.5 rounded-[1.1rem] border border-line-strong bg-white p-0.5">
                 {CHARTS[group.kind].map((c, i) => (
                   <button
                     key={c.id}
@@ -247,16 +288,19 @@ function Stage({
                 ))}
               </div>
             )}
-            {group?.kind === "rating" && view === "heatmap" && (
+            {group?.kind === "rating" && group.topics.length > 1 && (
               <label className="flex items-center gap-1.5 rounded-full border border-line-strong bg-white py-0.5 pl-3 pr-1">
                 Sort
                 <select
                   value={sort}
-                  onChange={(e) => setSort(e.target.value as Sort)}
+                  onChange={(e) => setPickedSort(e.target.value as ItemSort)}
                   className="rounded-full bg-transparent px-1 py-0.5 font-semibold"
                 >
-                  <option value="order">Your order</option>
-                  <option value="overall">Highest score first</option>
+                  {ITEM_SORTS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             )}
@@ -297,6 +341,11 @@ function Stage({
           <QuestionDescription text={group?.focus.description} />
           {groups.length === 0 ? (
             <p className="text-xl text-ink-soft">This presentation has no questions yet. Use “Edit questions” to add some.</p>
+          ) : !group && overviewMode === "heatmap" ? (
+            (() => {
+              const heat = heatRows(groups, criteria, cells, r, session.scaleMax);
+              return <ResultsHeatmap rows={heat.rows} skipped={heat.skipped} scaleMax={session.scaleMax} onOpen={setFocusIndex} />;
+            })()
           ) : !group ? (
             <FocusOverview
               groups={groups}
@@ -432,30 +481,30 @@ function Stage({
           ) : view === "ranking" ? (
             <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
               <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.4rem,2.2vw,2.5rem)] font-semibold">
-                Top rated in {group.focus.name}
+                {sort === "bottom" ? "Bottom rated in" : sort === "top" ? "Top rated in" : "Ranking for"} {group.focus.name}
               </h2>
-              <OverallBars data={byOverall} scaleMax={session.scaleMax} size="large" ranked />
+              <OverallBars data={sortedBars} scaleMax={session.scaleMax} size="large" ranked />
             </section>
           ) : view === "breakdown" ? (
             <div className="flex flex-col gap-3">
               <Breakdown
-                topics={focusTopics}
+                topics={sortedFocusTopics}
                 criteria={criteria}
                 cells={cells}
                 histograms={histograms}
                 scaleMax={session.scaleMax}
-                onOpen={setDetail}
+                onOpen={(i) => setDetail(sortedFocusTopics[i]?.item.id ?? null)}
               />
               <ScoreLegend scaleMax={session.scaleMax} lowLabel={session.lowLabel} highLabel={session.highLabel} />
             </div>
           ) : (
             <ExecSummary
-              topics={focusTopics}
+              rows={rated}
+              sort={sort}
               criteria={criteria}
               cells={cells}
-              histograms={histograms}
               scaleMax={session.scaleMax}
-              voterCount={voters}
+              voterCount={peopleIn(group.focus.id)}
             />
           )}
           </div>
@@ -473,17 +522,17 @@ function Stage({
         )}
       </div>
 
-      {group?.kind === "rating" && detail !== null && focusTopics[detail] && (
+      {group?.kind === "rating" && detailIndex !== -1 && (
         <TopicDistribution
-          topics={focusTopics}
-          current={detail}
+          topics={sortedFocusTopics}
+          current={detailIndex}
           criteria={criteria}
           cells={cells}
           dist={r.dist}
           scaleMax={session.scaleMax}
           lowLabel={session.lowLabel}
           highLabel={session.highLabel}
-          onMove={setDetail}
+          onMove={(i) => setDetail(sortedFocusTopics[i]?.item.id ?? null)}
           onClose={() => setDetail(null)}
         />
       )}

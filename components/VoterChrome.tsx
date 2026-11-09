@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Logo } from "./Logo";
+import { ListSheet, SheetButton } from "./ListSheet";
 import { Doodle } from "./Doodle";
 import { charactersFor } from "@/lib/decor";
 import { showStepDots } from "@/lib/progress";
@@ -59,7 +61,39 @@ export interface QuestionChip {
   progress?: string;
 }
 
-/** Sticky bar: answers done, and a chip per question to jump to it. */
+/** One button saying which question this is; it opens the list of all of them (up and down, never sideways). */
+function ChipPicker({ chips, onChip }: { chips: QuestionChip[]; onChip: (index: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const at = Math.max(0, chips.findIndex((c) => c.active));
+  return (
+    <>
+      <SheetButton className="mt-2.5 py-1.5" kicker={`Question ${at + 1} of ${chips.length}:`} label={chips[at]?.label ?? ""} onClick={() => setOpen(true)} />
+      {open && <ChipList chips={chips} onChip={onChip} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/** Every question, what's done ticked, the one on screen marked. */
+export function ChipList({ chips, onChip, onClose }: { chips: QuestionChip[]; onChip: (index: number) => void; onClose: () => void }) {
+  return (
+    <ListSheet
+      title="Questions"
+      currentAttr="step"
+      rows={chips.map((c, i) => ({
+        key: c.key,
+        label: c.label,
+        mark: c.finished ? "✓" : String(i + 1),
+        note: !c.finished ? c.progress : undefined,
+        current: c.active,
+        done: c.finished,
+      }))}
+      onPick={onChip}
+      onClose={onClose}
+    />
+  );
+}
+
+/** Sticky bar: answers done, and a button to jump to any question. */
 export function VoterProgress({ done, total, chips, onChip }: { done: number; total: number; chips: QuestionChip[]; onChip: (index: number) => void }) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   return (
@@ -83,25 +117,7 @@ export function VoterProgress({ done, total, chips, onChip }: { done: number; to
             {done} / {total} done
           </span>
         </div>
-        {chips.length > 1 && (
-          <nav aria-label="Questions" className="-mx-1 mt-2.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
-            {chips.map((c, i) => (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => onChip(i)}
-                aria-current={c.active ? "step" : undefined}
-                className={`shrink-0 rounded-full border border-line-strong px-3 py-1 text-xs font-bold whitespace-nowrap ${
-                  c.active ? "bg-ink text-white" : c.finished ? "bg-mint" : "bg-white"
-                }`}
-              >
-                {c.finished ? "✓ " : ""}
-                {c.label}
-                {!c.finished && c.progress && <span className="opacity-70"> {c.progress}</span>}
-              </button>
-            ))}
-          </nav>
-        )}
+        {chips.length > 1 && <ChipPicker chips={chips} onChip={onChip} />}
       </div>
     </div>
   );

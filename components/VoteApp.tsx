@@ -474,7 +474,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     );
 
   return (
-    <div className="min-h-dvh pb-16">
+    <div className="min-h-dvh overflow-x-clip pb-16">
       {(celebrate || levelUp) && <Confetti />}
       {levelUp && (
         <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">

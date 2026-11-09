@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
 import { topicColor } from "@/lib/colors";
 import { THEMES, getTheme, themeStyle, type ThemeId } from "@/lib/themes";
 
@@ -41,23 +39,12 @@ export function ThemePicker({
   compact?: boolean;
 }) {
   const rec = getTheme(recommended.id);
-  const row = useRef<HTMLDivElement>(null);
-  // In the scrolling row, keep the picked design in view (it may be far along on a phone).
-  useEffect(() => {
-    if (!compact || !row.current) return;
-    const el = row.current.querySelector<HTMLElement>('[aria-checked="true"]');
-    if (!el) return;
-    const r = row.current;
-    const left = el.offsetLeft - r.offsetLeft;
-    if (left < r.scrollLeft || left + el.offsetWidth > r.scrollLeft + r.clientWidth) r.scrollTo({ left: left - 8, behavior: "instant" as ScrollBehavior });
-  }, [compact, value]);
   return (
     <div>
       <div
-        ref={row}
         role="radiogroup"
         aria-label="Slide design"
-        className={compact ? "-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" : "grid grid-cols-3 gap-1.5 sm:grid-cols-5 sm:gap-2"}
+        className={compact ? "grid grid-cols-3 gap-1.5 sm:grid-cols-6" : "grid grid-cols-3 gap-1.5 sm:grid-cols-5 sm:gap-2"}
       >
         {THEMES.map((t) => {
           const on = t.id === value;
@@ -69,7 +56,7 @@ export function ThemePicker({
               aria-checked={on}
               onClick={() => onChange(t.id)}
               title={t.blurb}
-              className={`flex flex-col gap-1.5 rounded-lg border bg-white p-1.5 text-left ${compact ? "w-32 shrink-0" : ""} ${
+              className={`flex flex-col gap-1.5 rounded-lg border bg-white p-1.5 text-left ${
                 on ? "border-ink ring-2 ring-ink" : "border-line-strong hover:border-ink"
               }`}
             >

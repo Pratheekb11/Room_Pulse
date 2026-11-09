@@ -4,10 +4,13 @@ import { CountUp } from "./CountUp";
 export interface BarDatum {
   id: string;
   name: string;
+  description?: string | null;
   value: number | null;
   n: number;
   /** Original topic index, for its identity colour. */
   index: number;
+  /** Rank by average (1 = best); with `ranked`, shown instead of the list position. */
+  rank?: number | null;
 }
 
 interface Props {
@@ -31,9 +34,13 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
               gridTemplateRows: `repeat(${Math.ceil(data.length / 2)}, auto)`,
               gridAutoFlow: "column",
             }
-          : undefined
+          : large
+            ? undefined
+            : // One column that never grows past the card, whatever the text inside.
+              { gridTemplateColumns: "minmax(0, 1fr)" }
       } aria-label="Average score per item">
-      {data.map((d, rank) => {
+      {data.map((d, pos) => {
+        const rank = d.rank === undefined ? (d.value === null ? null : pos + 1) : d.rank;
         const pct = d.value === null ? 0 : (d.value / scaleMax) * 100;
         const color = topicColor(d.index);
         return (
@@ -41,20 +48,28 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
             {ranked && (
               <span
                 className={`font-display flex shrink-0 items-center justify-center rounded-full border border-line-strong font-semibold ${
-                  rank === 0 && d.value !== null ? "bg-sun" : "bg-white"
+                  rank === 1 ? "bg-sun" : "bg-white"
                 } ${large ? "h-[clamp(2.4rem,4.6vh,3.6rem)] w-[clamp(2.4rem,4.6vh,3.6rem)] text-[clamp(1.1rem,1.6vw,1.8rem)]" : "h-8 w-8 text-base"}`}
-                aria-label={`Rank ${rank + 1}`}
+                aria-label={rank === null ? "Not scored yet" : `Rank ${rank}`}
               >
-                {rank + 1}
+                {rank ?? "–"}
               </span>
             )}
-            <span
-              className={`shrink-0 truncate font-bold ${
-                large ? "w-[32%] text-[clamp(1.1rem,1.6vw,2rem)]" : "w-[34%] text-[clamp(0.95rem,1.1vw,1.3rem)]"
-              }`}
-              title={d.name}
-            >
-              {d.name}
+            <span className={`flex min-w-0 shrink-0 flex-col ${large ? "w-[32%]" : "w-[34%]"}`}>
+              <span
+                className={`truncate font-bold ${large ? "text-[clamp(1.1rem,1.6vw,2rem)]" : "text-[clamp(0.95rem,1.1vw,1.3rem)]"}`}
+                title={d.name}
+              >
+                {d.name}
+              </span>
+              {d.description && (
+                <span
+                  className={`font-semibold leading-snug text-ink-soft ${large ? "line-clamp-2 text-[clamp(0.8rem,1vw,1.15rem)]" : "truncate text-[clamp(0.7rem,0.8vw,0.9rem)]"}`}
+                  title={d.description}
+                >
+                  {d.description}
+                </span>
+              )}
             </span>
             <span
               className={`relative flex-1 overflow-hidden rounded-full border border-line-strong bg-white ${

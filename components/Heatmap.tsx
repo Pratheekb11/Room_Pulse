@@ -4,7 +4,7 @@ import { CountUp } from "./CountUp";
 import type { NamedItem } from "@/lib/types";
 
 interface Props {
-  topics: NamedItem[];
+  topics: (NamedItem & { description?: string | null })[];
   criteria: NamedItem[];
   cells: Map<string, Agg>;
   scaleMax: number;
@@ -65,6 +65,11 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
                   className="pr-3 text-left text-[clamp(1rem,1.3vw,1.55rem)] font-bold leading-tight break-words"
                 >
                   {t.name}
+                  {t.description && (
+                    <span className="mt-0.5 line-clamp-3 text-[clamp(0.75rem,0.9vw,1rem)] font-semibold leading-snug text-ink-soft" title={t.description}>
+                      {t.description}
+                    </span>
+                  )}
                 </th>
                 {criteria.map((c, i) => {
                   const key = cellKey(t.id, c.id);

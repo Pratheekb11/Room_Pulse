@@ -5,6 +5,9 @@ export function escapeMd(text: string): string {
   return text.replace(/\s+/g, " ").trim().replace(/([\\`*_{}[\]<>#|~!])/g, "\\$1");
 }
 
+/** "A", "A and B", "A, B and C". */
+const andList = (names: string[]) => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+
 const num = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
 /**
@@ -19,15 +22,40 @@ export function toMarkdown(title: string, ratings: SummaryRow[], choices: Choice
     sections.get(key)!.push(line);
   };
 
-  // Ratings: one line per item, with the average per measure.
-  const items = new Map<number, { focus: string; topic: string; parts: string[]; n: number }>();
+  // Score items: best and lowest rated, then every item best first with its description.
+  const items = new Map<number, { focus: string; topic: string; description: string | null; parts: string[]; n: number; sum: number; count: number; pos: number }>();
   for (const r of ratings) {
-    const it = items.get(r.topicPosition) ?? { focus: r.focus, topic: r.topic, parts: [], n: 0 };
+    const it = items.get(r.topicPosition) ?? { focus: r.focus, topic: r.topic, description: r.description ?? null, parts: [], n: 0, sum: 0, count: 0, pos: r.topicPosition };
     it.parts.push(`${escapeMd(r.criterion)} ${r.n ? (r.sum / r.n).toFixed(1) : "–"}`);
     it.n = Math.max(it.n, r.n);
+    it.sum += r.sum;
+    it.count += r.n;
     items.set(r.topicPosition, it);
   }
-  for (const it of items.values()) add(it.focus, `- ${escapeMd(it.topic)}: ${it.parts.join(", ")} (${it.n} ${it.n === 1 ? "answer" : "answers"})`);
+  const byFocus = new Map<string, (typeof items extends Map<number, infer V> ? V : never)[]>();
+  for (const it of items.values()) byFocus.set(it.focus, [...(byFocus.get(it.focus) ?? []), it]);
+  for (const [focus, list] of byFocus) {
+    const value = (it: (typeof list)[number]) => (it.count ? it.sum / it.count : null);
+    const ranked = [...list].sort((x, y) => {
+      const a = value(x);
+      const b = value(y);
+      if (a === null || b === null) return a === b ? x.pos - y.pos : a === null ? 1 : -1;
+      return b - a || x.pos - y.pos;
+    });
+    const scored = ranked.filter((it) => value(it) !== null);
+    if (scored.length) {
+      // every item sharing the top (or bottom) score, in the presenter's order
+      const hi = value(scored[0])!;
+      const lo = value(scored[scored.length - 1])!;
+      const named = (v: number) => andList(scored.filter((it) => value(it) === v).sort((x, y) => x.pos - y.pos).map((it) => escapeMd(it.topic)));
+      add(focus, `- Best rated: ${named(hi)} (${hi.toFixed(1)})${lo < hi ? `\n- Lowest rated: ${named(lo)} (${lo.toFixed(1)})` : ""}\n`);
+    }
+    ranked.forEach((it, i) => {
+      const v = value(it);
+      const line = `${i + 1}. ${escapeMd(it.topic)}: ${v === null ? "–" : v.toFixed(1)} (${it.parts.join(", ")}), ${it.n} ${it.n === 1 ? "answer" : "answers"}`;
+      add(focus, it.description ? `${line}\n   ${escapeMd(it.description)}` : line);
+    });
+  }
 
   const pollTotals = new Map<string, number>();
   for (const c of choices) if (c.kind === "Poll choice" || c.kind === "Quiz choice" || c.kind === "Right answer") pollTotals.set(c.focus, (pollTotals.get(c.focus) ?? 0) + c.n);

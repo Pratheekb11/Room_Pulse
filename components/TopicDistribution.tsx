@@ -8,7 +8,7 @@ import type { NamedItem, ScoreBucket } from "@/lib/types";
 import { faceFor } from "./RatingRow";
 
 interface Props {
-  topics: { item: NamedItem; index: number }[];
+  topics: { item: NamedItem & { description?: string | null }; index: number }[];
   current: number;
   criteria: NamedItem[];
   cells: Map<string, Agg>;
@@ -86,6 +86,9 @@ export function TopicDistribution(p: Props) {
               How people scored
             </p>
             <h2 className="font-display text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[1] tracking-tight break-words">{item.name}</h2>
+            {item.description && (
+              <p className="mt-2 text-[clamp(1rem,1.3vw,1.5rem)] leading-snug text-ink-soft break-words">{item.description}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => onMove(Math.max(0, current - 1))} disabled={current === 0} className="key rounded-lg bg-white px-4 py-2 font-bold">

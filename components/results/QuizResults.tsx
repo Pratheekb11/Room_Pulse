@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { topicColor } from "@/lib/colors";
+import { onSurface, topicColor } from "@/lib/colors";
 import { clockOffset, quizOwnerAction, quizStartConfirmed, quizTimeLeft, type PendingStart } from "@/lib/quiz";
 import type { LeaderRow, LiveQuiz, NamedItem, QuizCount } from "@/lib/types";
 
@@ -125,7 +125,7 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
                 <span
                   aria-hidden
                   className="absolute inset-y-0 left-0 transition-[width] duration-700"
-                  style={{ width: `${pct}%`, backgroundColor: `color-mix(in srgb, ${topicColor(i)} 45%, white)` }}
+                  style={{ width: `${pct}%`, backgroundColor: onSurface(topicColor(i), 45) }}
                 />
               )}
               <span
@@ -214,7 +214,7 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
 export function Leaderboard({ rows }: { rows: LeaderRow[] }) {
   if (rows.length === 0)
     return <p className="py-16 text-center text-[clamp(1.2rem,1.8vw,2rem)] font-semibold text-ink-soft">Scores will appear here after the first question.</p>;
-  const medal = ["bg-sun", "bg-canvas", "bg-[color-mix(in_srgb,var(--color-primary)_25%,white)]"];
+  const medal = ["bg-sun", "bg-canvas", "bg-[color-mix(in_srgb,var(--color-primary)_25%,var(--color-white))]"];
   return (
     <ol className="flex flex-col gap-[clamp(0.4rem,0.8vw,0.9rem)]" aria-label="Leaderboard">
       {rows.map((p, i) => (

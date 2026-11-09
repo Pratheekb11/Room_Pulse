@@ -116,3 +116,9 @@ export function readableOn(bgHex: string): string {
 export function contrastRatio(a: string, b: string): number {
   return contrast(parseHex(a), parseHex(b));
 }
+
+/**
+ * A colour mixed with the design's surface (white in light designs, dark in dark ones),
+ * so the theme's own text colour stays readable on it.
+ */
+export const onSurface = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, var(--color-white, #ffffff))`;

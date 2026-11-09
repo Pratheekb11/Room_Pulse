@@ -1,13 +1,15 @@
 import { scaleColor } from "@/lib/colors";
-import { agreement, takeaways } from "@/lib/insights";
-import { avg, cellKey, fmt1, sumAggs, type Agg } from "@/lib/stats";
+import { takeaways } from "@/lib/insights";
+import { bestAndWorst, sortItems, type ItemSort, type RatedItem } from "@/lib/rank-items";
+import { cellKey, avg, fmt1, type Agg } from "@/lib/stats";
 import type { NamedItem } from "@/lib/types";
 
 interface Props {
-  topics: { item: NamedItem; index: number }[];
+  /** Every item with its average and rank (rateItems). */
+  rows: RatedItem[];
+  sort: ItemSort;
   criteria: NamedItem[];
   cells: Map<string, Agg>;
-  histograms: Map<string, number[]>;
   scaleMax: number;
   voterCount: number;
 }
@@ -18,47 +20,61 @@ const AGREEMENT_STYLE = {
   "People disagree": "bg-peach/35 text-error",
 } as const;
 
-/** Board-room summary: the answer first, then the findings, then the evidence. */
-export function ExecSummary({ topics, criteria, cells, histograms, scaleMax, voterCount }: Props) {
-  const rows = topics
-    .map(({ item }) => {
-      const agg = sumAggs(criteria.map((c) => cells.get(cellKey(item.id, c.id))));
-      return {
-        item,
-        value: avg(agg),
-        n: agg.n,
-        agree: agreement(histograms.get(item.id) ?? [], scaleMax),
-        perCriterion: criteria.map((c) => avg(cells.get(cellKey(item.id, c.id)))),
-      };
-    })
-    .sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+/** "A", "A and B", "A, B and C". */
+const andList = (names: string[]) => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
-  const top = rows[0] && rows[0].value !== null ? rows[0] : null;
+/** The best or the lowest rated item, big; every item when several share the score. */
+function Standout({ label, rows, scaleMax, dark }: { label: string; rows: RatedItem[]; scaleMax: number; dark?: boolean }) {
+  const row = rows[0];
+  const tied = rows.length > 1;
+  return (
+    <section
+      className={`flex flex-1 flex-col rounded-xl p-[clamp(1rem,1.8vw,2rem)] ${dark ? "bg-ink text-white" : "border-2 border-error/40 bg-white"}`}
+    >
+      <h2 className={`text-[clamp(0.9rem,1.1vw,1.2rem)] font-semibold ${dark ? "text-white/70" : "text-error"}`}>{tied ? `Tied for ${label}` : `${label[0].toUpperCase()}${label.slice(1)} rated`}</h2>
+      <p className="font-display mt-1 text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-[1.05] break-words">{andList(rows.map((r) => r.item.name))}</p>
+      {!tied && row.item.description && (
+        <p className={`mt-1 text-[clamp(0.9rem,1.1vw,1.25rem)] leading-snug break-words ${dark ? "text-white/80" : "text-ink-soft"}`}>{row.item.description}</p>
+      )}
+      <p className="mt-auto pt-3">
+        <span className="font-display text-[clamp(2.2rem,3.8vw,4.4rem)] font-semibold leading-none">{fmt1(row.value)}</span>
+        <span className={`text-[clamp(1rem,1.3vw,1.5rem)] ${dark ? "text-white/70" : "text-ink-soft"}`}> / {scaleMax}</span>
+      </p>
+      {!tied && row.agree && <p className={`mt-1 text-[clamp(0.9rem,1.1vw,1.2rem)] ${dark ? "text-white/80" : "text-ink-soft"}`}>{row.agree}</p>}
+    </section>
+  );
+}
+
+/** Board-room summary: the best and the lowest rated first, then the findings, then every item by rank. */
+export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount }: Props) {
+  const { best, bestTies, worstTies } = bestAndWorst(rows);
   const findings = takeaways(
-    rows.map((r) => ({ name: r.item.name, overall: r.value, perCriterion: r.perCriterion, agreement: r.agree?.label ?? null })),
+    rows.map((r) => ({
+      name: r.item.name,
+      overall: r.value,
+      perCriterion: criteria.map((c) => avg(cells.get(cellKey(r.item.id, c.id)))),
+      agreement: r.agree,
+    })),
     criteria.map((c) => c.name),
     scaleMax,
   );
   const ratings = rows.reduce((s, r) => s + r.n, 0);
+  const sorted = sortItems(rows, sort);
 
   return (
     <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)]">
       <div className="flex flex-col gap-[clamp(0.75rem,1.4vw,1.5rem)]">
-        <section className="flex flex-1 flex-col rounded-xl bg-ink p-[clamp(1rem,1.8vw,2rem)] text-white">
-          <h2 className="text-[clamp(0.9rem,1.1vw,1.2rem)] font-semibold text-white/70">Highest score</h2>
-          {top ? (
-            <>
-              <p className="font-display mt-1 text-[clamp(1.8rem,3vw,3.4rem)] font-semibold leading-[1.05]">{top.item.name}</p>
-              <p className="mt-auto pt-4">
-                <span className="font-display text-[clamp(2.6rem,4.4vw,5rem)] font-semibold leading-none">{fmt1(top.value)}</span>
-                <span className="text-[clamp(1rem,1.3vw,1.5rem)] text-white/70"> / {scaleMax}</span>
-              </p>
-              {top.agree && <p className="mt-2 text-[clamp(0.9rem,1.1vw,1.2rem)] text-white/80">{top.agree.label}</p>}
-            </>
-          ) : (
+        {best ? (
+          <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)] sm:grid-cols-2 lg:grid-cols-1">
+            <Standout label="best" rows={bestTies} scaleMax={scaleMax} dark />
+            {worstTies.length > 0 && <Standout label="lowest" rows={worstTies} scaleMax={scaleMax} />}
+          </div>
+        ) : (
+          <section className="rounded-xl bg-ink p-[clamp(1rem,1.8vw,2rem)] text-white">
+            <h2 className="text-[clamp(0.9rem,1.1vw,1.2rem)] font-semibold text-white/70">Best rated</h2>
             <p className="mt-2 text-xl text-white/80">No scores yet.</p>
-          )}
-        </section>
+          </section>
+        )}
         <section className="grid grid-cols-2 gap-[clamp(0.75rem,1.4vw,1.5rem)]">
           {[
             { label: "People answered", value: voterCount },
@@ -91,50 +107,70 @@ export function ExecSummary({ topics, criteria, cells, histograms, scaleMax, vot
 
         <section className="overflow-x-auto rounded-xl border border-line-strong bg-white">
           <table className="w-full border-collapse text-left">
-            <caption className="sr-only">Items ranked by average score, with each measure</caption>
+            <caption className="sr-only">Every item with its rank by average score, its description and each measure</caption>
             <thead>
               <tr className="border-b border-line-strong text-[clamp(0.75rem,0.9vw,1rem)] text-ink-soft">
-                <th scope="col" className="w-[3rem] py-2.5 pl-5 font-semibold">Rank</th>
+                <th scope="col" className="w-[3rem] py-2.5 pl-3 font-semibold sm:pl-5">Rank</th>
                 <th scope="col" className="py-2.5 pl-2 font-semibold">Item</th>
                 <th scope="col" className="py-2.5 font-semibold">Average</th>
                 {criteria.map((c) => (
-                  <th key={c.id} scope="col" className="max-w-[9ch] truncate px-1 py-2.5 text-center font-semibold" title={c.name}>
+                  <th key={c.id} scope="col" className="hidden max-w-[9ch] truncate px-1 py-2.5 text-center font-semibold sm:table-cell" title={c.name}>
                     {c.name}
                   </th>
                 ))}
-                <th scope="col" className="py-2.5 pl-2 pr-5 font-semibold">Agreement</th>
+                <th scope="col" className="py-2.5 pl-2 pr-3 font-semibold sm:pr-5">Agreement</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={r.item.id} className="border-b border-line last:border-0">
-                  <td className="font-display py-[clamp(0.4rem,0.9vh,0.8rem)] pl-5 text-[clamp(1rem,1.3vw,1.5rem)] font-semibold text-ink-soft">{i + 1}</td>
-                  <td className="py-2 pl-2 pr-3 text-[clamp(1rem,1.2vw,1.4rem)] font-bold">{r.item.name}</td>
-                  <td className="font-display py-2 pr-2 text-[clamp(1.1rem,1.5vw,1.8rem)] font-semibold tabular-nums">{fmt1(r.value)}</td>
-                  {r.perCriterion.map((v, ci) => {
-                    const c = v === null ? null : scaleColor(v, scaleMax);
-                    return (
-                      <td key={criteria[ci].id} className="px-1 py-2 text-center">
+              {sorted.map((r) => {
+                const perCriterion = criteria.map((c) => avg(cells.get(cellKey(r.item.id, c.id))));
+                const tag = bestTies.includes(r) ? "Best" : worstTies.includes(r) ? "Lowest" : null;
+                return (
+                  <tr key={r.item.id} className="border-b border-line last:border-0">
+                    <td className="font-display py-[clamp(0.4rem,0.9vh,0.8rem)] pl-3 align-top sm:pl-5 text-[clamp(1rem,1.3vw,1.5rem)] font-semibold text-ink-soft">
+                      {r.rank ?? "–"}
+                    </td>
+                    <td className="min-w-[9rem] py-2 pl-2 pr-3 align-top">
+                      <span className="text-[clamp(1rem,1.2vw,1.4rem)] font-bold break-words">{r.item.name}</span>
+                      {tag && (
                         <span
-                          className="inline-block min-w-[3.2ch] rounded-lg px-1.5 py-0.5 text-[clamp(0.85rem,1vw,1.15rem)] font-bold tabular-nums"
-                          style={c ? { backgroundColor: c.bg, color: c.fg } : undefined}
+                          className={`ml-2 inline-block rounded-full px-2 py-0.5 align-middle text-[clamp(0.7rem,0.8vw,0.9rem)] font-bold ${
+                            tag === "Best" ? "bg-ink text-white" : "bg-peach/35 text-error"
+                          }`}
                         >
-                          {fmt1(v)}
+                          {tag}
                         </span>
-                      </td>
-                    );
-                  })}
-                  <td className="py-2 pl-2 pr-5">
-                    {r.agree ? (
-                      <span className={`rounded-full px-2.5 py-0.5 text-[clamp(0.72rem,0.85vw,0.95rem)] font-bold whitespace-nowrap ${AGREEMENT_STYLE[r.agree.label]}`}>
-                        {r.agree.label}
-                      </span>
-                    ) : (
-                      <span className="text-ink-soft">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      )}
+                      {r.item.description && (
+                        <span className="mt-0.5 block text-[clamp(0.8rem,0.95vw,1.05rem)] leading-snug text-ink-soft break-words">{r.item.description}</span>
+                      )}
+                    </td>
+                    <td className="font-display py-2 pr-2 align-top text-[clamp(1.1rem,1.5vw,1.8rem)] font-semibold tabular-nums">{fmt1(r.value)}</td>
+                    {perCriterion.map((v, ci) => {
+                      const c = v === null ? null : scaleColor(v, scaleMax);
+                      return (
+                        <td key={criteria[ci].id} className="hidden px-1 py-2 text-center align-top sm:table-cell">
+                          <span
+                            className="inline-block min-w-[3.2ch] rounded-lg px-1.5 py-0.5 text-[clamp(0.85rem,1vw,1.15rem)] font-bold tabular-nums"
+                            style={c ? { backgroundColor: c.bg, color: c.fg } : undefined}
+                          >
+                            {fmt1(v)}
+                          </span>
+                        </td>
+                      );
+                    })}
+                    <td className="py-2 pl-2 pr-3 align-top sm:pr-5">
+                      {r.agree ? (
+                        <span className={`inline-block rounded-xl px-2.5 py-0.5 text-[clamp(0.72rem,0.85vw,0.95rem)] font-bold sm:rounded-full sm:whitespace-nowrap ${AGREEMENT_STYLE[r.agree]}`}>
+                          {r.agree}
+                        </span>
+                      ) : (
+                        <span className="text-ink-soft">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>

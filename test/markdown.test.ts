@@ -9,6 +9,7 @@ import * as textRoute from "@/app/api/admin/sessions/[code]/text/route";
 import * as sessionRoute from "@/app/api/session/[code]/route";
 import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as answerRoute from "@/app/api/answer/route";
+import * as voteRoute from "@/app/api/vote/route";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
 
 let db: PGlite;
@@ -71,6 +72,44 @@ describe("Markdown export", () => {
     expect(body).toContain("## What should we try?\n\n- Pair on reviews");
     expect(body).not.toContain("rude");
     expect(body).toContain("- Average: 8");
+  });
+
+  it("ranks Score items best first, with the best, the lowest and each item's description", async () => {
+    const res = await adminSessions.POST(
+      new Request(
+        `${ORIGIN}/x`,
+        authed({
+          method: "POST",
+          body: JSON.stringify({
+            title: "Roadmap",
+            criteria: ["Impact", "Ease"],
+            focusTopics: [
+              {
+                name: "Score these",
+                kind: "rating",
+                topics: ["Dark mode", "Offline mode", "New logo"],
+                itemDescriptions: { "Dark mode": "A night theme", "New logo": "Fresh look" },
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+    const { code } = (await res.json()) as { code: string };
+    const s = (await (await sessionRoute.GET(new Request(`${ORIGIN}/x`), ctx(code))).json()) as SessionPayload;
+    const id = (name: string) => s.topics.find((t) => t.name === name)!.id;
+    const [impact, ease] = s.criteria.map((c) => c.id);
+    const vote = (topic: string, criterionId: string, score: number) =>
+      voteRoute.POST(
+        new Request(`${ORIGIN}/api/vote`, { method: "POST", body: JSON.stringify({ code, topicId: id(topic), criterionId, voterId: crypto.randomUUID(), score }) }),
+      );
+    await vote("Dark mode", impact, 2);
+    await vote("Dark mode", ease, 2);
+    await vote("Offline mode", impact, 5);
+    await vote("Offline mode", ease, 4);
+
+    const body = await (await exportRoute.GET(new Request(`${ORIGIN}/x?type=markdown`, authed()), ctx(code))).text();
+    expect(body).toContain("## Score these\n\n- Best rated: Offline mode (4.5)\n- Lowest rated: Dark mode (2.0)\n\n1. Offline mode: 4.5 (Impact 5.0, Ease 4.0), 1 answer\n2. Dark mode: 2.0 (Impact 2.0, Ease 2.0), 1 answer\n   A night theme\n3. New logo: – (Impact –, Ease –), 0 answers\n   Fresh look");
   });
 
   it("escapes Markdown in answers so they can't break the layout", async () => {

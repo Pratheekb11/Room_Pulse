@@ -10,6 +10,7 @@ import * as exportRoute from "@/app/api/admin/sessions/[code]/export/route";
 import * as sessionRoute from "@/app/api/session/[code]/route";
 import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as answerRoute from "@/app/api/answer/route";
+import * as voteRoute from "@/app/api/vote/route";
 import type { AdminSessionRow, ResultsPayload, SessionPayload } from "@/lib/types";
 
 let db: PGlite;
@@ -268,6 +269,34 @@ describe("closed voting and admin", () => {
 
     await resetRoute.POST(new Request(`${ORIGIN}/x`, authed({ method: "POST" })), ctx(code));
     expect(await results(code)).toMatchObject({ voterCount: 0, polls: [], ranks: [], numbers: [], texts: [], respondents: [] });
+  });
+
+  it("counts the people who scored each Score items question, not everyone in the presentation", async () => {
+    const res = await create({
+      title: "Retro",
+      criteria: ["Impact", "Effort"],
+      focusTopics: [
+        { name: "Rate the ideas", kind: "rating", topics: ["Dark mode", "Offline"] },
+        { name: "Rate the tools", kind: "rating", topics: ["Jira"] },
+        { name: "Any ideas?", kind: "text" },
+      ],
+    });
+    const { code } = (await res.json()) as { code: string };
+    const s = await info(code);
+    const [ideas, tools, text] = s.focusTopics;
+    const [dark, offline] = s.topics.filter((t) => t.focusId === ideas.id);
+    const vote = (body: Record<string, unknown>) =>
+      voteRoute.POST(new Request(`${ORIGIN}/api/vote`, { method: "POST", body: JSON.stringify({ code, ...body }) }));
+    const a = voter();
+    const b = voter();
+    for (const [v, t] of [[a, dark], [a, offline], [b, dark]] as const)
+      for (const c of s.criteria) expect((await vote({ topicId: t.id, criterionId: c.id, voterId: v, score: 4 })).status).toBe(200);
+    await answer({ code, kind: "text", focusId: text.id, voterId: voter(), text: "hi" });
+
+    const r = await results(code);
+    expect(r.voterCount).toBe(3);
+    expect(r.respondents).toContainEqual({ focusId: ideas.id, n: 2 });
+    expect(r.respondents.find((x) => x.focusId === tools.id)).toBeUndefined();
   });
 
   it("exports summaries and raw answers for the new types without voter ids", async () => {

@@ -71,6 +71,28 @@ describe("takeaways", () => {
     expect(out).toContain("Impact gets the lowest scores overall (3.0 on average).");
   });
 
+  it("calls an exact tie a tie, and names no last place or weakest measure when everything scores the same", () => {
+    const out = takeaways([t("Dark mode", 4, [4, 4]), t("Offline", 4, [4, 4])], crit, 5);
+    expect(out).toEqual(["Dark mode and Offline are tied at the top (4.0)."]);
+  });
+
+  it("names every item tied at the top and only the items below them as last", () => {
+    const out = takeaways([t("A", 4, [4, 4]), t("B", 4, [4, 4]), t("C", 2, [1.5, 2.5])], crit, 5);
+    expect(out[0]).toBe("A and B are tied at the top (4.0).");
+    expect(out).toContain("C ranks last at 2.0, weakest on Impact (1.5).");
+  });
+
+  it("names every item tied for last", () => {
+    const out = takeaways([t("A", 4, [4, 4]), t("Search", 2, [1, 3]), t("Logo", 2, [2, 2])], crit, 5);
+    expect(out).toContain("Search and Logo rank last at 2.0.");
+  });
+
+  it("names no weakest measure for the last item when its measures score the same", () => {
+    const out = takeaways([t("A", 4, [4, 4]), t("B", 2, [2, 2])], crit, 5);
+    expect(out).toContain("B ranks last at 2.0.");
+    expect(out.some((x) => x.includes("lowest scores overall"))).toBe(false);
+  });
+
   it("says nothing before any votes, and only the leader with one topic", () => {
     expect(takeaways([t("A", null, [null, null])], crit, 5)).toEqual([]);
     expect(takeaways([t("A", 3.5, [3, 4])], crit, 5)).toEqual(["A scores 3.5 out of 5."]);

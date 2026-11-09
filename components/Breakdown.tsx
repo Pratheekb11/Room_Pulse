@@ -4,7 +4,7 @@ import type { NamedItem } from "@/lib/types";
 import { Donut } from "./Donut";
 
 interface Props {
-  topics: { item: NamedItem; index: number }[];
+  topics: { item: NamedItem & { description?: string | null }; index: number }[];
   criteria: NamedItem[];
   cells: Map<string, Agg>;
   histograms: Map<string, number[]>;
@@ -35,6 +35,11 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
                 {t.name}
               </span>
             </h3>
+            {t.description && (
+              <p className="mt-1 line-clamp-2 text-[clamp(0.8rem,0.95vw,1.05rem)] leading-snug text-ink-soft" title={t.description}>
+                {t.description}
+              </p>
+            )}
             <div className="mt-3 flex flex-1 items-center gap-4">
             <div className="aspect-square w-[40%] max-w-[13rem] shrink-0">
               <Donut counts={counts} scaleMax={scaleMax} center={fmt1(overall)} label={`${t.name}: overall ${fmt1(overall)}`} />

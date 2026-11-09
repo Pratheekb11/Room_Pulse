@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Logo } from "./Logo";
+import { ListSheet, SheetButton } from "./ListSheet";
 import { Doodle } from "./Doodle";
 import { CountUp } from "./CountUp";
 import { charactersFor } from "@/lib/decor";
@@ -54,21 +56,53 @@ export function VotingPills({ voters, isOpen }: { voters: number; isOpen: boolea
   );
 }
 
-/** "All questions" plus a tab per question. `active` null = all questions. */
-export function QuestionTabs({ names, active, onPick }: { names: { key: string; name: string }[]; active: number | null; onPick: (index: number | null) => void }) {
+type TabName = { key: string; name: string };
+
+/**
+ * "All questions" plus a tab per question. `active` null = all questions.
+ * On a narrow screen the tabs fold into one button that opens a list (up and down, never sideways).
+ * Container queries, not the viewport: the builder's preview draws this screen at 1280px on any device.
+ */
+export function QuestionTabs({ names, active, onPick }: { names: TabName[]; active: number | null; onPick: (index: number | null) => void }) {
+  const [open, setOpen] = useState(false);
   const tab = (on: boolean) =>
     `flex items-center gap-2 rounded-full border border-line-strong px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${on ? "bg-ink text-white" : "bg-white"}`;
   return (
-    <nav aria-label="Questions" className="mb-[clamp(0.6rem,1.4vh,1.25rem)] flex flex-wrap items-center gap-2">
-      <button type="button" onClick={() => onPick(null)} aria-current={active === null ? "page" : undefined} className={tab(active === null)}>
-        All questions
-      </button>
-      {names.map((n, i) => (
-        <button key={n.key} type="button" onClick={() => onPick(i)} aria-current={active === i ? "page" : undefined} className={tab(active === i)}>
-          {n.name}
+    <div className="@container mb-[clamp(0.6rem,1.4vh,1.25rem)]">
+      <nav aria-label="Questions" className="flex flex-wrap items-center gap-2 @max-xl:hidden">
+        <button type="button" onClick={() => onPick(null)} aria-current={active === null ? "page" : undefined} className={tab(active === null)}>
+          All questions
         </button>
-      ))}
-    </nav>
+        {names.map((n, i) => (
+          <button key={n.key} type="button" onClick={() => onPick(i)} aria-current={active === i ? "page" : undefined} className={tab(active === i)}>
+            {n.name}
+          </button>
+        ))}
+      </nav>
+      <SheetButton
+        className="@xl:hidden"
+        kicker={active === null ? "Showing" : `Question ${active + 1} of ${names.length}:`}
+        label={active === null ? `All questions (${names.length})` : names[active]?.name ?? ""}
+        onClick={() => setOpen(true)}
+      />
+      {open && <QuestionList names={names} active={active} onPick={onPick} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+/** Every question in a full-screen list, "All questions" first. */
+export function QuestionList({ names, active, onPick, onClose }: { names: TabName[]; active: number | null; onPick: (index: number | null) => void; onClose: () => void }) {
+  return (
+    <ListSheet
+      title="Questions"
+      currentAttr="page"
+      rows={[
+        { key: "all", label: "All questions", mark: "≡", current: active === null },
+        ...names.map((n, i) => ({ key: n.key, label: n.name, mark: String(i + 1), current: active === i })),
+      ]}
+      onPick={(i) => onPick(i === 0 ? null : i - 1)}
+      onClose={onClose}
+    />
   );
 }
 
