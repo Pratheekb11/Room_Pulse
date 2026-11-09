@@ -64,6 +64,19 @@ Built for the target users (small meetups and team standups/retros):
 
 Still to do for these users: a room code you reuse every sprint with past rounds kept (today "Clear all answers" is the only way to start fresh).
 
+### On hold: abuse limits (security sweep, 2026-11-09)
+
+Built and tested, not deployed: branch `security/abuse-limits` (commit `cb47b5c`, 484 tests pass, full phone/desktop sweep passed). Not merged into `main` on purpose: the code needs 4 new tables, and pushing it before they exist in production breaks every vote and answer.
+
+What it does: per-address limits on password tries, sign-ups, guests, guest codes, answers and new voters (`rate_hits`); at most 1,000 voters per presentation (`session_voters`); lockouts per address instead of per email; at most 100 presentations per account; a site-wide daily AI cap; CDN-cached endpoints refuse query strings; the owner can hide word-cloud words (`hidden_words`) and quiz nicknames (`quiz_hidden_players`) on the big screen. Details are in the branch's CLAUDE.md / AGENTS.md ("Abuse limits").
+
+To ship it:
+
+1. Run the new `create table if not exists` section at the end of `db/schema.sql` on the branch (`rate_hits`, `session_voters`, `hidden_words`, `quiz_hidden_players`) in the Neon SQL Editor (Vercel, then Storage, then Open in Neon). It only adds tables. The local network's DNS doesn't resolve `*.aws.neon.tech`, so it can't be run from this laptop; use the Neon website, a phone hotspot or DNS 1.1.1.1.
+2. Merge the branch into `main` (rebase it if `main` moved), run the tests, and push.
+3. Check the live site at 390px and desktop: voting, the quiz, hiding a word and hiding a player.
+4. Optional: set `RATE_LIMIT_SECRET` in Vercel.
+
 ### Email verification and password reset — built, not switched on (INCOMPLETE)
 
 The code and tests exist (`app/api/auth/{verify,resend-verification,forgot,reset}`, `lib/email.ts`, `lib/email-links.ts`, `test/email-auth.test.ts`), but **production has no email provider configured**, so:
