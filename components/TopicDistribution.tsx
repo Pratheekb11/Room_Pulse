@@ -6,6 +6,7 @@ import { agreement } from "@/lib/insights";
 import { avg, cellKey, criterionHistograms, fmt1, sumAggs, type Agg } from "@/lib/stats";
 import type { NamedItem, ScoreBucket } from "@/lib/types";
 import { faceFor } from "./RatingRow";
+import { ToBody } from "./Portal";
 
 interface Props {
   topics: { item: NamedItem & { description?: string | null }; index: number }[];
@@ -79,6 +80,7 @@ export function TopicDistribution(p: Props) {
   const wide = n <= 2 ? "" : n <= 6 || n === 9 ? " @4xl:grid-cols-3" : " @4xl:grid-cols-3 @6xl:grid-cols-4";
 
   return (
+    <ToBody>
     <div role="dialog" aria-modal="true" aria-label={`How people scored ${item.name}`} className="fixed inset-0 z-50 overflow-y-auto bg-canvas">
       <div className="flex min-h-full flex-col gap-[clamp(0.75rem,1.6vh,1.5rem)] px-[clamp(1rem,2.2vw,2.75rem)] py-[clamp(0.75rem,2vh,1.75rem)]">
         <header className="flex flex-wrap items-start justify-between gap-4">
@@ -145,5 +147,6 @@ export function TopicDistribution(p: Props) {
         </div>
       </div>
     </div>
+    </ToBody>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import type { QuestionKind } from "@/lib/types";
 import { HowToDemo } from "../HowToDemo";
+import { ToBody } from "../Portal";
 
 /** "Show me how" from the builder: the walkthrough in a dialog, starting on the type being edited. */
 export function HowToDialog({ kind, onClose }: { kind: QuestionKind; onClose: () => void }) {
@@ -23,6 +24,7 @@ export function HowToDialog({ kind, onClose }: { kind: QuestionKind; onClose: ()
   }, []);
 
   return (
+    <ToBody>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-3 sm:p-4" onMouseDown={() => onCloseRef.current()}>
       <div
         role="dialog"
@@ -42,5 +44,6 @@ export function HowToDialog({ kind, onClose }: { kind: QuestionKind; onClose: ()
         <HowToDemo initial={kind} compact />
       </div>
     </div>
+    </ToBody>
   );
 }

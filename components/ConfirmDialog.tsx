@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { ToBody } from "./Portal";
 
 interface Props {
   title: string;
@@ -38,6 +39,7 @@ export function ConfirmDialog(p: Props) {
   const ok = !p.typeToConfirm || typed === p.typeToConfirm;
 
   return (
+    <ToBody>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onMouseDown={onCancel}>
       <div
         role="alertdialog"
@@ -84,5 +86,6 @@ export function ConfirmDialog(p: Props) {
         </form>
       </div>
     </div>
+    </ToBody>
   );
 }

@@ -1,4 +1,5 @@
 import { topicColor } from "@/lib/colors";
+import { ToBody } from "./Portal";
 
 // Deterministic pseudo-random so the render is pure.
 const rand = (i: number, salt: number) => {
@@ -17,6 +18,7 @@ const PIECES = Array.from({ length: 48 }, (_, i) => ({
 
 export function Confetti() {
   return (
+    <ToBody>
     <div aria-hidden className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
       {PIECES.map((p, i) => (
         <span
@@ -35,5 +37,6 @@ export function Confetti() {
         />
       ))}
     </div>
+    </ToBody>
   );
 }

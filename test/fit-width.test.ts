@@ -169,3 +169,12 @@ describe("Item close-up", () => {
     expect(src).toMatch(/grid-cols-1\$\{n > 1 \? " @md:grid-cols-2" : ""\}/);
   });
 });
+
+describe("full-screen layers cover the whole screen", () => {
+  it("every fixed full-screen layer renders into <body>, so an animated parent (the home page's hero) can't trap it", () => {
+    const offenders = files("components")
+      .filter((f) => /fixed inset-0/.test(readFileSync(join(root, f), "utf8")))
+      .filter((f) => !/<ToBody>|from "\.\/Portal"|from "\.\.\/Portal"|from "@\/components\/Portal"/.test(readFileSync(join(root, f), "utf8")) || !/<ToBody>/.test(readFileSync(join(root, f), "utf8")));
+    expect(offenders).toEqual([]);
+  });
+});

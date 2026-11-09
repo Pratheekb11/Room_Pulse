@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import { ToBody } from "./Portal";
 
 export interface SheetRow {
   key: string;
@@ -95,7 +95,7 @@ export function ListSheet({
     </div>
   );
   // On the body: a parent with a backdrop blur (the voter's sticky bar) would trap a fixed layer.
-  return typeof document === "undefined" ? sheet : createPortal(sheet, document.body);
+  return <ToBody>{sheet}</ToBody>;
 }
 
 /** The button that opens the sheet: looks like a dropdown, says where you are. */

@@ -4,6 +4,7 @@ import { GUEST_DAYS } from "@/lib/guest-rules";
 import { useState } from "react";
 import { apiFetch } from "./api";
 import { formatGuestCode, rememberGuestCode } from "./guestCode";
+import { ToBody } from "../Portal";
 
 const field = "mt-1 w-full rounded-lg border border-line-strong px-3 py-2.5 text-lg";
 
@@ -70,6 +71,7 @@ export function GuestOptions({
   if (shown && guestCode) {
     return (
       // Full-page, so nothing else on the screen competes with the code.
+      <ToBody>
       <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-canvas p-5">
         <div className="slab w-full max-w-sm rounded-xl bg-white p-6 text-center" role="dialog" aria-modal="true" aria-labelledby="code-h">
           <h2 id="code-h" className="font-display text-2xl">
@@ -89,6 +91,7 @@ export function GuestOptions({
           </button>
         </div>
       </div>
+      </ToBody>
     );
   }
 

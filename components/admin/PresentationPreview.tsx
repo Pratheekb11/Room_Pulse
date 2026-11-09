@@ -24,6 +24,7 @@ import { voterUrl } from "@/lib/site";
 import { QrPanel } from "../QrPanel";
 import { QuestionDescription, QuestionTabs, ResultCard, ScreenHeader, VotingPills } from "../ScreenChrome";
 import { ScorePill, StepIntro, StepNav, VoterHeader, VoterProgress } from "../VoterChrome";
+import { ToBody } from "../Portal";
 
 type Device = "screen" | "phone";
 
@@ -263,6 +264,7 @@ export function PresentationPreview({
   const t = getTheme(theme);
 
   return (
+    <ToBody>
     <div role="dialog" aria-modal="true" aria-label="Preview" className="fixed inset-0 z-50 flex flex-col bg-canvas">
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-white px-3 py-2 sm:px-5">
         <h2 className="font-display mr-auto text-xl font-semibold">Preview</h2>
@@ -338,5 +340,6 @@ export function PresentationPreview({
         </div>
       </div>
     </div>
+    </ToBody>
   );
 }
