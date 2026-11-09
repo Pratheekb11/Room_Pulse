@@ -135,12 +135,12 @@ export function TextSpotlight({ answers, onHide }: { answers: TextAnswer[]; onHi
     <div className="flex min-h-[48vh] flex-col items-center justify-center gap-6 text-center">
       <blockquote
         key={`${at}:${a.text}`}
-        className="font-display animate-rise max-w-[30ch] text-[clamp(1.6rem,4vw,4.4rem)] leading-tight font-semibold break-words"
+        className="font-display animate-rise max-w-[min(30ch,100%)] text-[clamp(1.6rem,4vw,4.4rem)] leading-tight font-semibold break-words"
         aria-live="polite"
       >
         &ldquo;{a.text}&rdquo;
       </blockquote>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <button type="button" className={btn} onClick={() => setI((x) => (x - 1 + n) % n)} aria-label="Previous answer">
           ←
         </button>

@@ -5,6 +5,9 @@ import type { RankTally } from "@/lib/answers";
 /** Dark ink for numbers on the places grid's light tints (the same in every design). */
 const INK = "#26251e";
 
+/** More places than this and a phone gets chips instead of the table. */
+const TABLE_ON_PHONES = 5;
+
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
 
 /** Options from most to least preferred, with their average place. */
@@ -44,11 +47,37 @@ export function RankList({ tally }: { tally: RankTally }) {
 
 /** Grid: how many people put each option in each place. Darker = more people. */
 export function RankPlaces({ tally }: { tally: RankTally }) {
-  const k = tally.rows.length;
+  const k = Math.max(0, ...tally.rows.map((r) => r.places.length));
   const max = Math.max(1, ...tally.rows.flatMap((r) => r.places));
+  // Many places: narrow screens list each option's places as chips instead of a wide table.
+  // Container queries: the builder's preview draws the big screen at 1280px on any device.
+  const chips = k > TABLE_ON_PHONES;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-separate border-spacing-[clamp(0.2rem,0.4vw,0.45rem)] text-[clamp(0.9rem,1.2vw,1.4rem)]">
+    <div className="@container">
+      {chips && (
+        <ul aria-label="Places per option" className="flex flex-col gap-2.5 @2xl:hidden">
+          {tally.rows.map((r) => (
+            <li key={r.id} className="rounded-xl border border-line-strong bg-white p-3">
+              <p className="font-bold leading-tight">{r.name}</p>
+              <ul aria-label={`Places for ${r.name}`} className="mt-1.5 flex flex-wrap gap-1.5">
+                {r.places.map((n, p) =>
+                  n ? (
+                    <li
+                      key={p}
+                      className="rounded-md px-2 py-0.5 text-sm font-bold tabular-nums"
+                      style={{ backgroundColor: `color-mix(in srgb, ${topicColor(r.index)} ${Math.round(25 + (n / max) * 75)}%, #ffffff)`, color: INK }}
+                    >
+                      {ordinal(p + 1)} · {n}
+                    </li>
+                  ) : null,
+                )}
+                {r.places.every((n) => !n) && <li className="text-sm text-ink-soft">Nobody placed it yet</li>}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+      <table className={`w-full border-separate ${chips ? "@max-2xl:hidden " : ""}border-spacing-[clamp(0.2rem,0.4vw,0.45rem)] text-[clamp(0.9rem,1.2vw,1.4rem)]`}>
         <thead>
           <tr>
             <th className="text-left font-semibold text-ink-soft">
@@ -72,7 +101,7 @@ export function RankPlaces({ tally }: { tally: RankTally }) {
                 return (
                   <td
                     key={p}
-                    className="font-display h-[clamp(2.4rem,5vh,3.6rem)] min-w-[2.8rem] rounded-lg border border-line text-center font-semibold tabular-nums transition-colors duration-500"
+                    className="font-display h-[clamp(2.4rem,5vh,3.6rem)] rounded-lg border border-line text-center font-semibold tabular-nums transition-colors duration-500"
                     style={{
                       // light tint in every design, so the number is always dark ink
                       backgroundColor: n ? `color-mix(in srgb, ${topicColor(r.index)} ${Math.round(25 + a * 75)}%, #ffffff)` : "var(--color-white, #ffffff)",

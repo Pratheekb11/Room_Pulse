@@ -60,6 +60,8 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
   );
   const ratings = rows.reduce((s, r) => s + r.n, 0);
   const sorted = sortItems(rows, sort);
+  /** A column per measure fits only for a few of them. */
+  const measureColumns = criteria.length <= 3;
 
   return (
     <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)]">
@@ -105,7 +107,9 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
           )}
         </section>
 
-        <section className="overflow-x-auto rounded-xl border border-line-strong bg-white">
+        {/* A column per measure only for a few measures and only where there's room; otherwise chips under each item.
+            Container queries: the builder's preview draws the big screen at 1280px on any device. */}
+        <section className="@container rounded-xl border border-line-strong bg-white">
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">Every item with its rank by average score, its description and each measure</caption>
             <thead>
@@ -113,11 +117,13 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
                 <th scope="col" className="w-[3rem] py-2.5 pl-3 font-semibold sm:pl-5">Rank</th>
                 <th scope="col" className="py-2.5 pl-2 font-semibold">Item</th>
                 <th scope="col" className="py-2.5 font-semibold">Average</th>
-                {criteria.map((c) => (
-                  <th key={c.id} scope="col" className="hidden max-w-[9ch] truncate px-1 py-2.5 text-center font-semibold sm:table-cell" title={c.name}>
-                    {c.name}
-                  </th>
-                ))}
+                {criteria.map((c) =>
+                  measureColumns && (
+                    <th key={c.id} scope="col" className="hidden max-w-[9ch] truncate px-1 py-2.5 text-center font-semibold @2xl:table-cell" title={c.name}>
+                      {c.name}
+                    </th>
+                  ),
+                )}
                 <th scope="col" className="py-2.5 pl-2 pr-3 font-semibold sm:pr-5">Agreement</th>
               </tr>
             </thead>
@@ -130,7 +136,7 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
                     <td className="font-display py-[clamp(0.4rem,0.9vh,0.8rem)] pl-3 align-top sm:pl-5 text-[clamp(1rem,1.3vw,1.5rem)] font-semibold text-ink-soft">
                       {r.rank ?? "–"}
                     </td>
-                    <td className="min-w-[9rem] py-2 pl-2 pr-3 align-top">
+                    <td className="py-2 pl-2 pr-3 align-top">
                       <span className="text-[clamp(1rem,1.2vw,1.4rem)] font-bold break-words">{r.item.name}</span>
                       {tag && (
                         <span
@@ -144,12 +150,28 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
                       {r.item.description && (
                         <span className="mt-0.5 block text-[clamp(0.8rem,0.95vw,1.05rem)] leading-snug text-ink-soft break-words">{r.item.description}</span>
                       )}
+                      {criteria.length > 1 && (
+                        <ul aria-label={`Scores for ${r.item.name}`} className={`mt-1.5 flex flex-wrap gap-1 ${measureColumns ? "@2xl:hidden" : ""}`}>
+                          {perCriterion.map((v, ci) => {
+                            const c = v === null ? null : scaleColor(v, scaleMax);
+                            return (
+                              <li
+                                key={criteria[ci].id}
+                                className="rounded-md border border-line px-1.5 py-0.5 text-[clamp(0.72rem,0.85vw,0.95rem)] font-semibold"
+                                style={c ? { backgroundColor: c.bg, color: c.fg, borderColor: "transparent" } : undefined}
+                              >
+                                {criteria[ci].name} <span className="font-bold tabular-nums">{fmt1(v)}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </td>
                     <td className="font-display py-2 pr-2 align-top text-[clamp(1.1rem,1.5vw,1.8rem)] font-semibold tabular-nums">{fmt1(r.value)}</td>
-                    {perCriterion.map((v, ci) => {
+                    {measureColumns && perCriterion.map((v, ci) => {
                       const c = v === null ? null : scaleColor(v, scaleMax);
                       return (
-                        <td key={criteria[ci].id} className="hidden px-1 py-2 text-center align-top sm:table-cell">
+                        <td key={criteria[ci].id} className="hidden px-1 py-2 text-center align-top @2xl:table-cell">
                           <span
                             className="inline-block min-w-[3.2ch] rounded-lg px-1.5 py-0.5 text-[clamp(0.85rem,1vw,1.15rem)] font-bold tabular-nums"
                             style={c ? { backgroundColor: c.bg, color: c.fg } : undefined}
@@ -161,7 +183,7 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
                     })}
                     <td className="py-2 pl-2 pr-3 align-top sm:pr-5">
                       {r.agree ? (
-                        <span className={`inline-block rounded-xl px-2.5 py-0.5 text-[clamp(0.72rem,0.85vw,0.95rem)] font-bold sm:rounded-full sm:whitespace-nowrap ${AGREEMENT_STYLE[r.agree]}`}>
+                        <span className={`inline-block rounded-xl px-2.5 py-0.5 text-[clamp(0.72rem,0.85vw,0.95rem)] font-bold [overflow-wrap:break-word] sm:rounded-full sm:whitespace-nowrap ${AGREEMENT_STYLE[r.agree]}`}>
                           {r.agree}
                         </span>
                       ) : (

@@ -27,7 +27,8 @@ export function ScreenHeader({
 }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-      <div className="min-w-0 flex-1">
+      {/* at least 34rem for the title (or the full width): when that and the controls don't fit side by side, the controls wrap below */}
+      <div className="min-w-0 flex-[1_1_min(100%,34rem)]">
         <Logo />
         <div className="mt-2 flex items-end gap-3">
           <h1 className="font-display min-w-0 text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[0.98] tracking-tight break-words">{title}</h1>
@@ -74,8 +75,15 @@ export function QuestionTabs({ names, active, onPick }: { names: TabName[]; acti
           All questions
         </button>
         {names.map((n, i) => (
-          <button key={n.key} type="button" onClick={() => onPick(i)} aria-current={active === i ? "page" : undefined} className={tab(active === i)}>
-            {n.name}
+          <button
+            key={n.key}
+            type="button"
+            onClick={() => onPick(i)}
+            aria-current={active === i ? "page" : undefined}
+            title={n.name}
+            className={`${tab(active === i)} min-w-0 max-w-[26ch]`}
+          >
+            <span className="truncate">{n.name}</span>
           </button>
         ))}
       </nav>

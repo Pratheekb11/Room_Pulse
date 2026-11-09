@@ -78,6 +78,20 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-feature-settings: "cv11", "ss01";
+  /* People type long unbroken words and links: break them rather than make anything scroll sideways. */
+  overflow-wrap: anywhere;
+}
+
+/* Interface words ("Pause", "Average") and numbers ("6.0") only break between words, never mid-word:
+   a squeezed row then wraps (flex-wrap) instead of splitting them letter by letter. */
+button,
+th,
+[role="tab"],
+.tabular-nums {
+  overflow-wrap: break-word;
+}
+.tabular-nums {
+  white-space: nowrap;
 }
 
 /* Slide designs with a background pattern (lib/themes.ts, e.g. Anime's halftone dots) */

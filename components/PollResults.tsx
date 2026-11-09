@@ -47,8 +47,17 @@ export function PollBars({ tally, noun = VOTES }: { tally: PollTally; noun?: Nou
 
 /** Vertical columns, one per option. */
 export function PollColumns({ tally, noun = VOTES }: { tally: PollTally; noun?: Noun }) {
+  // More than 5 columns don't fit a narrow screen: there the same results show as bars.
+  // Container queries: the builder's preview draws the big screen at 1280px on any device.
+  const many = tally.rows.length > 5;
   return (
-    <div className="flex h-[clamp(16rem,52vh,36rem)] items-end gap-[clamp(0.5rem,1.6vw,2rem)] px-2" role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
+    <div className="@container">
+      {many && (
+        <div className="@3xl:hidden">
+          <PollBars tally={tally} noun={noun} />
+        </div>
+      )}
+    <div className={`flex h-[clamp(16rem,52vh,36rem)] items-end gap-[clamp(0.5rem,1.6vw,2rem)] px-2 ${many ? "@max-3xl:hidden" : ""}`} role="img" aria-label={tally.rows.map((r) => `${r.name}: ${r.pct}%`).join(", ")}>
       {tally.rows.map((r) => {
         const c = topicColor(r.index);
         return (
@@ -63,12 +72,13 @@ export function PollColumns({ tally, noun = VOTES }: { tally: PollTally; noun?: 
             />
             <div className="w-full border-t border-line-strong pt-2 text-center">
               <span className="font-display mr-1 font-semibold">{LETTERS[r.index]}</span>
-              <span className="text-[0.8rem] font-bold break-words hyphens-auto sm:text-[clamp(0.9rem,1.25vw,1.4rem)]">{r.name}</span>
+              <span className={`${many ? "text-[clamp(0.75rem,0.85vw,1.05rem)]" : "text-[0.8rem] sm:text-[clamp(0.9rem,1.25vw,1.4rem)]"} font-bold break-words hyphens-auto`}>{r.name}</span>
               {tally.leader?.id === r.id && <span aria-label="leading"> 👑</span>}
             </div>
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

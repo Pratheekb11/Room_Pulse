@@ -14,9 +14,11 @@ interface Props {
 
 /** One card per topic: donut of score distribution + mini bars per criterion. */
 export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpen }: Props) {
-  const cols = topics.length <= 4 ? 2 : 3;
+  // One card per row on a phone, two when there's room, three for many items on a wide screen
+  // (container queries: the builder's preview draws the big screen at 1280px on any device).
   return (
-    <div className="grid gap-[clamp(0.6rem,1.2vw,1.25rem)]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+    <div className="@container">
+    <div className={`grid gap-[clamp(0.6rem,1.2vw,1.25rem)] grid-cols-1 @md:grid-cols-2${topics.length > 4 ? " @3xl:grid-cols-3" : ""}`}>
       {topics.map(({ item: t, index }, i) => {
         const row = criteria.map((c) => cells.get(cellKey(t.id, c.id)));
         const overall = avg(sumAggs(row));
@@ -72,6 +74,7 @@ export function Breakdown({ topics, criteria, cells, histograms, scaleMax, onOpe
           </button>
         );
       })}
+    </div>
     </div>
   );
 }

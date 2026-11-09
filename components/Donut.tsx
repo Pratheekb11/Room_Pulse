@@ -58,7 +58,7 @@ export function Donut({ counts, scaleMax, center, label }: Props) {
 
 export function ScoreLegend({ scaleMax, lowLabel, highLabel }: { scaleMax: number; lowLabel: string; highLabel: string }) {
   return (
-    <div className="flex items-center gap-3 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold">
       <span>{lowLabel}</span>
       <span className="flex gap-1">
         {Array.from({ length: scaleMax }, (_, i) => {

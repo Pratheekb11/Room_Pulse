@@ -74,7 +74,9 @@ export function TopicDistribution(p: Props) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose, onMove, current, count]);
 
-  const cols = p.criteria.length <= 3 ? p.criteria.length : p.criteria.length <= 6 ? 3 : 4;
+  // One chart per row on a phone, then 2, 3 and (for many measures) 4 as the screen widens; literal class names for Tailwind.
+  const n = p.criteria.length;
+  const wide = n <= 2 ? "" : n <= 6 || n === 9 ? " @4xl:grid-cols-3" : " @4xl:grid-cols-3 @6xl:grid-cols-4";
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`How people scored ${item.name}`} className="fixed inset-0 z-50 overflow-y-auto bg-canvas">
@@ -124,7 +126,8 @@ export function TopicDistribution(p: Props) {
           </div>
         </section>
 
-        <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+        <div className="@container">
+        <div className={`grid gap-[clamp(0.75rem,1.4vw,1.5rem)] grid-cols-1${n > 1 ? " @md:grid-cols-2" : ""}${wide}`}>
           {p.criteria.map((c) => (
             <section key={c.id} className="rounded-xl border border-line-strong bg-white p-[clamp(0.75rem,1.2vw,1.4rem)]">
               <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -138,6 +141,7 @@ export function TopicDistribution(p: Props) {
               <Columns counts={per[c.id]} scaleMax={p.scaleMax} />
             </section>
           ))}
+        </div>
         </div>
       </div>
     </div>
