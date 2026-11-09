@@ -1,0 +1,40 @@
+# Keeps the Vercel function and the Neon database awake on weekdays 9:00–19:00 IST,
+# so a presenter's first save isn't a 10–20 second cold start.
+#
+# Neon's free plan sleeps after 5 idle minutes and gives 100 compute-hours a month
+# (about 400 hours of the smallest database). Staying awake 24/7 would use them up
+# and stop the database until next month, so this only runs during the window:
+# about 55 compute-hours a month. Change the window here (times are UTC; IST = UTC + 5:30).
+#
+# Vercel's Hobby plan only allows daily cron jobs, so the ping runs on GitHub Actions
+# (free for public repositories). GitHub may start a scheduled run late, so each hourly
+# run pings for about 56 minutes (so no gap before the next one) instead of once.
+name: Keep warm
+
+on:
+  schedule:
+    # 03:30–12:30 UTC = 9:00–18:00 IST starts; the last run pings until about 19:00 IST.
+    - cron: "30 3-12 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: keep-warm
+  # a new hourly run takes over from one that started late
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Ping /api/warm every 4 minutes for about 56 minutes
+        env:
+          SITE: ${{ vars.SITE_URL || 'https://liverate-beta.vercel.app' }}
+        run: |
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$SITE/api/warm" || echo 000)
+            echo "$(date -u +%H:%M:%S) UTC  /api/warm -> $code"
+            if [ "$i" -lt 15 ]; then sleep 240; fi
+          done

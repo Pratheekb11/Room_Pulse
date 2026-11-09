@@ -59,7 +59,8 @@ Built for the target users (small meetups and team standups/retros):
 - `WarmUp` (home and /admin) calls `/api/warm` (`select 1`) in the background at most every 4 minutes, so a sleeping Vercel function and Neon database are awake before the visitor signs in or creates something.
 - The voter page (`/s/[code]`) fetches the questions on the server and passes them to `VoteApp` (`initial`), so phones skip a round trip.
 - Loading screens say "Starting up…" after 1.5 s (`SlowHint`).
-- Not done: Neon's free tier still pauses the database after ~5 idle minutes and Vercel functions cold-start. A paid Neon plan with autosuspend off (or a keep-warm ping, which uses free-tier compute hours) removes the last cold start.
+- **Keep-warm ping** (`.github/workflows/keep-warm.yml`, guarded by `test/keep-warm.test.ts`): GitHub Actions pings `/api/warm` every 4 minutes on weekdays 9:00–19:00 IST (hourly runs `30 3-12 * * 1-5` UTC, each ~56 minutes so there's no gap), so a presenter's first save in working hours isn't a 10–20 s cold start. Not 24/7: Neon's free plan has 100 compute-hours a month and the window uses about 55; running out stops the database until next month. Vercel Hobby only allows daily crons, hence GitHub Actions (free for this public repo; GitHub disables schedules after 60 days without commits, re-enable in the Actions tab). Set the repo variable `SITE_URL` if the domain changes.
+- Not done: outside that window (evenings, weekends) the first request after ~5 idle minutes is still a cold start. A paid Neon plan with autosuspend off removes it.
 
 Still to do for these users: a room code you reuse every sprint with past rounds kept (today "Clear all answers" is the only way to start fresh).
 
