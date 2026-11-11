@@ -15,13 +15,15 @@ describe("Colour grid: the name column on a narrow screen", () => {
   it.each([
     [1, "w-[44%]"],
     [2, "w-[38%]"],
-    [3, "w-[32%]"],
   ])("with %i measure(s) is %s wide, and 22% once there's room", (n, width) => {
     expect(grid(n)).toContain(`<th scope="col" class="${width} @2xl:w-[22%]"`);
   });
 
-  it("stays 22% when narrow screens get cards instead of the table", () => {
-    expect(grid(4)).toContain('<th scope="col" class="w-[22%]"');
+  it("with 3 measures a phone gets a card per item: four score columns left no room for names or headings", () => {
+    const out = grid(3);
+    expect(out).toMatch(/<table[^>]*class="[^"]*@max-2xl:hidden/);
+    expect(out).toMatch(/aria-label="Scores per item"[^>]*class="[^"]*@2xl:hidden/);
+    expect(out).toContain('<th scope="col" class="w-[22%]"');
   });
 });
 

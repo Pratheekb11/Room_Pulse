@@ -50,11 +50,11 @@ function Tile({ label, agg, scaleMax, strong }: { label: string; agg: Agg; scale
 
 /**
  * Where the table needs more room than the screen has, a card per item instead.
- * Literal class names (Tailwind only builds what it can see): up to 3 measures fit a phone,
+ * Literal class names (Tailwind only builds what it can see): up to 2 measures fit a phone,
  * up to 6 need 42rem, more need 64rem.
  */
 function cardsUntil(measures: number): { cards: string; table: string } | null {
-  if (measures <= 3) return null;
+  if (measures <= 2) return null;
   return measures <= 6 ? { cards: "@2xl:hidden", table: "@max-2xl:hidden" } : { cards: "@5xl:hidden", table: "@max-5xl:hidden" };
 }
 
@@ -65,7 +65,6 @@ function cardsUntil(measures: number): { cards: string; table: string } | null {
 const NAME_COLUMN: Record<number, string> = {
   1: "w-[44%] @2xl:w-[22%]",
   2: "w-[38%] @2xl:w-[22%]",
-  3: "w-[32%] @2xl:w-[22%]",
 };
 
 export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
