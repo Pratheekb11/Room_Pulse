@@ -1,5 +1,6 @@
 "use client";
 
+import { Credit } from "./Credit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
@@ -701,8 +702,9 @@ function ThankYou({
   const saving = values.some((s) => s === "saving" || s === "retrying");
   const closed = values.some((s) => s === "closed");
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+    <main className="flex min-h-dvh flex-col">
       {celebrate && <Confetti />}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
       {doodle && <Doodle character={doodle} className="mb-6 h-36 w-36" />}
       <svg viewBox="0 0 64 64" className="h-20 w-20" aria-hidden>
         <circle cx="32" cy="32" r="29" fill="none" stroke="var(--color-line)" strokeWidth="3" />
@@ -755,6 +757,8 @@ function ThankYou({
           </span>
         )}
       </p>
+      </div>
+      <Credit subtle />
     </main>
   );
 }
