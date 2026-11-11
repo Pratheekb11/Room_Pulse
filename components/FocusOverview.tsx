@@ -16,19 +16,20 @@ interface Props {
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** Bars for the top 3 of a list (poll, pick several, ranking). */
-function TopBars({ rows }: { rows: { id: string; name: string; index: number; pct: number; label: string }[] }) {
+/** More rows than this go in two columns where the card is wide enough. */
+const ONE_COLUMN_ROWS = 5;
+
+/** A bar for every item or option of a question, in the order given. Names wrap; nothing is cut off. */
+function Bars({ rows, labelWidth = "w-[4ch]" }: { rows: { id: string; name: string; index: number; pct: number; label: string }[]; labelWidth?: string }) {
   return (
-    <ol className="mt-4 flex flex-col gap-2">
-      {rows.slice(0, 3).map((r) => (
-        <li key={r.id} className="flex items-center gap-2">
-          <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.name}>
-            {r.name}
-          </span>
-          <span className="h-3 flex-1 overflow-hidden rounded-full bg-line-soft">
+    <ol className={`mt-4 ${rows.length > ONE_COLUMN_ROWS ? "@2xl:columns-2 @2xl:gap-x-[clamp(1.25rem,2.4vw,2.5rem)]" : ""}`}>
+      {rows.map((r) => (
+        <li key={r.id} className="mb-2 flex break-inside-avoid items-center gap-2 last:mb-0">
+          <span className="w-[42%] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] leading-snug font-semibold break-words">{r.name}</span>
+          <span className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft">
             <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${r.pct}%`, backgroundColor: topicColor(r.index) }} />
           </span>
-          <span className="font-display w-[4ch] text-right font-semibold tabular-nums">{r.label}</span>
+          <span className={`font-display ${labelWidth} shrink-0 text-right font-semibold whitespace-nowrap tabular-nums`}>{r.label}</span>
         </li>
       ))}
     </ol>
@@ -72,13 +73,13 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
               key={g.focus.id}
               type="button"
               onClick={() => onOpen(i)}
-              className="slab group flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
+              className="slab group @container flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
             >
               <p className="text-[clamp(0.8rem,0.9vw,1rem)] font-semibold text-ink-soft">{kindLabel(g.kind)}</p>
               <h2 className="font-display text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
-              {tally && <TopBars rows={[...tally.rows].sort((a, b) => b.n - a.n).map((r) => ({ ...r, label: `${r.pct}%` }))} />}
+              {tally && <Bars rows={[...tally.rows].sort((a, b) => b.n - a.n).map((r) => ({ ...r, label: `${r.pct}%` }))} />}
               {ranked && (
-                <TopBars
+                <Bars
                   rows={ranked.rows.map((r, pos) => ({ ...r, pct: r.average === null ? 0 : r.score * 100, label: r.average === null ? "–" : `#${pos + 1}` }))}
                 />
               )}
@@ -149,14 +150,13 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
             index,
             value: avg(sumAggs(criteria.map((c) => cells.get(cellKey(item.id, c.id))))),
           }))
-          .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
-          .slice(0, 3);
+          .sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
         return (
           <button
             key={g.focus.id || "loose"}
             type="button"
             onClick={() => onOpen(i)}
-            className="slab group flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
+            className="slab group @container flex flex-col rounded-xl bg-white p-[clamp(1rem,1.4vw,1.6rem)] text-left transition-transform hover:-translate-y-1"
             aria-label={`Open ${g.focus.name}: overall ${fmt1(s.average)}`}
           >
             {/* type and score on one row, the title under them at the card's full width */}
@@ -173,22 +173,15 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
             </div>
             <h2 className="font-display mt-1 text-[clamp(1.3rem,1.9vw,2.2rem)] font-semibold leading-tight break-words">{g.focus.name}</h2>
 
-            <ol className="mt-4 flex flex-col gap-2">
-              {ranked.map((r) => (
-                <li key={r.item.id} className="flex items-center gap-2">
-                  <span className="w-[42%] truncate text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={r.item.name}>
-                    {r.item.name}
-                  </span>
-                  <span className="h-3 flex-1 overflow-hidden rounded-full bg-line-soft">
-                    <span
-                      className="block h-full rounded-full transition-[width] duration-700"
-                      style={{ width: `${r.value === null ? 0 : (r.value / scaleMax) * 100}%`, backgroundColor: topicColor(r.index) }}
-                    />
-                  </span>
-                  <span className="font-display w-[3ch] text-right font-semibold tabular-nums">{fmt1(r.value)}</span>
-                </li>
-              ))}
-            </ol>
+            <Bars
+              rows={ranked.map((r) => ({
+                id: r.item.id,
+                name: r.item.name,
+                index: r.index,
+                pct: r.value === null ? 0 : (r.value / scaleMax) * 100,
+                label: fmt1(r.value),
+              }))}
+            />
 
             <span className="mt-auto flex items-center justify-between pt-4 text-[clamp(0.8rem,0.95vw,1.05rem)] font-bold">
               <span className="text-ink-soft">{s.n} {s.n === 1 ? "score" : "scores"}</span>
