@@ -29,12 +29,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${inter.variable} ${mono.variable} ${serif.variable} ${chalk.variable} ${poster.variable} ${anime.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <div className="flex-1">{children}</div>
-        <footer className="px-5 py-5 text-center text-[13.5px] text-ink-soft">
-          Built and maintained by{" "}
-          <a href="https://github.com/Pratheekb11" className="font-semibold text-ink underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
-            Pratheek B
-          </a>
-        </footer>
         <Analytics />
       </body>
     </html>

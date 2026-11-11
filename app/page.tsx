@@ -130,6 +130,12 @@ export default function Home() {
           <Logo />
           <p>Answers are anonymous. We don&rsquo;t store names or IP addresses.</p>
         </div>
+        <p className="px-5 pb-6 text-center text-[13.5px] text-ink-soft">
+          Built and maintained by{" "}
+          <a href="https://github.com/Pratheekb11" className="font-semibold text-ink underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
+            Pratheek B
+          </a>
+        </p>
       </footer>
     </div>
   );
