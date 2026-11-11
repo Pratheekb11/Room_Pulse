@@ -53,7 +53,7 @@ function SampleChart({ q }: { q: PreviewQuestion }) {
     );
   if (q.kind === "text" || q.kind === "qa")
     return (
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {(q.kind === "qa" ? SAMPLE_QA : SAMPLE_TEXT).map((t, i) => (
           <li key={t} className="slab flex items-start justify-between gap-2 rounded-xl bg-white px-4 py-3 text-base font-semibold" style={{ boxShadow: `inset 4px 0 0 ${topicColor(i)}` }}>
             <span>{t}</span>

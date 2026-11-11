@@ -255,7 +255,7 @@ export function SessionCard({
         </details>
       </div>
 
-      <div className="mt-5 grid gap-5 border-t border-line pt-4 sm:grid-cols-[auto_minmax(0,1fr)]">
+      <div className="mt-5 grid grid-cols-1 gap-5 border-t border-line pt-4 sm:grid-cols-[auto_minmax(0,1fr)]">
         <div className="rounded-lg border border-line-strong bg-white p-2 self-start justify-self-start">
           {urls && <QRCodeSVG value={urls.voter} size={104} marginSize={0} fgColor="#26251e" title={`QR code for ${urls.voter}`} />}
         </div>

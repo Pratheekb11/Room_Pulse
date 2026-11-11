@@ -110,7 +110,7 @@ export function TopicDistribution(p: Props) {
           </div>
         </header>
 
-        <section className="slab grid gap-[clamp(1rem,2vw,2.5rem)] rounded-xl bg-white p-[clamp(1rem,1.8vw,2rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
+        <section className="slab grid grid-cols-1 gap-[clamp(1rem,2vw,2.5rem)] rounded-xl bg-white p-[clamp(1rem,1.8vw,2rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
           <div className="flex flex-col justify-center">
             <p className="text-[clamp(0.9rem,1.1vw,1.2rem)] font-semibold text-ink-soft">Average across all measures</p>
             <p className="font-display text-[clamp(3rem,6vw,7rem)] font-semibold leading-none">{fmt1(overall)}</p>

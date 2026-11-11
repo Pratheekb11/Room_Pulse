@@ -189,3 +189,21 @@ describe("one very long word in a table that sizes its own columns", () => {
     expect(table).toMatch(/\[overflow-wrap:anywhere\]/);
   });
 });
+
+// Same day, same word: the Summary's own layout grid grew to fit it in the "Best rated" headline.
+// A grid with no column template sizes its column to the longest word; `grid-cols-1` (minmax(0, 1fr)) keeps it to the screen.
+describe("grids on a phone", () => {
+  it("every grid has a column template for narrow screens (or sets its columns in a style)", () => {
+    const offenders: string[] = [];
+    for (const f of [...files("components"), ...files("app")]) {
+      const src = readFileSync(join(root, f), "utf8");
+      for (const m of src.matchAll(/className=(?:"|\{`)([^"`]*)[\s\S]{0,160}/g)) {
+        const cls = m[1];
+        if (!/(^| )grid( |$)/.test(cls) || /(^| )(grid-cols-\S+|\[grid-template-columns:\S+|place-items-center)( |$)/.test(cls)) continue;
+        if (/gridTemplateColumns/.test(m[0])) continue;
+        offenders.push(`${f}: ${cls.slice(0, 80)}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});

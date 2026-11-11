@@ -3,7 +3,7 @@ import { productFeatures } from "@/lib/features";
 /** "What you can do": the home page's feature grid. */
 export function FeatureList({ ai }: { ai: boolean }) {
   return (
-    <ul className="stagger mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <ul className="stagger mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {productFeatures({ ai }).map((f) => (
         <li key={f.title} className="rounded-xl border border-line bg-white p-5">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold text-ink">

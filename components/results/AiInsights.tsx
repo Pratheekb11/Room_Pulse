@@ -100,7 +100,7 @@ export function AiInsights({ code, focusId, kind, questions = [] }: { code: stri
       )}
 
       {summary && (
-        <div className="mt-3 grid gap-4 md:grid-cols-2" aria-live="polite">
+        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2" aria-live="polite">
           <div>
             <h3 className="font-display text-[clamp(1.05rem,1.3vw,1.5rem)] font-semibold">Themes</h3>
             <ol className="mt-1.5 flex flex-col gap-2">

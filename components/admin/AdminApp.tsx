@@ -212,7 +212,7 @@ function Console({
               + New presentation
             </button>
           </div>
-          <div className="mt-4 grid gap-6 xl:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-6 xl:grid-cols-2">
             {sessions.map((s) => (
               <SessionCard key={s.code} session={s} call={call} onChanged={refresh} guest={guest} aiAvailable={aiAvailable} onNeedAccount={askForAccount} />
             ))}
@@ -323,7 +323,7 @@ function GuestBanner({ onSaved, open, setOpen }: { onSaved: () => void; open: bo
         )}
       </div>
       {open && (
-        <form onSubmit={save} className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" noValidate>
+        <form onSubmit={save} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" noValidate>
           <label className="block text-sm font-semibold">
             Email
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={`${inputClass} bg-white text-base`} />

@@ -64,10 +64,10 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
   const measureColumns = criteria.length <= 3;
 
   return (
-    <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)]">
+    <div className="grid grid-cols-1 gap-[clamp(0.75rem,1.4vw,1.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)]">
       <div className="flex flex-col gap-[clamp(0.75rem,1.4vw,1.5rem)]">
         {best ? (
-          <div className="grid gap-[clamp(0.75rem,1.4vw,1.5rem)] sm:grid-cols-2 lg:grid-cols-1">
+          <div className="grid grid-cols-1 gap-[clamp(0.75rem,1.4vw,1.5rem)] sm:grid-cols-2 lg:grid-cols-1">
             <Standout label="best" rows={bestTies} scaleMax={scaleMax} dark />
             {worstTies.length > 0 && <Standout label="lowest" rows={worstTies} scaleMax={scaleMax} />}
           </div>

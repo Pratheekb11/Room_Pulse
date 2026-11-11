@@ -73,7 +73,7 @@ export function NumberSummary({ stats, unit }: { stats: NumberStats; unit: strin
   const label = "text-[clamp(0.85rem,1.1vw,1.25rem)] font-semibold text-ink-soft";
   const big = "font-display mt-1 block text-[clamp(2.4rem,6vw,6.5rem)] leading-none font-semibold tabular-nums break-words";
   return (
-    <div className="grid gap-[clamp(0.6rem,1.2vw,1.4rem)] sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-[clamp(0.6rem,1.2vw,1.4rem)] sm:grid-cols-2">
       <div className={tile}>
         <span className={label}>Average</span>
         <span className={big}>

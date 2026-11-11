@@ -57,7 +57,7 @@ export function LiveDemo() {
         <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
         <span className="font-mono ml-3 text-xs text-muted">liverate · k7m2qp</span>
       </div>
-      <div className="grid gap-3 bg-canvas-soft p-3 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.6fr)]">
+      <div className="grid grid-cols-1 gap-3 bg-canvas-soft p-3 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.6fr)]">
         {/* phone */}
         <div className="rounded-lg border border-line bg-white p-4">
           <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Your vote</p>

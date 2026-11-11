@@ -37,7 +37,7 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-[1200px] px-5 sm:px-8">
-        <section className="stagger grid gap-12 pt-14 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
+        <section className="stagger grid grid-cols-1 gap-12 pt-14 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
           <div className="min-w-0">
             <h1 className="font-display text-[clamp(2.5rem,5.6vw,4rem)] leading-[1.04] text-ink">
               <span className="block">Know what the room thinks.</span>
@@ -83,7 +83,7 @@ export default function Home() {
           <h2 id="how-h" className="font-display text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
             How it works
           </h2>
-          <ol className="mt-8 grid gap-6 md:grid-cols-3">
+          <ol className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
             {STEPS.map((step, i) => (
               <li key={step.title} className="flex gap-4">
                 <span className="font-display grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line-strong text-ink">{i + 1}</span>
@@ -107,7 +107,7 @@ export default function Home() {
           <h2 id="types-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
             {KIND_INFO.length} kinds of question
           </h2>
-          <ul className="stagger mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="stagger mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {KIND_INFO.map((k, i) => (
               <li key={k.id} className="rounded-xl border border-line bg-white p-5">
                 <span className={`${TYPE_COLORS[i % TYPE_COLORS.length]} rounded-full px-2.5 py-1 text-xs font-semibold text-ink`}>{k.label}</span>

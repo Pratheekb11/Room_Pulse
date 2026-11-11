@@ -397,7 +397,7 @@ export function PresentationForm({
           People have already given scores, so the range is locked. Reset the votes to change it.
         </p>
       )}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
           1 means
           <input value={lowLabel} onChange={(e) => setLowLabel(e.target.value)} maxLength={30} placeholder="Low" className={field} />
@@ -711,7 +711,7 @@ export function PresentationForm({
             <p className="mt-4 text-sm font-semibold">
               Or use a template <span className="font-normal text-ink-soft">(optional, you can change everything)</span>
             </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {TEMPLATES.map((t) => (
                 <button
                   key={t.id}
