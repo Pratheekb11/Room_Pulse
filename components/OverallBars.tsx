@@ -57,7 +57,7 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
             )}
             <span className={`flex min-w-0 shrink-0 flex-col ${large ? "w-[32%]" : "w-[34%]"}`}>
               <span
-                className={`truncate font-bold ${large ? "text-[clamp(1.1rem,1.6vw,2rem)]" : "text-[clamp(0.95rem,1.1vw,1.3rem)]"}`}
+                className={`leading-tight font-bold break-words ${large ? "text-[clamp(1.1rem,1.6vw,2rem)]" : "text-[clamp(0.95rem,1.1vw,1.3rem)]"}`}
                 title={d.name}
               >
                 {d.name}

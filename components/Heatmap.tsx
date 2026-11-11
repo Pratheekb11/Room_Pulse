@@ -58,6 +58,16 @@ function cardsUntil(measures: number): { cards: string; table: string } | null {
   return measures <= 6 ? { cards: "@2xl:hidden", table: "@max-2xl:hidden" } : { cards: "@5xl:hidden", table: "@max-5xl:hidden" };
 }
 
+/**
+ * The item-name column. 22% suits a wide screen; on a phone that's ~75px and "Planning" broke mid-word,
+ * so with the few measures that still show as a table there, names get the room the score tiles can spare.
+ */
+const NAME_COLUMN: Record<number, string> = {
+  1: "w-[44%] @2xl:w-[22%]",
+  2: "w-[38%] @2xl:w-[22%]",
+  3: "w-[32%] @2xl:w-[22%]",
+};
+
 export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
   const empty: Agg = { n: 0, sum: 0 };
   // Container queries (not the viewport): the builder's preview draws the big screen at 1280px on any device.
@@ -87,7 +97,7 @@ export function Heatmap({ topics, criteria, cells, scaleMax, flash }: Props) {
         <caption className="sr-only">Average score for each item on each measure</caption>
         <thead>
           <tr>
-            <th scope="col" className="w-[22%]" />
+            <th scope="col" className={NAME_COLUMN[criteria.length] ?? "w-[22%]"} />
             {criteria.map((c) => (
               <th
                 key={c.id}
