@@ -47,6 +47,13 @@ describe("All questions: every item of a question is on its card", () => {
     expect(out).toMatch(/w-\[4ch\][^>]*>10\.0</);
   });
 
+  it("in a very narrow card the name gets a line to itself, with the bar and number under it", () => {
+    // 4 cards per row beside the QR code leaves ~200px: 42% of that split "Documentation" mid-word
+    const out = render("rating", 3);
+    expect(out).toMatch(/<li[^>]*class="[^"]*flex-wrap/);
+    expect(out).toMatch(/<li[^>]*><span class="w-full @\[17rem\]:w-\[42%\]/);
+  });
+
   it("a long list goes in two columns where the card is wide enough, never sideways", () => {
     const long = render("rating", 8);
     expect(long).toMatch(/@container/);

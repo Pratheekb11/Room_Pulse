@@ -23,9 +23,10 @@ const ONE_COLUMN_ROWS = 5;
 function Bars({ rows, labelWidth = "w-[4ch]" }: { rows: { id: string; name: string; index: number; pct: number; label: string }[]; labelWidth?: string }) {
   return (
     <ol className={`mt-4 ${rows.length > ONE_COLUMN_ROWS ? "@2xl:columns-2 @2xl:gap-x-[clamp(1.25rem,2.4vw,2.5rem)]" : ""}`}>
+      {/* under 17rem of card (4 per row beside the QR code) the name takes a line of its own, so words stay whole */}
       {rows.map((r) => (
-        <li key={r.id} className="mb-2 flex break-inside-avoid items-center gap-2 last:mb-0">
-          <span className="w-[42%] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] leading-snug font-semibold break-words">{r.name}</span>
+        <li key={r.id} className="mb-2 flex flex-wrap break-inside-avoid items-center gap-x-2 gap-y-0.5 last:mb-0">
+          <span className="w-full @[17rem]:w-[42%] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] leading-snug font-semibold break-words">{r.name}</span>
           <span className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft">
             <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${r.pct}%`, backgroundColor: topicColor(r.index) }} />
           </span>
