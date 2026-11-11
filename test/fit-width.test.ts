@@ -178,3 +178,14 @@ describe("full-screen layers cover the whole screen", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// Found on the live site, 2026-11-11: "Supercalifragilisticexpialidocious-integration" pushed the Summary table past a 390px screen.
+// In a table that sizes itself, `break-words` (overflow-wrap: break-word) can't shrink a column below its longest word; `anywhere` can.
+describe("one very long word in a table that sizes its own columns", () => {
+  const src = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  it.each(["components/ExecSummary.tsx", "components/results/RankResults.tsx"])("%s lets it break anywhere", (path) => {
+    const table = src(path).split("<table")[1].split("</table>")[0];
+    expect(table).not.toMatch(/break-words/);
+    expect(table).toMatch(/\[overflow-wrap:anywhere\]/);
+  });
+});

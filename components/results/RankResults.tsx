@@ -93,7 +93,7 @@ export function RankPlaces({ tally }: { tally: RankTally }) {
         <tbody>
           {tally.rows.map((r) => (
             <tr key={r.id}>
-              <th scope="row" className="max-w-[16ch] pr-2 text-left font-bold break-words">
+              <th scope="row" className="max-w-[16ch] pr-2 text-left font-bold [overflow-wrap:anywhere]">
                 {r.name}
               </th>
               {r.places.map((n, p) => {

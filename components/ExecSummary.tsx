@@ -137,7 +137,7 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
                       {r.rank ?? "–"}
                     </td>
                     <td className="py-2 pl-2 pr-3 align-top">
-                      <span className="text-[clamp(1rem,1.2vw,1.4rem)] font-bold break-words">{r.item.name}</span>
+                      <span className="text-[clamp(1rem,1.2vw,1.4rem)] font-bold [overflow-wrap:anywhere]">{r.item.name}</span>
                       {tag && (
                         <span
                           className={`ml-2 inline-block rounded-full px-2 py-0.5 align-middle text-[clamp(0.7rem,0.8vw,0.9rem)] font-bold ${
@@ -148,7 +148,7 @@ export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount 
                         </span>
                       )}
                       {r.item.description && (
-                        <span className="mt-0.5 block text-[clamp(0.8rem,0.95vw,1.05rem)] leading-snug text-ink-soft break-words">{r.item.description}</span>
+                        <span className="mt-0.5 block text-[clamp(0.8rem,0.95vw,1.05rem)] leading-snug text-ink-soft [overflow-wrap:anywhere]">{r.item.description}</span>
                       )}
                       {criteria.length > 1 && (
                         <ul aria-label={`Scores for ${r.item.name}`} className={`mt-1.5 flex flex-wrap gap-1 ${measureColumns ? "@2xl:hidden" : ""}`}>
