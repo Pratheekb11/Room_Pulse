@@ -158,7 +158,7 @@ export function leafSide(spot: { x: number; y?: number }, id: string): 1 | -1 {
   return hash(id) % 2 ? 1 : -1;
 }
 
-const LEAF_TURN = (45 * Math.PI) / 180; // how far a leaf turns out from its branch
+const LEAF_TURN = 45; // how far a leaf turns out from its branch, in degrees
 // how far a leaf may tip from level, in degrees, so its words read easily: up (−) more than down (+),
 // since leaves reaching up look alive and drooping ones look wilted
 const LEAF_UP = -32;
@@ -173,7 +173,7 @@ const MIN_OFF_BRANCH = 20; // a leaf sticks out at least this far from its branc
  */
 export function leafPose(at: LeafSpot, id: string, w: number, h: number): { side: 1 | -1; angle: number } {
   const base = (Math.atan2(at.dy * h, at.dx * w) * 180) / Math.PI;
-  const ways = [base + 45, base - 45].map((deg) => {
+  const ways = [base + LEAF_TURN, base - LEAF_TURN].map((deg) => {
     const x = Math.cos((deg * Math.PI) / 180);
     const side: 1 | -1 = x >= 0 ? 1 : -1;
     // the tilt from level, seen from the leaf's own side, kept within reach
