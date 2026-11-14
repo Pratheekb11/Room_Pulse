@@ -2,6 +2,8 @@
 // (leaves on a tree, sticky notes on a wall, stars in a sky) instead of a list.
 // Used by the team activities (lib/activities.ts).
 
+import { treeLeafSpot } from "./tree";
+
 export const BOARD_IDS = ["tree", "wall", "sky"] as const;
 export type BoardId = (typeof BOARD_IDS)[number];
 
@@ -75,26 +77,13 @@ const A2 = 1 / (G * G);
 const frac = (n: number) => n - Math.floor(n);
 const r2 = (k: number) => ({ x: frac(0.5 + A1 * k), y: frac(0.5 + A2 * k) });
 
-// The tree's spots: the R2 points that fall inside the round canopy, in order (kept as they are found).
-const treeSpots: { x: number; y: number }[] = [];
-let treeK = 0;
-function treeSpot(index: number) {
-  while (treeSpots.length <= index) {
-    treeK++;
-    const p = r2(treeK);
-    // a little inside the edge, so a leaf's middle never sits on the rim
-    if (Math.hypot(p.x - 0.5, p.y - 0.5) <= 0.46) treeSpots.push(p);
-  }
-  return treeSpots[index];
-}
-
 /**
  * Where the answer that arrived `index`-th (0 = first) sits, as 0..1 across and down the board's
- * fill area (a round canopy for the tree). Evenly spread from the first answer on, and depends only
- * on the index, so earlier answers never move when new ones come in.
+ * fill area (on a branch of the tree, lib/tree.ts). Evenly spread from the first answer on, and depends
+ * only on the index, so earlier answers never move when new ones come in.
  */
 export function boardSpot(board: BoardId, index: number): { x: number; y: number } {
-  if (board === "tree") return treeSpot(index);
+  if (board === "tree") return treeLeafSpot(index);
   const m = 0.04;
   const p = r2(index + 1);
   return { x: m + (1 - 2 * m) * p.x, y: m + (1 - 2 * m) * p.y };
