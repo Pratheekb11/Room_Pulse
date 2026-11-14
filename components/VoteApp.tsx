@@ -502,6 +502,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       )}
 
       <VoterHeader
+        signable={groups.some((g) => g.board)}
         title={session.title}
         theme={session.theme}
         decor={session.decor}

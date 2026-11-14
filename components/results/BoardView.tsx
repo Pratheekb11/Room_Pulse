@@ -12,7 +12,7 @@ const LEAF_INK = "#1f3b16";
 const NOTES = ["#fff1a8", "#ffd6e0", "#cfe8ff", "#d6f5c9", "#ffe0bf", "#e8dcff"] as const;
 const NOTE_INK = "#2b2620";
 
-const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const plural = (n: number, w: string) => `${n} ${n === 1 ? w : w === "leaf" ? "leaves" : `${w}s`}`;
 
 function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -44,7 +44,8 @@ function pieceShare(n: number): number {
 export function BoardView({ board, answers, onHide }: { board: BoardId; answers: TextAnswer[]; onHide?: (id: string) => void }) {
   const ordered = arrivalOrder(answers);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [listOpen, setListOpen] = useState(false);
+  // phones draw leaves too small to read, so the list starts open there
+  const [listOpen, setListOpen] = useState(() => typeof window !== "undefined" && window.innerWidth < 560);
   const info = boardInfo(board);
   const openIndex = openId ? ordered.findIndex((a) => a.id === openId) : -1;
 
@@ -104,7 +105,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   const [ref, width] = useWidth<HTMLDivElement>();
   const wide = width >= 560;
   const ratio = wide ? 1.6 : 0.85; // width / height
-  const w = Math.min(width, wide ? Math.round(typeof window === "undefined" ? width : window.innerHeight * 0.7 * ratio) : width);
+  const w = Math.min(width, wide ? Math.round(typeof window === "undefined" ? width : window.innerHeight * 0.62 * ratio) : width);
   const h = Math.round(w / ratio);
   const n = answers.length;
   const piece = Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
@@ -112,7 +113,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   const showText = font >= 9;
   // where the pieces go: the canopy, or most of the sky
   const area = board === "tree" ? { l: 0.07, t: 0.05, w: 0.86, h: 0.58 } : { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
-  const label = board === "tree" ? `A tree with ${plural(n, "leaf").replace("leafs", "leaves")}` : `A night sky with ${plural(n, "star")}`;
+  const label = board === "tree" ? `A tree with ${plural(n, "leaf")}` : `A night sky with ${plural(n, "star")}`;
 
   return (
     <div ref={ref} className="w-full">
@@ -215,7 +216,19 @@ function TreeArt({ w, h, n }: { w: number; h: number; n: number }) {
   return (
     <svg aria-hidden="true" width={w} height={h} className="absolute inset-0">
       <ellipse cx={cx} cy={h * 1.02} rx={w * 0.62} ry={h * 0.1} fill={tinted("#a9cf7d")} />
-      <ellipse cx={cx} cy={h * 0.34} rx={w * 0.47} ry={h * 0.32} fill={tinted("#9fd08a")} opacity={Math.min(0.35, n * 0.03)} />
+      {/* a soft crown that fills in as leaves arrive */}
+      <g fill={tinted("#9fd08a")} opacity={n === 0 ? 0 : Math.min(0.3, 0.08 + n * 0.015)}>
+        {[
+          [0.5, 0.3, 0.3],
+          [0.28, 0.4, 0.22],
+          [0.72, 0.4, 0.22],
+          [0.38, 0.2, 0.2],
+          [0.62, 0.2, 0.2],
+          [0.5, 0.48, 0.22],
+        ].map(([x, y, r], i) => (
+          <ellipse key={i} cx={x * w} cy={y * h} rx={r * w} ry={r * h * 0.95} />
+        ))}
+      </g>
       {twigs.map(([x, y, k], i) => (
         <path
           key={i}
@@ -329,7 +342,7 @@ function PieceDialog({
   const info = boardInfo(board);
   const style =
     board === "tree"
-      ? { background: tinted(LEAVES[pieceShade(answer.id, LEAVES.length)]), color: LEAF_INK, borderRadius: "48px 0" }
+      ? { background: tinted(LEAVES[pieceShade(answer.id, LEAVES.length)]), color: LEAF_INK, borderRadius: "70% 0" }
       : board === "wall"
         ? { background: tinted(NOTES[pieceShade(answer.id, NOTES.length)]), color: NOTE_INK, borderRadius: 4 }
         : { background: tinted("#141a33"), color: "#fdf7e3", borderRadius: 24 };

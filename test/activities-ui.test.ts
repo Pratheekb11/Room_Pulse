@@ -152,3 +152,28 @@ describe("the home page", () => {
     expect(f?.body).toContain("Motivation tree");
   });
 });
+
+describe("phone wording for signed answers", () => {
+  it("puts stars in the sky, not on it", () => {
+    expect(card({ board: "sky" })).toContain("goes in the sky");
+    expect(card({ board: "wall" })).toContain("goes on the wall");
+  });
+
+  it("doesn't promise anonymity in the header when answers can be signed", async () => {
+    const { VoterHeader } = await import("@/components/VoterChrome");
+    const head = (signable: boolean) => renderToStaticMarkup(createElement(VoterHeader, { title: "T", theme: "paper", decor: false, score: null, signable }));
+    expect(head(false)).toContain("Your answers are anonymous.");
+    expect(head(true)).not.toContain("Your answers are anonymous.");
+    expect(head(true)).toContain("Sign them only if you want to.");
+  });
+
+  it("passes whether any question can be signed to the header", () => {
+    const src = readFileSync(new URL("../components/VoteApp.tsx", import.meta.url), "utf8");
+    expect(src).toMatch(/signable=\{groups\.some\(\(g\) => g\.board\)\}/);
+  });
+
+  it("opens the list of leaves on phones, where leaves are too small to read", () => {
+    const src = readFileSync(new URL("../components/results/BoardView.tsx", import.meta.url), "utf8");
+    expect(src).toMatch(/useState\(\(\) => typeof window !== "undefined" && window\.innerWidth < 560\)/);
+  });
+});

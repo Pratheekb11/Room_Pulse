@@ -25,6 +25,7 @@ interface Props {
 
 const PAPER: Record<BoardId, string> = { tree: "#e3f2cf", wall: "#fff4b8", sky: "#e6e9fb" };
 const WHERE: Record<BoardId, string> = { tree: "the tree", wall: "the wall", sky: "the sky" };
+const ON: Record<BoardId, string> = { tree: "on the tree", wall: "on the wall", sky: "in the sky" };
 const tidy = (s: string) => s.trim().replace(/\s+/g, " ");
 
 /** Open answer: one short answer in the voter's own words. They can change it later. */
@@ -46,7 +47,7 @@ export function TextCard({ question, color, value, status, disabled, board = nul
 
   const how = board === "wall" ? "Write your sticky note" : piece ? `Write your ${piece}` : "Write your answer";
   const hint = board
-    ? `Your ${piece} goes on ${WHERE[board]} for everyone to see.${cleanName ? "" : " Unsigned, nobody will know it's yours."}`
+    ? `Your ${piece} goes ${ON[board]} for everyone to see.${cleanName ? "" : " Unsigned, nobody will know it's yours."}`
     : "Your answer is anonymous.";
 
   return (

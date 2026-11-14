@@ -175,23 +175,34 @@ export default function Home() {
 /** A small drawn Motivation tree with a few leaves, to show what an activity looks like. */
 function MiniTree() {
   const leaves: [number, number, number, string, string][] = [
-    [120, 70, -10, "#cdeab0", "My team"],
-    [190, 52, 8, "#b4dc92", "Learning"],
-    [258, 78, -6, "#dcecaa", "Customers"],
-    [92, 128, 10, "#a3d48a", "Growth"],
-    [168, 118, -4, "#efe3a0", "Autonomy"],
-    [244, 132, 6, "#c3e3a0", "Shipping"],
-    [300, 116, -12, "#b4dc92", "Coffee"],
-    [140, 172, 4, "#dcecaa", "Kind people"],
-    [222, 178, -8, "#cdeab0", "Hard problems"],
+    [190, 62, -4, "#b4dc92", "Learning"],
+    [112, 92, -12, "#cdeab0", "My team"],
+    [270, 92, 10, "#dcecaa", "Customers"],
+    [150, 132, 8, "#efe3a0", "Autonomy"],
+    [236, 136, -8, "#a3d48a", "Shipping"],
+    [76, 150, 10, "#c3e3a0", "Growth"],
+    [306, 152, -10, "#b4dc92", "Coffee"],
+    [130, 182, -6, "#dcecaa", "Kind people"],
+    [252, 186, 6, "#cdeab0", "Hard problems"],
   ];
   return (
     <figure className="mx-auto w-full max-w-md">
       <svg viewBox="0 0 380 300" role="img" aria-label="A tree whose leaves are people's answers: My team, Learning, Customers, Growth and more" className="w-full">
         <rect x="0" y="0" width="380" height="300" rx="20" fill="#eef6f9" />
-        <ellipse cx="190" cy="300" rx="230" ry="34" fill="#a9cf7d" />
-        <path d="M178 290 C182 250 182 230 184 200 L196 200 C198 230 198 250 202 290 Z" fill="#8a5a3b" />
-        <path d="M190 205 Q160 170 110 140 M190 205 Q220 165 270 130 M190 205 Q186 150 180 90 M190 205 Q230 190 300 160" stroke="#8a5a3b" strokeWidth="9" strokeLinecap="round" fill="none" />
+        <ellipse cx="190" cy="306" rx="230" ry="40" fill="#a9cf7d" />
+        <g fill="#9fd08a" opacity="0.3">
+          <ellipse cx="190" cy="120" rx="150" ry="95" />
+          <ellipse cx="100" cy="150" rx="80" ry="60" />
+          <ellipse cx="280" cy="150" rx="80" ry="60" />
+        </g>
+        <path d="M176 292 C181 262 182 245 184 222 L196 222 C198 245 199 262 204 292 Z" fill="#8a5a3b" />
+        <path
+          d="M190 226 Q150 200 112 150 M190 226 Q232 196 270 150 M190 226 Q188 150 190 80 M190 226 Q120 205 80 170 M190 226 Q262 205 304 172"
+          stroke="#8a5a3b"
+          strokeWidth="8"
+          strokeLinecap="round"
+          fill="none"
+        />
         {leaves.map(([x, y, r, fill, text]) => (
           <g key={text} transform={`translate(${x} ${y}) rotate(${r})`}>
             <path d="M -50 0 Q -6 -34 50 0 Q 6 34 -50 0 Z" fill={fill} />

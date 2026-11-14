@@ -26,30 +26,36 @@ export const boardInfo = (id: BoardId) => BOARDS.find((b) => b.id === id)!;
 /** Longest name someone may sign their answer with. */
 export const MAX_AUTHOR = 30;
 
-/** Leaves per layer of the tree; more than this start a second layer between the first. */
-const CAP = 60;
-const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 // R2 low-discrepancy sequence: evenly spread points that never move as more arrive.
 const G = 1.324717957244746;
 const A1 = 1 / G;
 const A2 = 1 / (G * G);
 const frac = (n: number) => n - Math.floor(n);
+const r2 = (k: number) => ({ x: frac(0.5 + A1 * k), y: frac(0.5 + A2 * k) });
+
+// The tree's spots: the R2 points that fall inside the round canopy, in order (kept as they are found).
+const treeSpots: { x: number; y: number }[] = [];
+let treeK = 0;
+function treeSpot(index: number) {
+  while (treeSpots.length <= index) {
+    treeK++;
+    const p = r2(treeK);
+    // a little inside the edge, so a leaf's middle never sits on the rim
+    if (Math.hypot(p.x - 0.5, p.y - 0.5) <= 0.46) treeSpots.push(p);
+  }
+  return treeSpots[index];
+}
 
 /**
  * Where the answer that arrived `index`-th (0 = first) sits, as 0..1 across and down the board's
- * fill area. Depends only on the index, so earlier answers never move when new ones come in.
+ * fill area (a round canopy for the tree). Evenly spread from the first answer on, and depends only
+ * on the index, so earlier answers never move when new ones come in.
  */
 export function boardSpot(board: BoardId, index: number): { x: number; y: number } {
-  if (board === "tree") {
-    // Sunflower spiral: a full, round canopy filling from the middle out.
-    const layer = Math.floor(index / CAP);
-    const j = index % CAP;
-    const r = Math.sqrt((j + 0.5) / CAP);
-    const a = j * GOLDEN + layer * (GOLDEN / 2);
-    return { x: 0.5 + 0.5 * r * Math.cos(a), y: 0.5 + 0.5 * r * Math.sin(a) };
-  }
+  if (board === "tree") return treeSpot(index);
   const m = 0.04;
-  return { x: m + (1 - 2 * m) * frac(0.5 + A1 * (index + 1)), y: m + (1 - 2 * m) * frac(0.5 + A2 * (index + 1)) };
+  const p = r2(index + 1);
+  return { x: m + (1 - 2 * m) * p.x, y: m + (1 - 2 * m) * p.y };
 }
 
 function hash(s: string): number {

@@ -239,6 +239,17 @@ describe("board layout", () => {
     expect(arrivalOrder([b, a]).map((t) => t.id)).toEqual(["a", "b"]);
   });
 
+  it("uses the whole canopy from the first few leaves, not just the middle", () => {
+    const first = Array.from({ length: 12 }, (_, i) => boardSpot("tree", i));
+    const far = Math.max(...first.map((p) => Math.hypot(p.x - 0.5, p.y - 0.5)));
+    expect(far).toBeGreaterThan(0.38);
+    // and stays inside the round canopy
+    for (let i = 0; i < 200; i++) {
+      const p = boardSpot("tree", i);
+      expect(Math.hypot(p.x - 0.5, p.y - 0.5)).toBeLessThanOrEqual(0.5);
+    }
+  });
+
   it("tilts each leaf a little, the same way every time", () => {
     const t = leafTilt("3f1c2a90-0000-4000-8000-000000000000");
     expect(t).toBe(leafTilt("3f1c2a90-0000-4000-8000-000000000000"));

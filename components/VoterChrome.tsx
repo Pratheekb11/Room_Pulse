@@ -17,6 +17,7 @@ export function VoterHeader({
   theme,
   decor,
   score,
+  signable = false,
   children,
 }: {
   title: string;
@@ -25,6 +26,8 @@ export function VoterHeader({
   decor: boolean;
   /** The points pill (and its animations) at the top right. */
   score: React.ReactNode;
+  /** Some answers can be signed with a name (team activities), so they aren't always anonymous. */
+  signable?: boolean;
   /** Extra lines under the title, e.g. "See live results". */
   children?: React.ReactNode;
 }) {
@@ -38,7 +41,9 @@ export function VoterHeader({
         <h1 className="font-display min-w-0 text-[clamp(1.7rem,7cqw,2.4rem)] font-semibold leading-[1.02] tracking-tight break-words">{title}</h1>
         {decor && <Doodle character={charactersFor(theme).phone} className="h-20 w-20 shrink-0" />}
       </div>
-      <p className="mt-1.5 text-[0.95rem] text-ink-soft">Tap an answer. It saves straight away. Your answers are anonymous.</p>
+      <p className="mt-1.5 text-[0.95rem] text-ink-soft">
+        Tap an answer. It saves straight away. {signable ? "You can add your name to some answers. Sign them only if you want to." : "Your answers are anonymous."}
+      </p>
       {children}
     </header>
   );
