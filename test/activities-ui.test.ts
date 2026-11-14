@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { TextCard } from "@/components/vote/TextCard";
+import { BoardCard } from "@/components/vote/BoardCard";
 import { BoardView } from "@/components/results/BoardView";
 import { TextAnswers } from "@/components/results/TextResults";
 import type { TextAnswer } from "@/lib/types";
@@ -22,34 +23,74 @@ const t = (id: string, text: string, author: string | null = null): TextAnswer =
   at: "2026-11-14T10:00:00.000Z",
 });
 
+const leafCard = (extra: Record<string, unknown>) =>
+  renderToStaticMarkup(
+    createElement(BoardCard, {
+      question: "What motivates you?",
+      color: "#000",
+      board: "tree",
+      leaves: [],
+      disabled: false,
+      onSave: () => {},
+      onRemove: () => {},
+      ...extra,
+    }),
+  );
+
 describe("the phone's card for a board question", () => {
   it("asks for a leaf on a tree, with an optional name to sign it", () => {
-    const html = card({ board: "tree" });
+    const html = leafCard({});
     expect(html).toContain("Write your leaf");
     expect(html).toContain("Sign it (optional)");
     expect(html).toMatch(/maxLength="30"|maxlength="30"/);
     expect(html).toContain("goes on the tree");
+    expect(html).toContain("Add my leaf");
+    expect(html).toContain("You can add up to 5 leaves.");
   });
 
   it("names the piece for each board", () => {
-    expect(card({ board: "wall" })).toContain("Write your sticky note");
-    expect(card({ board: "sky" })).toContain("Write your star");
+    expect(leafCard({ board: "wall" })).toContain("Write your sticky note");
+    expect(leafCard({ board: "sky" })).toContain("Write your star");
   });
 
   it("fills in the name the person signed with before", () => {
-    expect(card({ board: "tree", author: "Priya" })).toContain('value="Priya"');
+    expect(leafCard({ author: "Priya" })).toContain('value="Priya"');
+  });
+
+  it("lists the person's own leaves, each to change or take back, and offers another", () => {
+    const html = leafCard({ leaves: ["Growth", "", "Coffee"] });
+    expect(html).toContain("Growth");
+    expect(html).toContain("Coffee");
+    expect(html).toContain("Your leaves (2 of 5)");
+    expect(html).toContain('aria-label="Change leaf: Growth"');
+    expect(html).toContain('aria-label="Take back leaf: Coffee"');
+    expect(html).toContain("Add another leaf");
+  });
+
+  it("stops at 5 leaves", () => {
+    const html = leafCard({ leaves: ["a", "b", "c", "d", "e"] });
+    expect(html).toContain("Your leaves (5 of 5)");
+    expect(html).not.toContain("Add another leaf");
+    expect(html).toContain("most each person can add");
+  });
+
+  it("links to the live board once a leaf is on it, when results are shared", () => {
+    expect(leafCard({ seeHref: "/s/abcd/results" })).not.toContain("See the tree");
+    const html = leafCard({ leaves: ["Growth"], seeHref: "/s/abcd/results" });
+    expect(html).toContain('href="/s/abcd/results"');
+    expect(html).toContain("See the tree");
+  });
+
+  it("is what the voter page shows for board questions, one save per leaf", () => {
+    const src = readFileSync(new URL("../components/VoteApp.tsx", import.meta.url), "utf8");
+    expect(src).toContain("<BoardCard");
+    expect(src).toContain("leafKey(");
   });
 
   it("stays anonymous on a plain open answer: no name box", () => {
     const html = card({});
     expect(html).not.toContain("Sign it");
     expect(html).toContain("Your answer is anonymous.");
-  });
-
-  it("links to the live board once sent, when results are shared", () => {
-    const html = card({ board: "tree", value: "Growth", seeHref: "/s/abcd/results" });
-    expect(html).toContain('href="/s/abcd/results"');
-    expect(html).toContain("See the tree");
   });
 });
 
@@ -132,7 +173,7 @@ describe("the builder's preview", () => {
   it("draws the board and the leaf card", () => {
     const src = readFileSync(new URL("../components/admin/PresentationPreview.tsx", import.meta.url), "utf8");
     expect(src).toContain("<BoardView");
-    expect(src).toMatch(/<TextCard[^>]*board=\{q\.board/);
+    expect(src).toContain("<BoardCard");
   });
 });
 
@@ -155,8 +196,8 @@ describe("the home page", () => {
 
 describe("phone wording for signed answers", () => {
   it("puts stars in the sky, not on it", () => {
-    expect(card({ board: "sky" })).toContain("goes in the sky");
-    expect(card({ board: "wall" })).toContain("goes on the wall");
+    expect(leafCard({ board: "sky" })).toContain("goes in the sky");
+    expect(leafCard({ board: "wall" })).toContain("goes on the wall");
   });
 
   it("doesn't promise anonymity in the header when answers can be signed", async () => {
@@ -170,6 +211,14 @@ describe("phone wording for signed answers", () => {
   it("passes whether any question can be signed to the header", () => {
     const src = readFileSync(new URL("../components/VoteApp.tsx", import.meta.url), "utf8");
     expect(src).toMatch(/signable=\{groups\.some\(\(g\) => g\.board\)\}/);
+  });
+
+  it("has zoom buttons on the tree and sky", () => {
+    const src = readFileSync(new URL("../components/results/BoardView.tsx", import.meta.url), "utf8");
+    expect(src).toContain('aria-label="Zoom in"');
+    expect(src).toContain('aria-label="Zoom out"');
+    expect(src).toContain("sceneSize(");
+    expect(src).toContain("clampPan(");
   });
 
   it("opens the list of leaves on phones, where leaves are too small to read", () => {

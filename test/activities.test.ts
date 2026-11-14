@@ -12,7 +12,7 @@ import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as publicResults from "@/app/api/results/[code]/public/route";
 import * as answerRoute from "@/app/api/answer/route";
 import { ACTIVITIES, activityToBody } from "@/lib/activities";
-import { arrivalOrder, BOARDS, boardSpot, leafTilt, MAX_AUTHOR } from "@/lib/boards";
+import { arrivalOrder, BOARDS, boardSpot, clampPan, leafTilt, MAX_AUTHOR, MAX_LEAVES, sceneSize, ZOOMS } from "@/lib/boards";
 import { createSessionSchema } from "@/lib/validation";
 import { chartsFor } from "@/lib/charts";
 import { groupByFocus } from "@/lib/focus";
@@ -29,6 +29,13 @@ const create = (body: Record<string, unknown>) =>
   adminSessions.POST(new Request(`${ORIGIN}/api/admin/sessions`, as({ method: "POST", body: JSON.stringify({ criteria: [], ...body }) })));
 const edit = (code: string, body: unknown) =>
   adminSession.PUT(new Request(`${ORIGIN}/api/admin/sessions/${code}`, as({ method: "PUT", body: JSON.stringify(body) })), ctx(code));
+const leaf = (code: string, focusId: string, voterId: string, slot: number, text: string | null, extra: Record<string, unknown> = {}) =>
+  answerRoute.POST(
+    new Request(`${ORIGIN}/api/answer`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "text", code, focusId, voterId, slot, ...(text === null ? { remove: true } : { text }), ...extra }),
+    }),
+  );
 const answer = (code: string, focusId: string, voterId: string, text: string, author?: string) =>
   answerRoute.POST(
     new Request(`${ORIGIN}/api/answer`, { method: "POST", body: JSON.stringify({ kind: "text", code, focusId, voterId, text, ...(author === undefined ? {} : { author }) }) }),
@@ -191,6 +198,70 @@ describe("signing an answer with a name (optional)", () => {
   });
 });
 
+describe("several leaves per person on a board (it's an activity, not a one-answer question)", () => {
+  it(`lets one person add up to ${MAX_LEAVES} leaves, all signed, counted as one person`, async () => {
+    expect(MAX_LEAVES).toBe(5);
+    const { code, focusId } = await tree();
+    const me = crypto.randomUUID();
+    for (const [i, t] of ["Growth", "My team", "Coffee"].entries()) expect((await leaf(code, focusId, me, i, t, { author: "Priya" })).status).toBe(200);
+    const r = await results(code);
+    expect(r.texts.map((t) => t.text).sort()).toEqual(["Coffee", "Growth", "My team"]);
+    expect(r.texts.every((t) => t.author === "Priya")).toBe(true);
+    expect(r.voterCount).toBe(1);
+    expect(r.respondents.find((x) => x.focusId === focusId)?.n).toBe(1);
+  });
+
+  it(`refuses a ${MAX_LEAVES + 1}th leaf`, async () => {
+    const { code, focusId } = await tree();
+    expect((await leaf(code, focusId, crypto.randomUUID(), MAX_LEAVES, "Too many")).status).toBe(400);
+    expect((await leaf(code, focusId, crypto.randomUUID(), -1, "Nope")).status).toBe(400);
+  });
+
+  it("changes one leaf without touching the others, keeping its spot", async () => {
+    const { code, focusId } = await tree();
+    const me = crypto.randomUUID();
+    await leaf(code, focusId, me, 0, "Growth");
+    await leaf(code, focusId, me, 1, "Coffe");
+    const before = (await results(code)).texts.find((t) => t.text === "Coffe")!;
+    await leaf(code, focusId, me, 1, "Coffee");
+    const after = (await results(code)).texts;
+    expect(after.map((t) => t.text).sort()).toEqual(["Coffee", "Growth"]);
+    const fixed = after.find((t) => t.text === "Coffee")!;
+    expect(fixed.id).toBe(before.id);
+    expect(fixed.created).toBe(before.created);
+  });
+
+  it("lets a person take a leaf back", async () => {
+    const { code, focusId } = await tree();
+    const me = crypto.randomUUID();
+    await leaf(code, focusId, me, 0, "Growth");
+    await leaf(code, focusId, me, 1, "Oops");
+    expect((await leaf(code, focusId, me, 1, null)).status).toBe(200);
+    expect((await results(code)).texts.map((t) => t.text)).toEqual(["Growth"]);
+    // someone else's leaf in the same spot is untouched
+    const other = crypto.randomUUID();
+    await leaf(code, focusId, other, 0, "Mine");
+    await leaf(code, focusId, me, 0, null);
+    expect((await results(code)).texts.map((t) => t.text)).toEqual(["Mine"]);
+  });
+
+  it("needs words unless taking a leaf back", async () => {
+    const { code, focusId } = await tree();
+    const res = await answerRoute.POST(new Request(`${ORIGIN}/api/answer`, { method: "POST", body: JSON.stringify({ kind: "text", code, focusId, voterId: crypto.randomUUID(), slot: 0 }) }));
+    expect(res.status).toBe(400);
+  });
+
+  it("keeps plain open answers to one per person, whatever spot is sent", async () => {
+    const res = await create({ title: "Retro", focusTopics: [{ name: "What went well?", kind: "text" }] });
+    const { code } = (await res.json()) as { code: string };
+    const focusId = (await info(code)).focusTopics[0].id;
+    const me = crypto.randomUUID();
+    await leaf(code, focusId, me, 0, "Demos");
+    await leaf(code, focusId, me, 3, "Demos and pairing");
+    expect((await results(code)).texts.map((t) => t.text)).toEqual(["Demos and pairing"]);
+  });
+});
+
 describe("creating a presentation with results already shared on phones", () => {
   it("can turn on results on phones from the start", async () => {
     const { code } = await tree({ showResults: true });
@@ -254,6 +325,48 @@ describe("board layout", () => {
     const t = leafTilt("3f1c2a90-0000-4000-8000-000000000000");
     expect(t).toBe(leafTilt("3f1c2a90-0000-4000-8000-000000000000"));
     expect(Math.abs(t)).toBeLessThanOrEqual(14);
+  });
+});
+
+describe("fitting the tree on any screen", () => {
+  const cases = [
+    { width: 357, viewportH: 844, top: 450 },
+    { width: 357, viewportH: 640, top: 120 },
+    { width: 975, viewportH: 900, top: 420 },
+    { width: 1700, viewportH: 1080, top: 300 },
+    { width: 1200, viewportH: 600, top: 500 },
+    { width: 2400, viewportH: 1300, top: 0 },
+    { width: 300, viewportH: 2000, top: 0 },
+  ];
+
+  it("is never wider than its space nor taller than the screen, and keeps its shape", () => {
+    for (const c of cases) {
+      const s = sceneSize(c.width, c.viewportH, c.top);
+      expect(s.w, JSON.stringify(c)).toBeLessThanOrEqual(c.width);
+      expect(s.h, JSON.stringify(c)).toBeLessThanOrEqual(c.viewportH - 16);
+      expect(Math.abs(s.w / s.h - s.ratio), JSON.stringify(c)).toBeLessThan(0.02);
+    }
+  });
+
+  it("fits in the first screen when it starts in the top half", () => {
+    for (const c of cases.filter((c) => c.top <= c.viewportH * 0.45)) {
+      const s = sceneSize(c.width, c.viewportH, c.top);
+      expect(c.top + s.h, JSON.stringify(c)).toBeLessThanOrEqual(c.viewportH);
+    }
+  });
+
+  it("is tall on phones and wide on big screens", () => {
+    expect(sceneSize(357, 844, 0).ratio).toBeLessThan(1);
+    expect(sceneSize(1200, 900, 0).ratio).toBeGreaterThan(1);
+  });
+
+  it("zooms in steps and never pans past the edges", () => {
+    expect(ZOOMS[0]).toBe(1);
+    expect(ZOOMS.at(-1)).toBeGreaterThanOrEqual(3);
+    expect(clampPan({ x: 50, y: 50 }, 1, 400, 300)).toEqual({ x: 0, y: 0 });
+    expect(clampPan({ x: 50, y: 50 }, 2, 400, 300)).toEqual({ x: 0, y: 0 });
+    expect(clampPan({ x: -999, y: -999 }, 2, 400, 300)).toEqual({ x: -400, y: -300 });
+    expect(clampPan({ x: -100, y: -50 }, 2, 400, 300)).toEqual({ x: -100, y: -50 });
   });
 });
 
