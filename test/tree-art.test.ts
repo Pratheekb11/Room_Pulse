@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { boardSpot } from "@/lib/boards";
-import { leafSide, TREE_BRANCHES, treeFork } from "@/lib/tree";
+import { leafPose, leafSide, TREE_BRANCHES, treeFork, treeLeafAt } from "@/lib/tree";
 
 const dist = (p: { x: number; y: number }, s: (typeof TREE_BRANCHES)[number]) => {
   const dx = s.x2 - s.x1;
@@ -93,8 +93,7 @@ describe("the drawing", () => {
     expect(src).not.toContain('borderRadius: "75% 0"');
   });
 
-  it("hangs each leaf by its stem from its spot, on the side away from the trunk", () => {
-    expect(src).toContain("leafSide(");
+  it("hangs each leaf by its stem from its spot", () => {
     expect(src).toMatch(/transformOrigin/);
   });
 
@@ -147,5 +146,66 @@ describe("long leaves (a paragraph instead of a few words)", () => {
     );
     expect(html).toMatch(/<li class="flex flex-col/);
     expect(html).toContain("line-clamp-4");
+  });
+});
+
+describe("how a leaf grows out of its branch", () => {
+  const leaves = Array.from({ length: 100 }, (_, i) => ({ i, at: treeLeafAt(i) }));
+
+  it("knows which way its branch runs at every spot", () => {
+    for (const { at } of leaves) {
+      expect(Math.hypot(at.dx, at.dy)).toBeCloseTo(1, 5);
+      expect(at.dy).toBeLessThan(0.5); // branches grow upwards or sideways, some droop a little, none hang down
+    }
+  });
+
+  it("points the way its branch grows, out from the trunk, never back towards it", () => {
+    for (const { at } of leaves) {
+      const pose = leafPose(at, `id${at.x}`, 800, 500);
+      if (Math.abs(at.dx) > 0.3) expect(pose.side, JSON.stringify(at)).toBe(at.dx > 0 ? 1 : -1);
+    }
+  });
+
+  it("stays nearly level, so its words read easily: up to 32° up, at most 20° down (drooping leaves look wilted)", () => {
+    for (const { at, i } of leaves) {
+      for (const [w, h] of [[800, 500], [330, 390]]) {
+        const { angle } = leafPose(at, `leaf${i}`, w, h);
+        expect(angle).toBeGreaterThanOrEqual(-32);
+        expect(angle).toBeLessThanOrEqual(20);
+      }
+    }
+  });
+
+  it("mostly reaches up or level, rarely down", () => {
+    const down = leaves.filter(({ at, i }) => leafPose(at, `leaf${i}`, 800, 500).angle > 5).length;
+    expect(down).toBeLessThan(35);
+  });
+
+  it("sticks out of its branch instead of lying along it", () => {
+    for (const { at, i } of leaves) {
+      for (const [w, h] of [[800, 500], [330, 390]]) {
+        const pose = leafPose(at, `leaf${i}`, w, h);
+        // the leaf's direction on screen, from its stalk to its tip
+        const a = (pose.angle * Math.PI) / 180;
+        const leaf = { x: pose.side * Math.cos(a), y: Math.sin(a) };
+        const bx = at.dx * w;
+        const by = at.dy * h;
+        const len = Math.hypot(bx, by);
+        const cos = (leaf.x * bx + leaf.y * by) / len;
+        expect(Math.acos(Math.min(1, cos)) * (180 / Math.PI), `leaf ${i} at ${w}x${h}`).toBeGreaterThanOrEqual(20);
+      }
+    }
+  });
+
+  it("is the same every time", () => {
+    const at = treeLeafAt(5);
+    expect(leafPose(at, "x", 800, 500)).toEqual(leafPose(at, "x", 800, 500));
+  });
+
+  it("is never turned round to fit: the tree leaves room at its edges instead", () => {
+    const src = readFileSync(new URL("../components/results/BoardView.tsx", import.meta.url), "utf8");
+    expect(src).toContain("leafPose(");
+    expect(src).not.toContain("leafSide(");
+    expect(src).toMatch(/crownBox\(w, h, piece\)/);
   });
 });
