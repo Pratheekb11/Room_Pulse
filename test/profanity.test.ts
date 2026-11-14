@@ -61,6 +61,24 @@ describe("hasBadWords", () => {
     }
   });
 
+  it("catches fck and its forms", () => {
+    for (const s of ["fck", "Fck", "f c k", "fcking", "fckin", "fcked", "fcker"]) {
+      expect(hasBadWords(s), s).toBe(true);
+    }
+  });
+
+  it("catches insults aimed at people (it's a team board, not just swearing)", () => {
+    for (const s of ["idiot", "Idiots", "idiotic", "idi0t", "you stupid", "STUPID", "stoopid", "stupidity", "moron", "morons", "imbecile", "dimwit", "nitwit", "halfwit", "bewakoof", "bevakoof"]) {
+      expect(hasBadWords(s), s).toBe(true);
+    }
+  });
+
+  it("leaves words that only look like insults alone", () => {
+    for (const s of ["Idiom of the day", "Studio session", "Stupa visit"]) {
+      expect(hasBadWords(s), s).toBe(false);
+    }
+  });
+
   it("catches slurs", () => {
     for (const s of ["faggot", "retard", "retarded"]) {
       expect(hasBadWords(s), s).toBe(true);
