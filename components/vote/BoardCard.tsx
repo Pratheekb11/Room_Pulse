@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { boardInfo, MAX_AUTHOR, MAX_LEAVES, type BoardId } from "@/lib/boards";
 import { tinted } from "@/lib/colors";
+import { BLOCKED_MESSAGE, hasBadWords } from "@/lib/profanity";
 import { MAX_TEXT_ANSWER } from "@/lib/validation";
 import { haptic } from "../Burst";
 import type { SaveStatus } from "@/lib/vote-queue";
@@ -36,7 +37,8 @@ const plural = (piece: string) => (piece === "leaf" ? "leaves" : `${piece}s`);
 
 /**
  * A team activity's board on the phone: each person can add several leaves (notes, stars),
- * change one, or take one back, and may sign them with a name.
+ * change one, or take one back. Each one carries the person's name (team building is about
+ * knowing who said what), and bad words are kept off the board.
  */
 export function BoardCard({ question, color, board, leaves, status, disabled, author = "", seeHref, onSave, onRemove, finished = false, onFinish }: Props) {
   const piece = boardInfo(board).piece;
@@ -46,6 +48,7 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [name, setName] = useState(author);
+  const [problem, setProblem] = useState(false);
   const clean = tidy(draft);
   const target = editing ?? freeSlot;
   const full = editing === null && freeSlot === undefined;
@@ -54,7 +57,11 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
 
   function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!clean || target === undefined || disabled) return;
+    if (!clean || !tidy(name) || target === undefined || disabled) return;
+    if (hasBadWords(clean) || hasBadWords(name)) {
+      setProblem(true);
+      return;
+    }
     haptic();
     onSave(target, clean, tidy(name));
     setDraft("");
@@ -125,7 +132,10 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
             <textarea
               id="text-answer"
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setProblem(false);
+              }}
               maxLength={MAX_TEXT_ANSWER}
               rows={3}
               disabled={disabled}
@@ -135,12 +145,16 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
             />
             <div className="flex flex-col gap-1">
               <label htmlFor="text-author" className="text-sm font-bold text-ink-soft">
-                Sign it (optional)
+                Your name
               </label>
               <input
                 id="text-author"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setProblem(false);
+                }}
+                required
                 maxLength={MAX_AUTHOR}
                 disabled={disabled}
                 autoComplete="given-name"
@@ -148,6 +162,11 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
                 className="w-full rounded-xl border border-line-strong px-4 py-2.5 text-base"
               />
             </div>
+            {problem && (
+              <p role="alert" className="rounded-lg border border-error px-3 py-2 text-sm font-semibold text-error">
+                {BLOCKED_MESSAGE}
+              </p>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className={`text-xs font-semibold tabular-nums ${left < 20 ? "text-error" : "text-ink-soft"}`}>{left} left</span>
               <span className="flex gap-2">
@@ -163,14 +182,13 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
                     Cancel
                   </button>
                 )}
-                <button type="submit" disabled={disabled || !clean} className="key rounded-xl bg-primary px-6 py-3 font-bold text-white">
+                <button type="submit" disabled={disabled || !clean || !tidy(name)} className="key rounded-xl bg-primary px-6 py-3 font-bold text-white">
                   {editing !== null ? "Save" : mine.length ? `Add another ${piece}` : `Add my ${piece}`}
                 </button>
               </span>
             </div>
             <p className="text-right text-xs font-semibold text-ink-soft">
-              {`Your ${piece} goes ${ON[board]} for everyone to see.`}
-              {tidy(name) ? "" : " Unsigned, nobody will know it's yours."}
+              {`Your ${piece} goes ${ON[board]} with your name, for everyone to see.`}
               {mine.length === 0 ? ` You can add up to ${MAX_LEAVES} ${pieces}.` : ""}
             </p>
           </form>

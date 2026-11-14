@@ -61,18 +61,18 @@ export function previewQuestions(
   });
 }
 
-const SAMPLE_LEAVES: [string, string | null][] = [
+const SAMPLE_LEAVES: [string, string][] = [
   ["Learning something new every week", "Priya"],
-  ["Helping a customer for real", null],
+  ["Helping a customer for real", "Meera"],
   ["My team", "Sam"],
-  ["Shipping things people use", null],
+  ["Shipping things people use", "Arjun"],
   ["Freedom to try ideas", "Ana"],
-  ["Good coffee and better people", null],
+  ["Good coffee and better people", "Lee"],
   ["Growing into a lead role", "Ravi"],
-  ["Solving hard problems", null],
+  ["Solving hard problems", "Kavya"],
 ];
 
-/** Sample answers for a board in the preview: a few signed, a few not. */
+/** Sample answers for a board in the preview, each with a name (board leaves always have one). */
 export function sampleBoardAnswers(focusId: string): TextAnswer[] {
   return SAMPLE_LEAVES.map(([text, author], i) => ({
     id: `${focusId}-sample-${i}`,

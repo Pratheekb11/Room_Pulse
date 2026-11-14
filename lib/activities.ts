@@ -26,7 +26,7 @@ export const ACTIVITIES: Activity[] = [
     minutes: 15,
     steps: [
       "Show the QR code. Everyone joins, in the room or online.",
-      "Give people 3 minutes to write their leaf. Signing it is optional.",
+      "Give people 3 minutes to write their leaf. Each leaf shows its writer's name.",
       "Watch the tree grow. Tap a leaf to show it big, and talk about it.",
       "Ask: what do many of us share? What surprised you?",
     ],
@@ -56,7 +56,7 @@ export const ACTIVITIES: Activity[] = [
     plan: {
       title: "Our goals for next year",
       questions: [
-        { kind: "text", board: "sky", name: "One goal you want to reach next year", description: "Big or small. Sign it if you like." },
+        { kind: "text", board: "sky", name: "One goal you want to reach next year", description: "Big or small." },
         { kind: "text", board: "wall", name: "What would help you get there?" },
       ],
     },
@@ -74,7 +74,7 @@ export const ACTIVITIES: Activity[] = [
     plan: {
       title: "Kudos wall",
       questions: [
-        { kind: "text", board: "wall", name: "Who helped you lately, and how?", description: "Name them in your note. Sign it or stay anonymous." },
+        { kind: "text", board: "wall", name: "Who helped you lately, and how?", description: "Name them in your note." },
       ],
     },
   },
@@ -130,7 +130,7 @@ export const ACTIVITIES: Activity[] = [
     plan: {
       title: "Hidden superpowers",
       questions: [
-        { kind: "text", board: "sky", name: "What's a skill of yours the team might not know about?", description: "Sign it, so people know who to ask." },
+        { kind: "text", board: "sky", name: "What's a skill of yours the team might not know about?", description: "Your name goes on it, so people know who to ask." },
         { kind: "words", name: "One thing you'd love to learn" },
       ],
     },

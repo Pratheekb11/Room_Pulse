@@ -30,6 +30,7 @@ import type { AnswerInput, CreateSessionInput, EditSessionInput, QaAction, QuizA
 import type { AddPointInput, ChangePointInput, QuizControl } from "./validation";
 import { itemKey, MAX_QA_PER_VOTER } from "./validation";
 import { generateCode, generateDashboardKey } from "./code";
+import { hasBadWords } from "./profanity";
 
 // All SQL lives here. Every statement is a parameterised tagged template.
 
@@ -709,7 +710,8 @@ export async function getOwnedSessionIsOpen(code: string, ownerId: string): Prom
 
 // ---------------------------------------------------------------- polls & word clouds
 
-export type AnswerOutcome = VoteOutcome;
+/** "blocked" = a bad word on a board leaf or its name; "name_required" = a board leaf with no name. */
+export type AnswerOutcome = VoteOutcome | "blocked" | "name_required";
 
 /** Saves a poll choice, word-cloud answers, picks, open answer, ranking or number (replacing earlier ones). */
 export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
@@ -734,6 +736,8 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
     saved = rows.length > 0;
   } else if (a.kind === "text") {
     if (!a.text) return "invalid";
+    // Board leaves (team activities) need a name and no bad words; plain open answers are left as typed.
+    const blocked = hasBadWords(a.text) || hasBadWords(a.author);
     const rows = await sql`
       insert into text_answers (session_id, focus_id, voter_id, slot, body, author)
       select s.id, f.id, ${a.voterId}::uuid,
@@ -745,10 +749,19 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
       from live_sessions s
       join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'text'
       where s.code = ${a.code} and s.is_open
+        and (f.board is null or (${a.author ?? null}::text is not null and not ${blocked}::boolean))
       on conflict (focus_id, voter_id, slot) do update set body = excluded.body, author = excluded.author, updated_at = now()
       returning 1 as ok
     `;
     saved = rows.length > 0;
+    if (!saved) {
+      const [q] = (await sql`
+        select f.board from live_sessions s
+        join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'text'
+        where s.code = ${a.code} and s.is_open
+      `) as { board: string | null }[];
+      if (q?.board) return blocked ? "blocked" : "name_required";
+    }
   } else if (a.kind === "number") {
     const rows = await sql`
       insert into number_answers (session_id, focus_id, voter_id, value)

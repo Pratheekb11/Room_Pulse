@@ -18,6 +18,10 @@ export async function POST(req: Request) {
         return json({ error: "closed" }, 403);
       case "invalid":
         return badRequest("invalid_answer");
+      case "blocked":
+        return badRequest("blocked_words");
+      case "name_required":
+        return badRequest("name_required");
     }
   } catch (err) {
     logDbError("answer", err);
