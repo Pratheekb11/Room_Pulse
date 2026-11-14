@@ -3,7 +3,7 @@
 // No list is ever complete: the presenter can still hide an answer on the big screen.
 
 /**
- * The words kept off a board, in lower case. How each one matches a word someone typed:
+ * The words kept off a board, in lower case: swearing, insults aimed at people and slurs. How each one matches a word someone typed:
  * - `word`   only that word ("cock" blocks "cock", not "cocktail", "peacock" or "cocky")
  * - `word+`  that word or it with a usual ending (-s, -ed, -er, -ing, -y, -head, -face, -hole…)
  * - `word*`  any word starting with it ("cunt*" blocks "cunts", not "Scunthorpe")
@@ -22,6 +22,8 @@ export const BAD_WORDS: readonly string[] = [
   "ass", "asses", "arse", "arses", "dumbass", "jackass", "smartass", "asswipe", "asshat", "cock", "cocks", "cockhead",
   "prick", "pricks", "tits", "titty", "titties", "boob", "boobs", "boobies", "cum", "cumshot", "pussy", "pussies",
   "raping", "rapist", "rapists", "jerkoff", "jackoff", "biatch", "biotch", "milf", "wtf", "stfu",
+  // Insults aimed at people
+  "idiot*", "stupid*", "stoopid*", "moron*", "imbecile*", "cretin*", "dimwit*", "nitwit*", "halfwit*",
   // Slurs
   "nigger*", "nigga*", "niggaz", "faggot*", "fag", "fags", "spic", "spics", "chink", "chinks", "kike", "kikes",
   "tranny", "trannies", "dyke", "dykes",
@@ -29,6 +31,7 @@ export const BAD_WORDS: readonly string[] = [
   "chutiya*", "chutiye*", "chutia*", "chut", "choot", "bhenchod*", "behenchod*", "benchod*", "bhanchod*", "bahenchod*",
   "bhencho", "madarchod*", "maderchod*", "maachod*", "bhosdi*", "bhosad*", "bhosda", "bsdk", "gandu", "gaandu",
   "gaand", "lauda", "lawda", "lavda", "lund", "lodu", "randwa", "harami*", "haramkhor*", "kamina", "kamine", "kaminey",
+  "bewakoof*", "bevakoof*", "bewkoof*",
 ];
 
 /** Ordinary words that would otherwise be caught once undisguised. */
