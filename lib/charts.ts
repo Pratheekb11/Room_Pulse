@@ -1,4 +1,5 @@
 import type { QuestionKind } from "./types";
+import { boardInfo, type BoardId } from "./boards";
 
 /** Charts a presenter can pick for each question type. The first is the default. */
 export const CHARTS = {
@@ -25,6 +26,8 @@ export const CHARTS = {
   text: [
     { id: "wall", label: "Answer wall" },
     { id: "spotlight", label: "One at a time" },
+    // only for questions shown as a board (lib/boards.ts); labelled with the board's name
+    { id: "board", label: "Board" },
   ],
   rank: [
     { id: "ranking", label: "Ranking" },
@@ -49,3 +52,11 @@ export type ChartId<K extends QuestionKind = QuestionKind> = (typeof CHARTS)[K][
 export const defaultChart = (kind: QuestionKind): string => CHARTS[kind][0].id;
 
 export const isChartFor = (kind: QuestionKind, chart: string): boolean => CHARTS[kind].some((c) => c.id === chart);
+
+/** Charts to offer for one question: the board view only on board questions, first and named after the board. */
+export function chartsFor(kind: QuestionKind, board: BoardId | null | undefined): { id: string; label: string }[] {
+  const list: { id: string; label: string }[] = CHARTS[kind].map((c) => ({ id: c.id, label: c.label }));
+  if (kind !== "text") return list;
+  const rest = list.filter((c) => c.id !== "board");
+  return board ? [{ id: "board", label: boardInfo(board).label }, ...rest] : rest;
+}

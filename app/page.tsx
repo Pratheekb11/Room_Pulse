@@ -8,6 +8,7 @@ import { aiAvailable } from "@/lib/ai";
 import { Logo } from "@/components/Logo";
 import { WarmUp } from "@/components/WarmUp";
 import { KIND_INFO } from "@/lib/kinds";
+import { ACTIVITIES } from "@/lib/activities";
 
 const TYPE_COLORS = ["bg-peach", "bg-sky", "bg-mint", "bg-lavender"];
 
@@ -96,6 +97,40 @@ export default function Home() {
           </ol>
         </section>
 
+        <section className="border-t border-line py-20" aria-labelledby="activities-h">
+          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            <div>
+              <h2 id="activities-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
+                Team activities everyone can join
+              </h2>
+              <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-ink-soft">
+                Team building that works for the people in the room and the ones on a call. Everyone writes from their phone, and the tree, the
+                wall or the night sky fills up live, on the big screen and on every phone.
+              </p>
+              <Link href="/admin" className="key mt-6 inline-flex h-11 items-center rounded-lg bg-primary px-5 font-semibold text-white">
+                Start an activity
+              </Link>
+            </div>
+            <MiniTree />
+          </div>
+          <ul className="stagger mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ACTIVITIES.map((a) => (
+              <li key={a.id} className="flex gap-3 rounded-xl border border-line bg-white p-5">
+                <span aria-hidden className="text-2xl leading-none">
+                  {a.icon}
+                </span>
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-semibold text-ink">{a.label}</span>
+                    <span className="text-xs font-semibold text-ink-soft tabular-nums">{a.minutes} min</span>
+                  </span>
+                  <span className="mt-1 block text-[15px] leading-relaxed text-ink-soft">{a.blurb}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section className="border-t border-line py-20" aria-labelledby="features-h">
           <h2 id="features-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
             What you can do
@@ -134,5 +169,39 @@ export default function Home() {
         <Credit />
       </footer>
     </div>
+  );
+}
+
+/** A small drawn Motivation tree with a few leaves, to show what an activity looks like. */
+function MiniTree() {
+  const leaves: [number, number, number, string, string][] = [
+    [120, 70, -10, "#cdeab0", "My team"],
+    [190, 52, 8, "#b4dc92", "Learning"],
+    [258, 78, -6, "#dcecaa", "Customers"],
+    [92, 128, 10, "#a3d48a", "Growth"],
+    [168, 118, -4, "#efe3a0", "Autonomy"],
+    [244, 132, 6, "#c3e3a0", "Shipping"],
+    [300, 116, -12, "#b4dc92", "Coffee"],
+    [140, 172, 4, "#dcecaa", "Kind people"],
+    [222, 178, -8, "#cdeab0", "Hard problems"],
+  ];
+  return (
+    <figure className="mx-auto w-full max-w-md">
+      <svg viewBox="0 0 380 300" role="img" aria-label="A tree whose leaves are people's answers: My team, Learning, Customers, Growth and more" className="w-full">
+        <rect x="0" y="0" width="380" height="300" rx="20" fill="#eef6f9" />
+        <ellipse cx="190" cy="300" rx="230" ry="34" fill="#a9cf7d" />
+        <path d="M178 290 C182 250 182 230 184 200 L196 200 C198 230 198 250 202 290 Z" fill="#8a5a3b" />
+        <path d="M190 205 Q160 170 110 140 M190 205 Q220 165 270 130 M190 205 Q186 150 180 90 M190 205 Q230 190 300 160" stroke="#8a5a3b" strokeWidth="9" strokeLinecap="round" fill="none" />
+        {leaves.map(([x, y, r, fill, text]) => (
+          <g key={text} transform={`translate(${x} ${y}) rotate(${r})`}>
+            <path d="M -50 0 Q -6 -34 50 0 Q 6 34 -50 0 Z" fill={fill} />
+            <path d="M -42 0 L 42 0" stroke="#1f3b16" strokeOpacity="0.15" strokeWidth="1" />
+            <text textAnchor="middle" dominantBaseline="middle" fontSize="11" fontWeight="700" fill="#1f3b16">
+              {text}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </figure>
   );
 }

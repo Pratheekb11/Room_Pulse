@@ -45,6 +45,8 @@
   --animate-live: live 1.8s ease-out infinite;
   --animate-rise: rise 520ms var(--ease-out-soft) both;
   --animate-fade: fade 400ms ease-out both;
+  /* a leaf, note or star arriving on a board; backwards so hover scaling still works afterwards */
+  --animate-grow: grow 650ms var(--ease-spring) backwards;
 
   @keyframes pop {
     0% { scale: 0.92; }
@@ -66,6 +68,10 @@
   @keyframes fade {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+  @keyframes grow {
+    from { opacity: 0; scale: 0.2; }
+    to { opacity: 1; scale: 1; }
   }
 }
 

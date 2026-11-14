@@ -1,5 +1,6 @@
 import { avg, cellKey, sumAggs, type Agg } from "./stats";
 import { defaultChart } from "./charts";
+import type { BoardId } from "./boards";
 import { hasOptions } from "./validation";
 import type { FocusItem, NamedItem, QuestionKind, TopicItem } from "./types";
 
@@ -16,6 +17,8 @@ export interface FocusGroup {
   seconds: number | null;
   /** Chart the presenter chose; the dashboard opens on it. */
   chart: string;
+  /** Open answers shown as a board (lib/boards.ts); null = a plain list. */
+  board?: BoardId | null;
   /** `index` is the topic's position in the whole presentation (drives its colour). */
   topics: { item: TopicItem; index: number }[];
 }
@@ -34,6 +37,7 @@ export function groupByFocus(
           focus: { id: f.id, name: f.name, description: f.description ?? null, imageId: f.imageId ?? null },
           kind,
           chart: f.chart ?? defaultChart(kind),
+          board: f.board ?? null,
           maxPicks: f.maxPicks ?? null,
           min: f.min ?? null,
           max: f.max ?? null,
@@ -48,6 +52,7 @@ export function groupByFocus(
     focus: { id: "", name: "Topics", description: null },
     kind: "rating",
     chart: "heatmap",
+    board: null,
     maxPicks: null,
     min: null,
     max: null,

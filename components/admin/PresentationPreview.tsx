@@ -5,7 +5,7 @@ import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
 import { kindLabel } from "@/lib/kinds";
 import { getTheme, themeStyle, type ThemeId } from "@/lib/themes";
-import { sampleCounts, sampleWords, type PreviewQuestion } from "@/lib/preview";
+import { sampleBoardAnswers, sampleCounts, sampleWords, type PreviewQuestion } from "@/lib/preview";
 import type { PollTally } from "@/lib/answers";
 import type { NamedItem, SessionInfo } from "@/lib/types";
 import { PollBars } from "../PollResults";
@@ -17,6 +17,7 @@ import { MultiCard } from "../vote/MultiCard";
 import { NumberCard } from "../vote/NumberCard";
 import { RankCard } from "../vote/RankCard";
 import { TextCard } from "../vote/TextCard";
+import { BoardView } from "../results/BoardView";
 import { ThemePicker } from "./ThemePicker";
 import { LiveBadge } from "../LiveBadge";
 import { useClientValue } from "../useClientValue";
@@ -51,6 +52,7 @@ function SampleChart({ q }: { q: PreviewQuestion }) {
         </p>
       </div>
     );
+  if (q.kind === "text" && q.board) return <BoardView board={q.board} answers={sampleBoardAnswers("preview")} />;
   if (q.kind === "text" || q.kind === "qa")
     return (
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -190,7 +192,7 @@ function PhoneSlide({
         ) : q.kind === "words" ? (
           <WordsCard {...common} value={value as string[] | undefined} finished={false} onSend={set} onFinish={() => {}} />
         ) : (
-          <TextCard {...common} value={value as string | undefined} onSend={set} />
+          <TextCard {...common} board={q.board ?? null} value={value as string | undefined} onSend={set} />
         )}
         </div>
         {(q.kind === "quiz" || q.kind === "qa") && (

@@ -1,3 +1,4 @@
+import { ACTIVITIES } from "./activities";
 import { GUEST_DAYS } from "./guest-rules";
 import { KIND_INFO } from "./kinds";
 import { TEMPLATES } from "./templates";
@@ -15,6 +16,7 @@ export interface Feature {
 export function productFeatures({ ai }: { ai: boolean }): Feature[] {
   const list: Feature[] = [
     { icon: "📋", title: "Start from a template", body: `${TEMPLATES.map((t) => t.label).join(", ")}. Change anything you like.` },
+    { icon: "🌳", title: `${ACTIVITIES.length} team activities`, body: "Motivation tree, Kudos wall, Sailboat retro and more. Everyone joins, in the room or online." },
     { icon: "🎛️", title: `${KIND_INFO.length} kinds of question`, body: "Score items, polls, quizzes, audience Q&A, word clouds and more. Add pictures to questions and options." },
     { icon: "🎨", title: `${THEME_IDS.length} slide designs`, body: "From plain to playful, dark to anime. Preview the big screen and a phone before you start." },
     { icon: "📈", title: "Live results", body: "Answers show up on your screen as people tap. Share the results to their phones if you like." },

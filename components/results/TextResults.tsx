@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { visibleTexts } from "@/lib/answers";
 import { onSurface, topicColor } from "@/lib/colors";
+import type { BoardId } from "@/lib/boards";
 import type { TextAnswer } from "@/lib/types";
+import { BoardView } from "./BoardView";
 
 const EMPTY = <p className="py-16 text-center text-[clamp(1.2rem,1.8vw,2rem)] font-semibold text-ink-soft">Answers will appear here.</p>;
 
@@ -18,12 +20,15 @@ export function TextAnswers({
   answers,
   focusId,
   view,
+  board = null,
   owner,
 }: {
   code: string;
   answers: TextAnswer[];
   focusId: string;
-  view: "wall" | "spotlight";
+  view: "wall" | "spotlight" | "board";
+  /** Board questions: which picture the board view draws. */
+  board?: BoardId | null;
   owner: boolean;
 }) {
   // Changes made here show at once, before the next results refresh confirms them.
@@ -63,7 +68,13 @@ export function TextAnswers({
           {error}
         </p>
       )}
-      {view === "spotlight" ? <TextSpotlight answers={shown} onHide={onHide} /> : <TextWall answers={shown} onHide={onHide} />}
+      {view === "board" && board ? (
+        <BoardView board={board} answers={shown} onHide={onHide} />
+      ) : view === "spotlight" ? (
+        <TextSpotlight answers={shown} onHide={onHide} />
+      ) : (
+        <TextWall answers={shown} onHide={onHide} />
+      )}
       {owner && hidden.length > 0 && (
         <div className="mt-5 border-t border-line pt-4">
           <button type="button" onClick={() => setShowHidden((v) => !v)} aria-expanded={showHidden} className="text-sm font-bold text-ink-soft underline underline-offset-2">
@@ -73,7 +84,10 @@ export function TextAnswers({
             <ul className="mt-3 flex flex-col gap-2">
               {hidden.map((a) => (
                 <li key={a.id} className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-line-strong p-3 text-ink-soft">
-                  <span className="min-w-0 break-words">{a.text}</span>
+                  <span className="min-w-0 break-words">
+                    {a.text}
+                    {a.author && <span className="text-ink-soft"> — {a.author}</span>}
+                  </span>
                   <button type="button" className={pill} onClick={() => void setHidden(a.id, false)}>
                     Show again
                   </button>
@@ -100,6 +114,7 @@ export function TextWall({ answers, onHide }: { answers: TextAnswer[]; onHide?: 
           style={{ backgroundColor: onSurface(topicColor(i), 30) }}
         >
           {a.text}
+          {a.author && <span className="mt-1 block text-[0.8em] font-bold text-ink-soft">— {a.author}</span>}
           {onHide && (
             <div className="mt-2">
               <button type="button" className={pill} onClick={() => onHide(a.id)} aria-label={`Hide answer: ${a.text}`}>
@@ -139,6 +154,7 @@ export function TextSpotlight({ answers, onHide }: { answers: TextAnswer[]; onHi
         aria-live="polite"
       >
         &ldquo;{a.text}&rdquo;
+        {a.author && <footer className="mt-3 text-[0.5em] font-bold text-ink-soft">— {a.author}</footer>}
       </blockquote>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <button type="button" className={btn} onClick={() => setI((x) => (x - 1 + n) % n)} aria-label="Previous answer">

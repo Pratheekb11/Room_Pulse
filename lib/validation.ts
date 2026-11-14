@@ -85,6 +85,13 @@ export const itemKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowe
 
 export const QUIZ_SECONDS_DEFAULT = 20;
 
+/** Board questions open on their board; the board view needs a board, so plain ones fall back to the wall. */
+function boardChart(kind: Kind, board: string | null, chart: string | null): string {
+  if (kind !== "text") return chart ?? defaultChart(kind);
+  if (!board) return chart && chart !== "board" ? chart : defaultChart(kind);
+  return chart ?? "board";
+}
+
 type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null; image?: string | null; itemImages?: Record<string, string> | null; board?: string | null };
 const topicName = (t: unknown) => cleanName(typeof t === "string" ? t : (t as { name: string }).name);
 
@@ -95,7 +102,7 @@ function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] 
   return {
     ...rest,
     topics: hasOptions(f.kind) ? f.topics : [],
-    chart: f.chart ?? defaultChart(f.kind),
+    chart: boardChart(f.kind, f.board ?? null, f.chart ?? null),
     maxPicks: f.kind === "multi" ? (f.maxPicks ?? null) : null,
     min: isNumber ? (f.min ?? 0) : null,
     max: isNumber ? (f.max ?? 100) : null,

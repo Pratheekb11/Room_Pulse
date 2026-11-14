@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CHARTS, defaultChart } from "@/lib/charts";
+import { chartsFor, defaultChart } from "@/lib/charts";
+import { ACTIVITIES } from "@/lib/activities";
+import { BOARDS, isBoard, type BoardId } from "@/lib/boards";
 import { topicColor } from "@/lib/colors";
 import {
   hasOptions,
@@ -61,6 +63,8 @@ interface QuestionDraft {
   description: string | null;
   /** Optional picture shown with the question (an uploaded picture's id). */
   image?: string | null;
+  /** Open answers: shown as a board (tree, sticky notes, sky); null = a plain list. */
+  board?: BoardId | null;
 }
 
 export type FormMode =
@@ -127,10 +131,11 @@ const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
   correct: "",
   seconds: 20,
   description: null,
+  board: null,
 });
 
-/** Builder questions for a template or AI-drafted plan. */
-function draftsFromPlan(plan: PresentationPlan, firstKey: number): QuestionDraft[] {
+/** Builder questions for a template, activity or AI-drafted plan. */
+export function draftsFromPlan(plan: PresentationPlan, firstKey: number): QuestionDraft[] {
   return plan.questions.map((q, i) => {
     const d = blank(firstKey + i, q.kind);
     const options = (q.options ?? []).map((name) => ({ name }));
@@ -142,6 +147,9 @@ function draftsFromPlan(plan: PresentationPlan, firstKey: number): QuestionDraft
       max: q.kind === "number" ? String(q.max ?? 100) : d.max,
       unit: q.kind === "number" ? (q.unit ?? "") : d.unit,
       correct: q.kind === "quiz" ? (q.options?.[0] ?? "") : d.correct,
+      description: q.description ?? null,
+      board: q.kind === "text" && isBoard(q.board) ? q.board : null,
+      chart: q.kind === "text" && isBoard(q.board) ? "board" : d.chart,
     };
   });
 }
@@ -175,6 +183,8 @@ interface Draft {
   decor: boolean;
   /** How it was started (template or AI draft), so the way back survives a refresh. */
   start?: StartChoice;
+  /** Voters see the results on their phones from the start (team activities turn it on). */
+  showResults?: boolean;
 }
 
 type StartChoice = null | "blank" | { label: string; snapshot: string };
@@ -241,6 +251,7 @@ function fromSession(s: SessionPayload): Draft {
       seconds: f.seconds ?? 20,
       description: f.description ?? null,
       image: f.imageId ?? null,
+      board: f.board ?? null,
     })),
     criteria: rowsFrom(s.criteria),
     theme: isThemeId(s.session.theme) ? s.session.theme : "paper",
@@ -291,6 +302,7 @@ export function PresentationForm({
   );
   const [themeChoice, setThemeChoice] = useState<ThemeId | null>(initial?.theme ?? null);
   const [decor, setDecor] = useState(initial?.decor ?? true);
+  const [showResults, setShowResults] = useState(initial?.showResults === true);
   /**
    * How this presentation was started: null while choosing, "blank", or the template / AI draft used
    * (with a snapshot, so going back can tell whether anything was changed since).
@@ -316,12 +328,13 @@ export function PresentationForm({
           theme: themeChoice,
           decor,
           start,
+          showResults,
         }),
       );
     } catch {
       /* storage unavailable */
     }
-  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows, themeChoice, decor, start]);
+  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows, themeChoice, decor, start, showResults]);
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
   // The problem list and save errors sit at the bottom of a long form, under the sticky Create
@@ -355,6 +368,7 @@ export function PresentationForm({
     itemDescriptions: f.kind === "rating" ? descriptionsOf(f.items) : null,
     image: f.image ?? null,
     itemImages: hasOptions(f.kind) ? imagesOf(f.items) : null,
+    board: f.kind === "text" ? (f.board ?? null) : null,
   });
   const hasRating = parsed.some((f) => f.kind === "rating");
 
@@ -453,6 +467,7 @@ export function PresentationForm({
         itemDescriptions: f.kind === "rating" ? descriptionsOf(f.items) : undefined,
         image: f.image ?? null,
         itemImages: hasOptions(f.kind) ? imagesOf(f.items) : undefined,
+        board: f.kind === "text" ? (f.board ?? null) : null,
       })),
     );
 
@@ -500,12 +515,14 @@ export function PresentationForm({
   const [confirmRestart, setConfirmRestart] = useState(false);
   // Keys differ between renders of the same questions, so leave them out of the comparison.
   const snapshotOf = (t: string, f: QuestionDraft[]) => JSON.stringify([t, f.map((q) => ({ ...q, key: 0 }))]);
-  function applyPlan(plan: PresentationPlan, label: string) {
+  function applyPlan(plan: PresentationPlan, label: string, shareResults = false) {
     const drafts = draftsFromPlan(plan, nextKey.current);
     setTitle(plan.title);
     setFocus(drafts);
     nextKey.current += plan.questions.length;
     setStart({ label, snapshot: snapshotOf(plan.title, drafts) });
+    // activities are watched together: everyone sees the tree fill up on their phone
+    setShowResults(shareResults);
   }
   /** Back to the start choices with an empty form. */
   function restart() {
@@ -514,6 +531,7 @@ export function PresentationForm({
     setCriteriaRows(DEFAULT_CRITERIA);
     setThemeChoice(null);
     setStart(null);
+    setShowResults(false);
     setConfirmRestart(false);
   }
   const changedSinceStart = start !== null && start !== "blank" && snapshotOf(title, focus) !== start.snapshot;
@@ -616,6 +634,7 @@ export function PresentationForm({
           highLabel,
           theme,
           decor,
+          showResults,
           focusTopics: parsed.map((f) => ({
             name: f.name,
             kind: f.kind,
@@ -632,6 +651,7 @@ export function PresentationForm({
       setFocus([blank(nextKey.current++)]);
       setThemeChoice(null);
       setStart(null);
+      setShowResults(false);
       setTouched(false);
       await onDone(body.code);
     } catch (err) {
@@ -730,6 +750,27 @@ export function PresentationForm({
                 >
                   <span className="block font-bold">{t.label}</span>
                   <span className="block text-sm text-ink-soft">{t.blurb}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-4 text-sm font-semibold">
+              Or a team activity <span className="font-normal text-ink-soft">(for people in the room and online alike)</span>
+            </p>
+            <h4 className="sr-only">Team activities</h4>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {ACTIVITIES.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => applyPlan(a.plan, `the “${a.label}” activity`, true)}
+                  className="rounded-lg border border-line-strong bg-white px-3 py-2.5 text-left hover:bg-canvas"
+                >
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="font-bold">{a.label}</span>
+                    <span className="shrink-0 text-xs font-semibold text-ink-soft tabular-nums">{a.minutes} min</span>
+                  </span>
+                  <span className="block text-sm text-ink-soft">{a.blurb}</span>
                 </button>
               ))}
             </div>
@@ -885,6 +926,7 @@ export function PresentationForm({
                               update(f.key, {
                                 kind: k.id,
                                 chart: defaultChart(k.id),
+                                board: null,
                                 // a shortcut's Yes / No / Not sure doesn't carry into Score items; at least 2 rows to fill
                                 items: rowsForKind(f.items, k.id, startRows(k.id).length),
                               })
@@ -1110,6 +1152,42 @@ export function PresentationForm({
                     </div>
                   )}
 
+                  {f.kind === "text" && (
+                    <div className="mt-3">
+                      <p id={`board-${f.key}`} className="text-sm font-semibold">
+                        Show answers as
+                      </p>
+                      <div role="radiogroup" aria-labelledby={`board-${f.key}`} className="mt-1 flex flex-wrap gap-1.5">
+                        {[{ id: null, label: "A list", blurb: "Answers as cards" }, ...BOARDS].map((b) => {
+                          const on = (f.board ?? null) === b.id;
+                          return (
+                            <button
+                              key={b.id ?? "list"}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              title={b.blurb}
+                              onClick={() =>
+                                update(f.key, {
+                                  board: b.id,
+                                  chart: b.id ? "board" : f.chart === "board" ? defaultChart("text") : f.chart,
+                                })
+                              }
+                              className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold ${on ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
+                            >
+                              {b.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1 text-xs text-ink-soft">
+                        {f.board
+                          ? `${BOARDS.find((b) => b.id === f.board)!.blurb}. People can sign theirs with a name if they like.`
+                          : "Answers are anonymous. Pick a picture for team activities: people can sign theirs with a name."}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="mt-3">
                     <p id={`chart-${f.key}`} className="text-sm font-semibold">
                       Show results as
@@ -1119,7 +1197,7 @@ export function PresentationForm({
                       aria-labelledby={`chart-${f.key}`}
                       className="mt-1 flex flex-wrap gap-1.5"
                     >
-                      {CHARTS[f.kind].map((c) => (
+                      {chartsFor(f.kind, f.board).map((c) => (
                         <button
                           key={c.id}
                           type="button"
@@ -1182,6 +1260,15 @@ export function PresentationForm({
               <span className="block text-ink-soft">Cheerful doodle characters next to the title on the big screen and on phones, picked to match the design.</span>
             </span>
           </label>
+          {!editing && (
+            <label className="mt-3 flex items-start gap-2.5 text-sm">
+              <input type="checkbox" checked={showResults} onChange={(e) => setShowResults(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-ink" />
+              <span>
+                <span className="font-semibold">Show results on phones</span>
+                <span className="block text-ink-soft">People can watch the results live on their own phones, without any presenter controls. You can change this later.</span>
+              </span>
+            </label>
+          )}
         </section>
 
         <p

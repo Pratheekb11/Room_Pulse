@@ -1,3 +1,5 @@
+import type { BoardId } from "./boards";
+import type { TextAnswer } from "./types";
 import { hasOptions } from "./validation";
 import type { QuestionKind, TopicItem } from "./types";
 
@@ -39,11 +41,13 @@ export interface PreviewQuestion {
   /** The question's picture, and options' pictures by name. */
   image?: string | null;
   itemImages?: Record<string, string>;
+  /** Open answers shown as a board (lib/boards.ts). */
+  board?: BoardId | null;
 }
 
 /** Builder drafts as preview slides: blank names and option lists get placeholders. */
 export function previewQuestions(
-  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null; description?: string | null; itemDescriptions?: Record<string, string>; image?: string | null; itemImages?: Record<string, string> }[],
+  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null; description?: string | null; itemDescriptions?: Record<string, string>; image?: string | null; itemImages?: Record<string, string>; board?: BoardId | null }[],
 ): PreviewQuestion[] {
   return drafts.map((d, i) => {
     const focusId = `preview-${i}`;
@@ -55,4 +59,27 @@ export function previewQuestions(
       options: names.map((name, j) => ({ id: `${focusId}-${j}`, name, focusId, description: d.itemDescriptions?.[name] ?? null, imageId: d.itemImages?.[name] ?? null })),
     };
   });
+}
+
+const SAMPLE_LEAVES: [string, string | null][] = [
+  ["Learning something new every week", "Priya"],
+  ["Helping a customer for real", null],
+  ["My team", "Sam"],
+  ["Shipping things people use", null],
+  ["Freedom to try ideas", "Ana"],
+  ["Good coffee and better people", null],
+  ["Growing into a lead role", "Ravi"],
+  ["Solving hard problems", null],
+];
+
+/** Sample answers for a board in the preview: a few signed, a few not. */
+export function sampleBoardAnswers(focusId: string): TextAnswer[] {
+  return SAMPLE_LEAVES.map(([text, author], i) => ({
+    id: `${focusId}-sample-${i}`,
+    focusId,
+    hidden: false,
+    text,
+    author,
+    at: new Date(Date.UTC(2026, 0, 1, 10, i)).toISOString(),
+  }));
 }

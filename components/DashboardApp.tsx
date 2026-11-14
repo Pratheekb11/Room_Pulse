@@ -23,7 +23,7 @@ import { QaList } from "./results/QaResults";
 import { Leaderboard, QuizStage } from "./results/QuizResults";
 import { PollBars, PollColumns, PollPie } from "./PollResults";
 import { WordCloud, WordList } from "./WordCloud";
-import { CHARTS, isChartFor } from "@/lib/charts";
+import { chartsFor, isChartFor } from "@/lib/charts";
 import { ScoreLegend } from "./Donut";
 import { Heatmap } from "./Heatmap";
 import { QuestionDescription, QuestionTabs, ResultCard, ScreenHeader, VotingPills } from "./ScreenChrome";
@@ -305,9 +305,9 @@ function Stage({
                 ))}
               </div>
             )}
-            {group && CHARTS[group.kind].length > 1 && (
+            {group && chartsFor(group.kind, group.board).length > 1 && (
               <div role="tablist" aria-label="Chart" className="flex max-w-full flex-wrap gap-0.5 rounded-[1.1rem] border border-line-strong bg-white p-0.5">
-                {CHARTS[group.kind].map((c, i) => (
+                {chartsFor(group.kind, group.board).map((c, i) => (
                   <button
                     key={c.id}
                     role="tab"
@@ -528,7 +528,14 @@ function Stage({
           ) : group.kind === "text" ? (
             <ResultCard title={group.focus.name}>
               {aiOn && <AiInsights code={code} focusId={group.focus.id} kind="text" />}
-              <TextAnswers code={code} answers={r.texts} focusId={group.focus.id} view={view === "spotlight" ? "spotlight" : "wall"} owner={isOwner} />
+              <TextAnswers
+                code={code}
+                answers={r.texts}
+                focusId={group.focus.id}
+                view={view === "spotlight" ? "spotlight" : view === "board" && group.board ? "board" : "wall"}
+                board={group.board ?? null}
+                owner={isOwner}
+              />
             </ResultCard>
           ) : group.kind === "words" ? (
             <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">

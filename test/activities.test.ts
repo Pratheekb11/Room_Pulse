@@ -14,6 +14,8 @@ import * as answerRoute from "@/app/api/answer/route";
 import { ACTIVITIES, activityToBody } from "@/lib/activities";
 import { arrivalOrder, BOARDS, boardSpot, leafTilt, MAX_AUTHOR } from "@/lib/boards";
 import { createSessionSchema } from "@/lib/validation";
+import { chartsFor } from "@/lib/charts";
+import { groupByFocus } from "@/lib/focus";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
 
 let db: PGlite;
@@ -79,6 +81,42 @@ describe("boards: an open answer question shown as leaves, notes or stars", () =
     });
     const { code } = (await res.json()) as { code: string };
     expect((await info(code)).focusTopics.map((f) => f.board)).toEqual([null, null]);
+  });
+
+  it("opens the results on the board, unless the presenter picked another view", async () => {
+    const res = await create({
+      title: "Views",
+      focusTopics: [
+        { name: "Leaves", kind: "text", board: "tree" },
+        { name: "Spot", kind: "text", board: "sky", chart: "spotlight" },
+        { name: "Plain", kind: "text", chart: "board" },
+        { name: "Plain too", kind: "text" },
+      ],
+    });
+    const { code } = (await res.json()) as { code: string };
+    expect((await info(code)).focusTopics.map((f) => f.chart)).toEqual(["board", "spotlight", "wall", "wall"]);
+  });
+
+  it("offers the board view first, named after the board, only on board questions", () => {
+    expect(chartsFor("text", null).map((c) => c.id)).toEqual(["wall", "spotlight"]);
+    expect(chartsFor("text", "tree").map((c) => [c.id, c.label])).toEqual([
+      ["board", "Tree"],
+      ["wall", "Answer wall"],
+      ["spotlight", "One at a time"],
+    ]);
+    expect(chartsFor("text", "wall")[0].label).toBe("Sticky notes");
+    expect(chartsFor("poll", null).map((c) => c.id)).toEqual(["bars", "columns", "pie", "donut"]);
+  });
+
+  it("reaches the results screen with each question", () => {
+    const groups = groupByFocus(
+      [
+        { id: "a", name: "Leaves", kind: "text", board: "tree" },
+        { id: "b", name: "Plain", kind: "text" },
+      ],
+      [],
+    );
+    expect(groups.map((g) => g.board)).toEqual(["tree", null]);
   });
 
   it("refuses an unknown look", async () => {
@@ -223,6 +261,7 @@ describe("the activity collection", () => {
   it("gives every activity a way to run it, a length and a valid presentation with results on phones", () => {
     for (const a of ACTIVITIES) {
       expect(a.label.length, a.id).toBeGreaterThan(0);
+      expect(a.icon.length, a.id).toBeGreaterThan(0);
       expect(a.blurb.length, a.id).toBeGreaterThan(0);
       expect(a.steps.length, a.id).toBeGreaterThanOrEqual(2);
       expect(a.minutes, a.id).toBeGreaterThan(0);

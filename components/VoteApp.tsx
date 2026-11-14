@@ -27,6 +27,10 @@ import { useDocumentTheme } from "./useDocumentTheme";
 import { Doodle } from "./Doodle";
 import { RaisePoint } from "./vote/RaisePoint";
 import { charactersFor, type Character } from "@/lib/decor";
+import { MAX_AUTHOR } from "@/lib/boards";
+
+/** The stored name to sign board answers with, or null for none. */
+const signedName = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, MAX_AUTHOR) : null);
 
 export function VoteApp({ code, initial = null }: { code: string; initial?: SessionPayload | null }) {
   // Set when the status poll sees the presenter changed the questions; reloads them.
@@ -64,6 +68,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const pendingKey = `liverate:pending:${code}`;
   const answersKey = `liverate:answers:${code}`;
   const answersPendingKey = `liverate:answers-pending:${code}`;
+  // Team activities: the name this person signs their leaves, notes and stars with (one for the presentation).
+  const authorKey = `liverate:author:${code}`;
 
   const groups = useMemo(() => groupByFocus(data.focusTopics ?? [], topics), [data.focusTopics, topics]);
 
@@ -113,6 +119,10 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     >,
   );
   const [statuses, setStatuses] = useState<Record<string, SaveStatus>>({});
+  const [author, setAuthor] = useState(() => {
+    const v = readJSON<unknown>(authorKey, "");
+    return signedName(v) ?? "";
+  });
   // Word clouds count as done at 3 answers, or when the voter says "that's all".
   const finishedKey = `liverate:finished:${code}`;
   const [finished, setFinished] = useState<string[]>(() => readJSON<string[]>(finishedKey, []));
@@ -155,7 +165,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           if (kind === "poll") return { kind, focusId, topicId: v };
           if (kind === "multi" || kind === "rank") return { kind, focusId, topicIds: v };
           if (kind === "number") return { kind, focusId, value: v };
-          if (kind === "text") return { kind, focusId, text: v };
+          if (kind === "text") return { kind, focusId, text: v, ...(byFocus.get(focusId)?.board ? { author: signedName(readJSON<unknown>(authorKey, "")) } : {}) };
           return { kind: "words", focusId, words: v };
         },
         initialPending: Object.fromEntries(
@@ -631,7 +641,16 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   value={typeof answers[group.focus.id] === "string" ? (answers[group.focus.id] as string) : undefined}
                   status={statuses[group.focus.id]}
                   disabled={!isOpen}
-                  onSend={(text) => onAnswer(here.gi, text)}
+                  board={group.board ?? null}
+                  author={author}
+                  seeHref={resultsHref}
+                  onSend={(text, name) => {
+                    if (group.board) {
+                      setAuthor(name);
+                      writeJSON(authorKey, name);
+                    }
+                    onAnswer(here.gi, text);
+                  }}
                 />
               ) : here.kind === "quiz" ? (
                 <QuizCard
