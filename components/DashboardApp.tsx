@@ -166,6 +166,23 @@ function Stage({
   const [pointsOpen, setPointsOpen] = useState(() => !audience && new URLSearchParams(window.location.search).get("points") === "1");
   const pointsState = useOpenPoints(code, isOwner, { groups, criteria, cells, histograms, results: r, scaleMax: session.scaleMax });
   const showPoints = pointsOpen && isOwner;
+  // Opening the list adds a step to the browser's history, so the browser's or phone's Back button
+  // closes it instead of leaving the results screen.
+  const openPoints = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("points", "1");
+    window.history.pushState({ points: true }, "", `${window.location.pathname}?${params}${window.location.hash}`);
+    setPointsOpen(true);
+  }, []);
+  const closePoints = useCallback(() => {
+    if ((window.history.state as { points?: boolean } | null)?.points) window.history.back();
+    else setPointsOpen(false);
+  }, []);
+  useEffect(() => {
+    const onPop = () => setPointsOpen(new URLSearchParams(window.location.search).get("points") === "1");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const group = focusIndex === null ? null : (groups[focusIndex] ?? null);
   const view = group
     ? (viewByFocus[group.focus.id] ?? (urlView && isChartFor(group.kind, urlView) ? urlView : group.chart))
@@ -185,7 +202,7 @@ function Stage({
     else params.delete("points");
     const qs = params.toString();
     // keep the #k=… part: it's what lets this screen read the results
-    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
   }, [focusIndex, view, single, pickedSort, pointsOpen]);
 
   const groupId = group?.focus.id;
@@ -241,7 +258,8 @@ function Stage({
       const target = e.target as HTMLElement | null;
       if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
       const v = VIEWS.find((x) => x.key === e.key);
-      if (v && groupKind === "rating") setView(v.id);
+      if (showPoints && e.key === "Escape") closePoints();
+      else if (v && groupKind === "rating") setView(v.id);
       else if (!audience && e.key.toLowerCase() === "q") setShowQr((s) => !s);
       else if (!audience && e.key.toLowerCase() === "f") toggleFit();
       else if (!single && e.key === "Escape") setFocusIndex(null);
@@ -250,7 +268,7 @@ function Stage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [single, groups.length, setView, groupKind, audience, toggleFit]);
+  }, [single, groups.length, setView, groupKind, audience, toggleFit, showPoints, closePoints]);
 
   const voters = r.voterCount;
   // The AI's summary of the whole presentation: on "All questions", or under the only question.
@@ -356,13 +374,12 @@ function Stage({
             {isOwner && (
               <button
                 type="button"
-                aria-pressed={showPoints}
-                onClick={() => setPointsOpen((on) => !on)}
-                title={pointsState.signals.length ? "The results suggest follow-ups" : "Things to follow up after this session"}
-                className={`rounded-full border border-line-strong px-3 py-1 tabular-nums ${showPoints ? "bg-sun" : "bg-white hover:bg-canvas"}`}
+                onClick={showPoints ? closePoints : openPoints}
+                title={showPoints ? "Close the open point list. Shortcut: Esc" : pointsState.signals.length ? "The results suggest follow-ups" : "Things to follow up after this session"}
+                className={`rounded-full border border-line-strong px-3 py-1 tabular-nums ${showPoints ? "bg-ink font-bold text-white" : "bg-white hover:bg-canvas"}`}
               >
-                Open points{(r.openPoints ?? 0) > 0 ? ` · ${r.openPoints}` : ""}
-                {pointsState.signals.length > 0 && (
+                {showPoints ? "← Back to results" : `Open points${(r.openPoints ?? 0) > 0 ? ` · ${r.openPoints}` : ""}`}
+                {!showPoints && pointsState.signals.length > 0 && (
                   <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-xs font-bold text-white" aria-label={`${pointsState.signals.length} suggested`}>
                     +{pointsState.signals.length}
                   </span>
@@ -405,7 +422,7 @@ function Stage({
 
       <div className="flex min-h-0 flex-1 flex-col gap-[clamp(0.75rem,1.6vw,2rem)] lg:flex-row">
         <main className="min-w-0 flex-1">
-          {showPoints && <OpenPoints code={code} state={pointsState} groups={groups} onClose={() => setPointsOpen(false)} />}
+          {showPoints && <OpenPoints code={code} state={pointsState} groups={groups} onClose={closePoints} />}
           <div className={showPoints ? "hidden" : undefined}>
           {!single && (
             <QuestionTabs compact={fit} names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />

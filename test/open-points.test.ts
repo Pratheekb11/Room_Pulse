@@ -396,3 +396,33 @@ describe("open points on screen", () => {
     expect(read("components/admin/SessionCard.tsx")).toContain("openPoints");
   });
 });
+
+describe("getting back to the results from the open point list", () => {
+  const dashboard = read("components/DashboardApp.tsx");
+  const panel = read("components/results/OpenPoints.tsx");
+
+  it("has a big Back to results button first, above the heading, easy to tap", () => {
+    const back = panel.indexOf('data-part="back-to-results"');
+    expect(back).toBeGreaterThan(-1);
+    expect(back).toBeLessThan(panel.indexOf("Open points\n"));
+    expect(panel).toMatch(/data-part="back-to-results"[^>]*min-h-11/);
+    expect(panel).toContain("← Back to results");
+  });
+
+  it("has another one under the list, so a long list doesn't need scrolling back up", () => {
+    expect(panel).toContain('data-part="back-to-results-end"');
+  });
+
+  it("the header's Open points button turns into Back to results while the list is open", () => {
+    expect(dashboard).toMatch(/showPoints \? "← Back to results"/);
+  });
+
+  it("Esc closes the list", () => {
+    expect(dashboard).toMatch(/showPoints && e\.key === "Escape"\) closePoints\(\)/);
+  });
+
+  it("the browser's or phone's Back button closes the list instead of leaving the page", () => {
+    expect(dashboard).toContain("window.history.pushState");
+    expect(dashboard).toMatch(/addEventListener\("popstate"/);
+  });
+});

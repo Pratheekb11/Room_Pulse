@@ -171,6 +171,14 @@ export function OpenPoints({ code, state, groups, onClose }: { code: string; sta
 
   return (
     <section aria-labelledby={`${id}-h`} className="slab @container rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
+      <button
+        type="button"
+        onClick={onClose}
+        data-part="back-to-results"
+        className="key mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-base font-bold text-white"
+      >
+        ← Back to results
+      </button>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id={`${id}-h`} className="font-display text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight">
@@ -184,9 +192,6 @@ export function OpenPoints({ code, state, groups, onClose }: { code: string; sta
           <a href={`${base}/export?type=points`} className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas">
             Download the list
           </a>
-          <button type="button" onClick={onClose} className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas">
-            Back to results
-          </button>
         </div>
       </div>
 
@@ -295,6 +300,16 @@ export function OpenPoints({ code, state, groups, onClose }: { code: string; sta
             <PointRow key={p.id} p={p} people={`${id}-people`} question={questionName(p.focusId)} onChange={(body) => change(p.id, body)} onDelete={() => remove(p.id)} />
           ))}
         </ol>
+      )}
+      {shown.length > 3 && (
+        <button
+          type="button"
+          onClick={onClose}
+          data-part="back-to-results-end"
+          className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-white px-5 py-2.5 text-base font-bold hover:bg-canvas"
+        >
+          ← Back to results
+        </button>
       )}
     </section>
   );
