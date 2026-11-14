@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, pieceSize, pieceTextSize, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
 import { tinted } from "@/lib/colors";
-import { leafSide, TREE_BRANCHES, treeFork } from "@/lib/tree";
+import { leafPose, TREE_BRANCHES, treeFork, treeLeafAt } from "@/lib/tree";
 import type { TextAnswer } from "@/lib/types";
 import { ToBody } from "../Portal";
 
@@ -182,11 +182,11 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   };
 
   const n = answers.length;
-  const piece = board === "tree" ? pieceSize(w, h, n) : Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
+  const piece = board === "tree" ? Math.min(pieceSize(w, h, n), Math.round(w * 0.12)) : Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
   const font = piece * (board === "tree" ? 0.115 : 0.1);
   const showText = font * zoom >= 9;
   // where the pieces go: the canopy, or most of the sky
-  const area = board === "tree" ? crownBox(w, h) : { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
+  const area = board === "tree" ? crownBox(w, h, piece) : { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
   const label = board === "tree" ? `A tree with ${plural(n, "leaf")}` : `A night sky with ${plural(n, "star")}`;
   const zoomBtn =
     "flex h-9 min-w-9 items-center justify-center rounded-full border border-line-strong bg-white px-2 text-lg font-bold text-ink shadow-sm disabled:opacity-40";
@@ -214,19 +214,18 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
           onPointerCancel={onPointerUp}
         >
           <div className="absolute inset-0 origin-top-left" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-            {board === "tree" ? <TreeArt w={w} h={h} /> : <SkyArt w={w} h={h} />}
+            {board === "tree" ? <TreeArt w={w} h={h} box={area} /> : <SkyArt w={w} h={h} />}
             {answers.map((a, i) => {
               const p = boardSpot(board, i);
               const left = (area.l + p.x * area.w) * w;
               const top = (area.t + p.y * area.h) * h;
               const name = a.author ? ` — ${a.author}` : "";
               if (board === "tree") {
-                // hang the leaf by its stem from its spot on the branch, growing away from the trunk
-                // (or inwards when there's no room at the edge of the picture)
-                let side = leafSide(p, a.id);
-                if (side === 1 && left + piece > w && left - piece >= 0) side = -1;
-                else if (side === -1 && left - piece < 0 && left + piece <= w) side = 1;
-                const angle = side * (leafTilt(a.id) * 0.8 - 8);
+                // the leaf's stalk sits on its branch and the leaf grows out of it like a real one:
+                // turned off the branch, pointing the way the branch grows, nearly level
+                const { side, angle: tip } = leafPose(treeLeafAt(i), a.id, area.w * w, area.h * h);
+                // the flipped leaf's tip is on its left, so tipping it down turns it the other way
+                const angle = side === 1 ? tip : -tip;
                 return (
                   <button
                     key={a.id}
@@ -319,7 +318,13 @@ const LEAF_RATIO = 0.56;
  * Where the crown's box sits in the picture (the same box the leaf spots use). On a tall picture
  * (phones) the crown takes more of the height and the trunk is shorter, so leaves get more room.
  */
-const crownBox = (w: number, h: number) => (h > w ? { l: 0.05, t: 0.03, w: 0.9, h: 0.78 } : { l: 0.08, t: 0.04, w: 0.84, h: 0.64 });
+function crownBox(w: number, h: number, piece: number) {
+  const b = h > w ? { l: 0.05, t: 0.03, w: 0.9, h: 0.78 } : { l: 0.08, t: 0.04, w: 0.84, h: 0.64 };
+  // room at the sides and top for a leaf pointing out from the outermost twigs, so none is cut off
+  const side = Math.max(b.l, Math.min(0.2, (piece * 0.95) / w));
+  const top = Math.max(b.t, Math.min(0.2, (piece * 0.8) / h));
+  return { l: side, t: top, w: 1 - 2 * side, h: b.h - (top - b.t) };
+}
 
 /** A leaf: a pointed blade with a stem on the left (or right when flipped), a middle vein and a few side veins. */
 function LeafShape({ color, flip }: { color: string; flip: boolean }) {
@@ -339,7 +344,7 @@ function LeafShape({ color, flip }: { color: string; flip: boolean }) {
           <stop offset="1" stopColor={light} stopOpacity={0.82} />
         </linearGradient>
       </defs>
-      <path data-part="stem" d="M0 28 Q 6 27 12 28" stroke={tinted("#6d4a2c")} strokeWidth={3} strokeLinecap="round" fill="none" />
+      <path data-part="stem" d="M0 28 Q 7 26.5 14 27.5" stroke={tinted("#5d3b25")} strokeWidth={3.5} strokeLinecap="round" fill="none" />
       <path d="M10 28 C 24 6, 66 -2, 99 20 C 90 42, 56 60, 10 28 Z" fill={tinted("#3f6b25")} opacity={0.25} transform="translate(0 1.5)" />
       <path d="M10 28 C 24 6, 66 -2, 99 20 C 90 42, 56 60, 10 28 Z" fill={`url(#${id})`} stroke={tinted("#5b8a3a")} strokeOpacity={0.45} strokeWidth={1} />
       <path data-part="vein" d="M11 28 Q 52 25 96 21" stroke={tinted("#5b8a3a")} strokeOpacity={0.5} strokeWidth={1.4} fill="none" />
@@ -354,8 +359,7 @@ function LeafShape({ color, flip }: { color: string; flip: boolean }) {
 }
 
 /** The tree: sky, sun, clouds and hills, a flared trunk and tapering branches (lib/tree.ts). */
-function TreeArt({ w, h }: { w: number; h: number }) {
-  const CROWN = crownBox(w, h);
+function TreeArt({ w, h, box: CROWN }: { w: number; h: number; box: { l: number; t: number; w: number; h: number } }) {
   const X = (x: number) => (CROWN.l + x * CROWN.w) * w;
   const Y = (y: number) => (CROWN.t + y * CROWN.h) * h;
   const W = (k: number) => Math.max(1.2, k * CROWN.w * w);

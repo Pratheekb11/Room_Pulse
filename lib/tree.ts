@@ -77,30 +77,56 @@ export const treeFork = () => ({ ...FORK });
 // a little apart, put in an order that spreads them out (each next one as far as possible
 // from those before it), so the first few leaves already cover the whole tree and a leaf's
 // spot depends only on its place in line.
-let candidates: { x: number; y: number }[] | null = null;
+/** A spot on a branch, and which way that branch grows there (a unit vector in the crown's box). */
+export interface LeafSpot {
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+}
+let candidates: LeafSpot[] | null = null;
 const order: number[] = [];
 let gap: number[] = [];
+let centres: { x: number; y: number }[] = [];
 
 function allCandidates() {
   if (candidates) return candidates;
-  const pts: { x: number; y: number }[] = [];
+  const pts: LeafSpot[] = [];
   for (const b of TREE_BRANCHES) {
     if (b.level < 2) continue; // leaves grow on the outer branches, not the big limbs
+    const len = Math.hypot(b.x2 - b.x1, b.y2 - b.y1) || 1;
+    const dx = (b.x2 - b.x1) / len;
+    const dy = (b.y2 - b.y1) / len;
     const steps = Math.max(1, Math.round(Math.hypot(b.x2 - b.x1, b.y2 - b.y1) / 0.02));
     for (let s = 0; s <= steps; s++) {
       const x = b.x1 + ((b.x2 - b.x1) * s) / steps;
       const y = b.y1 + ((b.y2 - b.y1) * s) / steps;
       if (pts.some((p) => Math.hypot(p.x - x, p.y - y) < 0.012)) continue;
-      pts.push({ x, y });
+      pts.push({ x, y, dx, dy });
     }
   }
   candidates = pts;
   gap = pts.map(() => Infinity);
+  // where each leaf's middle lands on a typical big screen: leaves are spread by their middles,
+  // since a leaf reaches out from its stalk and two stalks apart can still put leaves on top of each other
+  const W = 670;
+  const H = 320;
+  centres = pts.map((p) => {
+    const { side, angle } = leafPose(p, "", W, H);
+    const a = (angle * Math.PI) / 180;
+    return { x: p.x + (side * Math.cos(a) * 0.5 * 110) / W, y: p.y + (Math.sin(a) * 0.5 * 110) / H };
+  });
   return pts;
 }
 
 /** The spot (0..1 in the crown's box) of the leaf that arrived `index`-th; earlier leaves never move. */
 export function treeLeafSpot(index: number): { x: number; y: number } {
+  const { x, y } = treeLeafAt(index);
+  return { x, y };
+}
+
+/** The leaf that arrived `index`-th: its spot and which way its branch grows there. */
+export function treeLeafAt(index: number): LeafSpot {
   const pts = allCandidates();
   while (order.length <= index && order.length < pts.length) {
     let best = -1;
@@ -111,7 +137,11 @@ export function treeLeafSpot(index: number): { x: number; y: number } {
       for (let i = 0; i < pts.length; i++) if (gap[i] > 0 && (best < 0 || gap[i] > gap[best])) best = i;
     }
     order.push(best);
-    for (let i = 0; i < pts.length; i++) gap[i] = Math.min(gap[i], Math.hypot(pts[i].x - pts[best].x, pts[i].y - pts[best].y));
+    const c = centres[best];
+    const at = pts[best];
+    // apart both where the stalks sit and where the leaves' middles land
+    for (let i = 0; i < pts.length; i++)
+      gap[i] = Math.min(gap[i], Math.hypot(centres[i].x - c.x, centres[i].y - c.y), Math.hypot(pts[i].x - at.x, pts[i].y - at.y));
   }
   return { ...pts[order[index % order.length]] };
 }
@@ -126,4 +156,44 @@ function hash(s: string): number {
 export function leafSide(spot: { x: number; y?: number }, id: string): 1 | -1 {
   if (Math.abs(spot.x - 0.5) > 0.04) return spot.x > 0.5 ? 1 : -1;
   return hash(id) % 2 ? 1 : -1;
+}
+
+const LEAF_TURN = (45 * Math.PI) / 180; // how far a leaf turns out from its branch
+// how far a leaf may tip from level, in degrees, so its words read easily: up (−) more than down (+),
+// since leaves reaching up look alive and drooping ones look wilted
+const LEAF_UP = -32;
+const LEAF_DOWN = 20;
+const MIN_OFF_BRANCH = 20; // a leaf sticks out at least this far from its branch, in degrees
+
+/**
+ * How a leaf grows out of its branch, like a real one: turned 45° off the branch (the more level way),
+ * pointing the way the branch grows (out from the trunk), and tipped at most 35° from level.
+ * `w` and `h` are the crown box's size on screen, since the tree is stretched to fit it.
+ * side: 1 = the leaf points right of its stalk, −1 = left. angle: degrees, + = the tip tips down.
+ */
+export function leafPose(at: LeafSpot, id: string, w: number, h: number): { side: 1 | -1; angle: number } {
+  const base = (Math.atan2(at.dy * h, at.dx * w) * 180) / Math.PI;
+  const ways = [base + 45, base - 45].map((deg) => {
+    const x = Math.cos((deg * Math.PI) / 180);
+    const side: 1 | -1 = x >= 0 ? 1 : -1;
+    // the tilt from level, seen from the leaf's own side, kept within reach
+    const raw = side === 1 ? deg : 180 - deg;
+    const tilt = Math.max(LEAF_UP, Math.min(LEAF_DOWN, ((raw + 540) % 360) - 180));
+    // how far that leaf, once tilted, ends up from its branch
+    const leafDeg = side === 1 ? tilt : 180 - tilt;
+    const off = Math.abs(((leafDeg - base + 540) % 360) - 180);
+    return { side, tilt, off };
+  });
+  let options = ways.filter((v) => v.off >= MIN_OFF_BRANCH);
+  if (!options.length) options = ways;
+  // on a branch that clearly goes one way, the leaf goes that way too
+  if (Math.abs(at.dx) > 0.3) {
+    const along = options.filter((v) => v.side === Math.sign(at.dx));
+    if (along.length) options = along;
+  }
+  // the more level one, counting a downward tip as worse; a near tie goes by the answer, the same every time
+  const cost = (v: { tilt: number }) => (v.tilt > 0 ? v.tilt * 2.2 : -v.tilt);
+  const [a, b] = options;
+  const pick = !b ? a : Math.abs(cost(a) - cost(b)) < 6 ? options[hash(id) % 2] : cost(a) <= cost(b) ? a : b;
+  return { side: pick.side, angle: Math.round(pick.tilt * 10) / 10 };
 }
