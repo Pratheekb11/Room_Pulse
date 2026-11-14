@@ -33,12 +33,14 @@ const leaf = (code: string, focusId: string, voterId: string, slot: number, text
   answerRoute.POST(
     new Request(`${ORIGIN}/api/answer`, {
       method: "POST",
-      body: JSON.stringify({ kind: "text", code, focusId, voterId, slot, ...(text === null ? { remove: true } : { text }), ...extra }),
+      // board leaves need a name, so every leaf here is signed unless a test says otherwise
+      body: JSON.stringify({ kind: "text", code, focusId, voterId, slot, ...(text === null ? { remove: true } : { text, author: "Kim" }), ...extra }),
     }),
   );
-const answer = (code: string, focusId: string, voterId: string, text: string, author?: string) =>
+/** `author` null = send no name at all. */
+const answer = (code: string, focusId: string, voterId: string, text: string, author: string | null = "Kim") =>
   answerRoute.POST(
-    new Request(`${ORIGIN}/api/answer`, { method: "POST", body: JSON.stringify({ kind: "text", code, focusId, voterId, text, ...(author === undefined ? {} : { author }) }) }),
+    new Request(`${ORIGIN}/api/answer`, { method: "POST", body: JSON.stringify({ kind: "text", code, focusId, voterId, text, ...(author === null ? {} : { author }) }) }),
   );
 
 async function tree(extra: Record<string, unknown> = {}) {
@@ -144,25 +146,40 @@ describe("boards: an open answer question shown as leaves, notes or stars", () =
   });
 });
 
-describe("signing an answer with a name (optional)", () => {
+describe("signing a leaf with your name (needed on boards: team building is about knowing who said what)", () => {
   it("keeps the name on a board question, tidied", async () => {
     const { code, focusId } = await tree();
     expect((await answer(code, focusId, crypto.randomUUID(), "My team", "  Priya   S ")).status).toBe(200);
-    expect((await answer(code, focusId, crypto.randomUUID(), "Shipping things"))).toHaveProperty("status", 200);
-    const texts = (await results(code)).texts;
-    expect(texts.find((t) => t.text === "My team")?.author).toBe("Priya S");
-    expect(texts.find((t) => t.text === "Shipping things")?.author).toBeNull();
+    expect((await results(code)).texts.find((t) => t.text === "My team")?.author).toBe("Priya S");
   });
 
-  it("treats a blank name as no name, and changing the answer can drop the name", async () => {
+  it("refuses a board leaf with no name or a blank one, and says why", async () => {
+    const { code, focusId } = await tree();
+    for (const author of [null, "", "   "]) {
+      const res = await answer(code, focusId, crypto.randomUUID(), "Growth", author);
+      expect(res.status, String(author)).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe("name_required");
+    }
+    expect((await results(code)).texts).toEqual([]);
+  });
+
+  it("changing a leaf can change the name on it", async () => {
     const { code, focusId } = await tree();
     const me = crypto.randomUUID();
-    await answer(code, focusId, me, "Growth", "   ");
-    expect((await results(code)).texts[0].author).toBeNull();
     await answer(code, focusId, me, "Growth", "Sam");
-    expect((await results(code)).texts[0].author).toBe("Sam");
-    await answer(code, focusId, me, "Growth and people");
-    expect((await results(code)).texts[0]).toMatchObject({ text: "Growth and people", author: null });
+    await answer(code, focusId, me, "Growth and people", "Samir");
+    expect((await results(code)).texts[0]).toMatchObject({ text: "Growth and people", author: "Samir" });
+  });
+
+  it("lets a leaf be taken back without a name", async () => {
+    const { code, focusId } = await tree();
+    const me = crypto.randomUUID();
+    await answer(code, focusId, me, "Growth", "Sam");
+    const res = await answerRoute.POST(
+      new Request(`${ORIGIN}/api/answer`, { method: "POST", body: JSON.stringify({ kind: "text", code, focusId, voterId: me, slot: 0, remove: true }) }),
+    );
+    expect(res.status).toBe(200);
+    expect((await results(code)).texts).toEqual([]);
   });
 
   it(`is at most ${MAX_AUTHOR} characters`, async () => {
@@ -176,7 +193,8 @@ describe("signing an answer with a name (optional)", () => {
     const { code } = (await res.json()) as { code: string };
     const focusId = (await info(code)).focusTopics[0].id;
     expect((await answer(code, focusId, crypto.randomUUID(), "Demos", "Priya")).status).toBe(200);
-    expect((await results(code)).texts[0].author).toBeNull();
+    expect((await answer(code, focusId, crypto.randomUUID(), "Pairing", null)).status).toBe(200);
+    expect((await results(code)).texts.map((t) => t.author)).toEqual([null, null]);
   });
 
   it("shows on voters' phones when results are shared, but hidden answers don't", async () => {
@@ -189,10 +207,10 @@ describe("signing an answer with a name (optional)", () => {
   it("goes into the exports next to the answer", async () => {
     const { code, focusId } = await tree();
     await answer(code, focusId, crypto.randomUUID(), "Autonomy", "Ravi");
-    await answer(code, focusId, crypto.randomUUID(), "Coffee");
+    await answer(code, focusId, crypto.randomUUID(), "Coffee", "Lee");
     const md = await (await exportRoute.GET(new Request(`${ORIGIN}/x?type=markdown`, { headers: { cookie } }), ctx(code))).text();
     expect(md).toContain("Autonomy — Ravi");
-    expect(md).toContain("- Coffee");
+    expect(md).toContain("- Coffee — Lee");
     const raw = await (await exportRoute.GET(new Request(`${ORIGIN}/x?type=raw`, { headers: { cookie } }), ctx(code))).text();
     expect(raw).toContain("Autonomy — Ravi");
   });

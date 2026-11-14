@@ -39,10 +39,13 @@ const leafCard = (extra: Record<string, unknown>) =>
   );
 
 describe("the phone's card for a board question", () => {
-  it("asks for a leaf on a tree, with an optional name to sign it", () => {
+  it("asks for a leaf on a tree, signed with the person's name (team building needs names)", () => {
     const html = leafCard({});
     expect(html).toContain("Write your leaf");
-    expect(html).toContain("Sign it (optional)");
+    expect(html).toContain("Your name");
+    expect(html).not.toContain("optional");
+    expect(html).not.toContain("nobody will know");
+    expect(html).toMatch(/id="text-author"[^>]*required/);
     expect(html).toMatch(/maxLength="30"|maxlength="30"/);
     expect(html).toContain("goes on the tree");
     expect(html).toContain("Add my leaf");
@@ -56,6 +59,11 @@ describe("the phone's card for a board question", () => {
 
   it("fills in the name the person signed with before", () => {
     expect(leafCard({ author: "Priya" })).toContain('value="Priya"');
+  });
+
+  it("won't add a leaf until there's a name", () => {
+    const src = readFileSync(new URL("../components/vote/BoardCard.tsx", import.meta.url), "utf8");
+    expect(src).toMatch(/disabled=\{disabled \|\| !clean \|\| !tidy\(name\)\}/);
   });
 
   it("lists the person's own leaves, each to change or take back, and offers another", () => {
@@ -172,14 +180,13 @@ describe("the builder", () => {
 });
 
 describe("the builder's preview", () => {
-  it("keeps each question's board and has sample leaves, some signed", async () => {
+  it("keeps each question's board and has sample leaves, all signed", async () => {
     const { previewQuestions, sampleBoardAnswers } = await import("@/lib/preview");
     const [q] = previewQuestions([{ kind: "text", name: "What motivates you?", options: [], board: "tree" }]);
     expect(q.board).toBe("tree");
     const samples = sampleBoardAnswers("preview-0");
     expect(samples.length).toBeGreaterThanOrEqual(6);
-    expect(samples.some((s) => s.author)).toBe(true);
-    expect(samples.some((s) => !s.author)).toBe(true);
+    expect(samples.every((s) => s.author)).toBe(true);
     expect(new Set(samples.map((s) => s.id)).size).toBe(samples.length);
   });
 
@@ -218,7 +225,7 @@ describe("phone wording for signed answers", () => {
     const head = (signable: boolean) => renderToStaticMarkup(createElement(VoterHeader, { title: "T", theme: "paper", decor: false, score: null, signable }));
     expect(head(false)).toContain("Your answers are anonymous.");
     expect(head(true)).not.toContain("Your answers are anonymous.");
-    expect(head(true)).toContain("Sign them only if you want to.");
+    expect(head(true)).toContain("Answers on a board show your name.");
   });
 
   it("passes whether any question can be signed to the header", () => {
