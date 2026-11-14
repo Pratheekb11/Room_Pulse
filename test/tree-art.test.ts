@@ -110,3 +110,42 @@ describe("zooming the tree", () => {
     expect(src).toContain("?? maxZoom, w / 2, focusY)");
   });
 });
+
+describe("long leaves (a paragraph instead of a few words)", () => {
+  it("picks a smaller size for longer text when a leaf is shown big", async () => {
+    const { pieceTextSize } = await import("@/lib/boards");
+    expect(pieceTextSize("Coffee")).toBe("big");
+    expect(pieceTextSize("x".repeat(60))).toBe("medium");
+    expect(pieceTextSize("x".repeat(200))).toBe("small");
+  });
+
+  it("keeps the shown leaf on the screen: it scrolls inside instead of pushing the buttons away", () => {
+    const src = readFileSync(new URL("../components/results/BoardView.tsx", import.meta.url), "utf8");
+    expect(src).toMatch(/max-h-\[calc\(100dvh-9rem\)\][^"]*overflow-y-auto/);
+    expect(src).toContain("pieceTextSize(answer.text)");
+  });
+
+  it("only uses the pointed leaf shape for short text, so long text stays inside the box", () => {
+    const src = readFileSync(new URL("../components/results/BoardView.tsx", import.meta.url), "utf8");
+    expect(src).toMatch(/borderRadius: size === "big" \? "70% 0" : "2.5rem 0.75rem"/);
+  });
+
+  it("lists a person's long leaf at full width on the phone, with Change and Remove under it", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { BoardCard } = await import("@/components/vote/BoardCard");
+    const html = renderToStaticMarkup(
+      createElement(BoardCard, {
+        question: "Q",
+        color: "#000",
+        board: "tree",
+        leaves: ["A very long leaf ".repeat(12)],
+        disabled: false,
+        onSave: () => {},
+        onRemove: () => {},
+      }),
+    );
+    expect(html).toMatch(/<li class="flex flex-col/);
+    expect(html).toContain("line-clamp-4");
+  });
+});
