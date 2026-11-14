@@ -66,7 +66,7 @@ Built test-first on 2026-11-14 (`test/images.test.ts`, `test/report.test.ts`, `t
 
 To ship it (schema first, or every page breaks: `getSession` reads `image_id`):
 
-1. Run the last three sections of `db/schema.sql` (from "Pictures on questions and options" to the end: `images`, `open_points`, `ai_reports`, the new columns and the `live_sessions` view) in the Neon SQL Editor. They only add tables and columns. The local network can't reach `*.aws.neon.tech` (see "On hold" below).
+1. Run `db/2026-11-14-pictures-points-ai.sql` (the same as the end of `db/schema.sql`: `images`, `open_points`, `ai_reports`, the new columns and the `live_sessions` view) in the Neon SQL Editor; its last query should list 3 tables and 5 columns. They only add tables and columns. The local network can't reach `*.aws.neon.tech` (see "On hold" below).
 2. Merge the branch into `main`, run the tests and push. If `security/abuse-limits` is merged first or after, rebase: both add schema sections and touch `lib/queries.ts`; the new public write `POST /api/points/[code]` and `POST /api/admin/images` should get the same per-address limits.
 3. Check the live site at 390px and desktop: a picture on a question and an option, Fit to screen on a long Score items question, the report and Save as PDF, raising and closing an open point, the AI summary.
 
