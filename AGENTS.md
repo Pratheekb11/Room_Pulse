@@ -74,6 +74,34 @@ Not done yet (backlog):
 - AI summary: written on request, not kept up to date as answers arrive (it says how many people answered since). Free Gemini tier caveat above still applies.
 - Fit to screen: very long lists stop at 40% and scroll; Score spread with 10 items is around 44%.
 
+### Team activities (branch `feat/team-activities`)
+
+Built test-first on 2026-11-14 (`test/activities.test.ts`, `test/activities-ui.test.ts`), checked in a browser at 390px and desktop (Paper and Midnight). **Not deployed yet.**
+
+Why: team building is a pain point for teams, and most of it ends up offline, which leaves remote people out. LiveRate already gets everyone onto the same screen from their phones, so these activities work for people in the room and online alike. It's a differentiator: Mentimeter and Slido are built around polls, and retro tools don't do team building.
+
+- **Boards** (`lib/boards.ts`, `focus_topics.board`: `tree` / `wall` / `sky`, Open answer only): open answers drawn as leaves on a tree, sticky notes on a cork wall or stars in a night sky (`components/results/BoardView.tsx`), instead of a list. A results view of its own (chart `board`, named after the board by `chartsFor` in `lib/charts.ts`, the default for board questions; "Answer wall" and "One at a time" still work). The tree starts bare and grows a leaf per answer; each answer keeps its spot as more arrive (`boardSpot`: R2 points inside the canopy, by arrival order `arrivalOrder`, which uses `created`). Tap a piece to show it big (arrows step through; the owner can Hide it there). Phones draw leaves too small to read, so the "Read all N leaves" list starts open below 560px. Colours go through `tinted()`, so Mono turns them grey.
+- **Signed answers** (`text_answers.author`, up to `MAX_AUTHOR` = 30 characters): on board questions only, the phone card ("Write your leaf", leaf-shaped box) has "Sign it (optional)". One name per person per presentation (`liverate:author:<code>` in localStorage), sent with every board answer. Plain open answers never store a name and stay anonymous; the phone header only says "Your answers are anonymous" when no question can be signed. Names show on the board, in the dialog, in the list, on the answer wall, and in exports (`answer — Name`).
+- **Activity collection** (`lib/activities.ts`, 9 activities, each with an icon, length, how-to-run steps and a plan): Motivation tree, Goals for next year (sky), Kudos wall, Sailboat retro (wind / anchor / rocks / island), Weather check-in, Hidden superpowers, This or that, Our team in one word, Team agreements. `activityToBody` = `planToBody` + `showResults: true` (everyone watches the board fill up on their phone). Plans can carry `board` and `description`.
+- **Where they show**: the builder's start screen ("Or a team activity", after the templates); a board picker on Open answer questions ("Show answers as": A list, Tree, Sticky notes, Night sky); "Show results on phones" checkbox when creating (create accepts `showResults`); the builder preview draws the board with sample leaves (`sampleBoardAnswers`) and the leaf card; the home page has a "Team activities everyone can join" section with a drawn tree, and "9 team activities" in What you can do.
+
+To ship it (needs "deploy it"): run `node scripts/run-sql.mjs db/2026-11-14-team-activities.sql` (adds two nullable columns), then merge into `main` and push, then check the live site at 390px and desktop.
+
+Not done yet (backlog):
+
+- One leaf per person per question (open answers are one per voter). Several leaves each would need answers keyed by id instead of (question, voter).
+- The tree runs a little off the bottom of a 900px-tall laptop screen with the QR panel open (Fit to screen or Full screen shows it all). Very full trees (60+ leaves) overlap a little.
+- The facilitator's "how to run it" steps (`Activity.steps`) aren't shown anywhere yet. Show them in the builder or on the results screen.
+- No board in the "All questions" overview cards, the heatmap or the PDF report (they show the answers as text).
+- Names aren't moderated: the owner can hide a whole answer, not just its name.
+- Ideas for more activities: Two truths and a lie (guess which), Gratitude jar, Time capsule (open next year), Team map (where everyone joins from), Bucket list. Dot voting on the sticky notes once **Split 100 points** exists.
+
+### Kids and classrooms: decided not now (2026-11-14)
+
+Considered and parked. The market is big, but it isn't empty: Kahoot, Blooket, Quizizz (Wayground) and Gimkit already own kids' quizzes and are very kid-friendly. There are legal rules too: India's DPDP Act 2023 needs verifiable parental consent before handling the data of anyone under 18, and COPPA (US, under 13) and GDPR-K apply elsewhere. Kids typing free text and nicknames onto a big screen also needs moderation, and hiding nicknames is still on the unmerged `security/abuse-limits` branch.
+
+If it comes back, build a narrow **Classroom mode** (a per-presentation setting), not a kids product: the teacher is the only account and kids stay anonymous with no sign-up; nicknames come from a safe generated list (adjective + animal) instead of typing; answers are big emoji or picture tiles; no free text on the big screen (or the teacher approves each one first); bigger tap targets and the Pop / Arcade / Anime designs; no AI. Talk to 3–5 teachers before building, and get a legal check on consent.
+
 ### Speed (first visit must feel instant)
 
 - The home page is static and served from the CDN (`○` in the build). It gets its CSP from `next.config.ts` (no nonce, `'unsafe-inline'` scripts; it shows no user content). Every other page needs this request's nonce from `proxy.ts`, so it exports `dynamic = "force-dynamic"` (guarded by `test/speed.test.ts`). A new page must do the same.
