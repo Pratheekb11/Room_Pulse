@@ -99,6 +99,8 @@ export async function overview(digest: Digest): Promise<AiOverviewDraft | null> 
       GUARD,
     prompt: JSON.stringify({ title: digest.title, people: digest.people, questions: digest.questions.map((q) => ({ index: q.index, question: q.question, type: q.type, results: q.results })) }),
     schema: OVERVIEW_SCHEMA,
+    // up to ten insights plus the summary: more room than a single question's themes need
+    maxOutputTokens: 4096,
   });
   const parsed = overviewSchema.safeParse(reply);
   if (!parsed.success) return null;

@@ -19,6 +19,14 @@ describe("what you can do: the feature list on the create page", () => {
     expect(all).toContain(`${GUEST_DAYS} days`);
   });
 
+  it("tells people about pictures, the PDF report and open points", () => {
+    const all = productFeatures({ ai: true }).map((f) => `${f.title} ${f.body}`).join(" ");
+    expect(all).toMatch(/pictures/i);
+    expect(all).toMatch(/PDF report/);
+    expect(all).toMatch(/open points/i);
+    expect(all).toMatch(/whole presentation/i);
+  });
+
   it("shows AI only when the site has AI switched on, and says it needs an account", () => {
     expect(titles(false).some((t) => /AI/.test(t))).toBe(false);
     const ai = productFeatures({ ai: true }).find((f) => /AI/.test(f.title))!;

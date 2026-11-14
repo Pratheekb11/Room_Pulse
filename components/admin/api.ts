@@ -30,6 +30,9 @@ const MESSAGES: Record<string, string> = {
   ai_limit: "You've used today's AI allowance. It resets at midnight (UTC).",
   ai_failed: "The AI couldn't do that just now. Try again in a moment. This didn't use up your allowance.",
   too_few_answers: "Wait for at least 3 answers first.",
+  image_too_big: "That picture is too big. Try a smaller one.",
+  not_an_image: "That file isn't a picture we can use. Try a JPG or PNG.",
+  image_limit: "You've reached the most pictures one account can keep. Delete a presentation that has pictures, then try again.",
 };
 
 /** Same-origin fetch (sends the session cookie). Throws UnauthorizedError on 401, Error otherwise. */

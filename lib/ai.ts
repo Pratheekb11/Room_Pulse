@@ -32,7 +32,19 @@ export type GeminiSchema =
   | { type: "ARRAY"; items: GeminiSchema; maxItems?: string }
   | { type: "OBJECT"; properties: Record<string, GeminiSchema>; required?: string[] };
 
-export async function askJson(opts: { system: string; prompt: string; schema: GeminiSchema; temperature?: number }): Promise<unknown> {
+/** Gemini is busy (503) or asks to slow down (429): worth one more try. */
+const BUSY = new Set([429, 500, 503]);
+
+export async function askJson(opts: {
+  system: string;
+  prompt: string;
+  schema: GeminiSchema;
+  temperature?: number;
+  /** Room for the reply (default 2048). */
+  maxOutputTokens?: number;
+  /** Wait before the one retry when Gemini is busy (tests shorten it). */
+  retryDelayMs?: number;
+}): Promise<unknown> {
   if (process.env.AI_TRANSPORT === "memory") {
     aiCalls.push({ system: opts.system, prompt: opts.prompt });
     if (!aiReplies.length) throw new AiError("no fake reply queued");
@@ -43,8 +55,8 @@ export async function askJson(opts: { system: string; prompt: string; schema: Ge
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25_000);
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+  const send = () =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       signal: controller.signal,
       headers: { "content-type": "application/json", "x-goog-api-key": key },
@@ -53,12 +65,18 @@ export async function askJson(opts: { system: string; prompt: string; schema: Ge
         contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
         generationConfig: {
           temperature: opts.temperature ?? 0.3,
-          maxOutputTokens: 2048,
+          maxOutputTokens: opts.maxOutputTokens ?? 2048,
           responseMimeType: "application/json",
           responseSchema: opts.schema,
         },
       }),
     });
+  try {
+    let res = await send();
+    if (BUSY.has(res.status)) {
+      await new Promise((done) => setTimeout(done, opts.retryDelayMs ?? 1500));
+      res = await send();
+    }
     if (!res.ok) throw new AiError(`Gemini answered ${res.status}`);
     const body = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
     const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";

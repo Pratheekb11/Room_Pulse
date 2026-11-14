@@ -64,6 +64,14 @@ describe("Fit to screen on the results screen", () => {
     expect(dashboard).toMatch(/key\.toLowerCase\(\) === "f"/);
   });
 
+  it("makes room while it's on: a smaller title without the illustration, and the question tabs as one button", () => {
+    expect(dashboard).toMatch(/<ScreenHeader\b[^>]*\bcompact=\{fit\}/);
+    expect(dashboard).toMatch(/<QuestionTabs\b[^>]*\bcompact=\{fit\}/);
+    const chrome = read("components/ScreenChrome.tsx");
+    expect(chrome).toMatch(/compact \? /);
+    expect(chrome).toMatch(/decor && !compact/);
+  });
+
   it("is remembered on this device", () => {
     expect(dashboard).toContain("liverate:fit");
   });

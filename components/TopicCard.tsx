@@ -43,7 +43,7 @@ export function TopicCard(p: Props) {
           {complete ? "Done ✓" : `${rated}/${p.criteria.length}`}
         </span>
       </header>
-      {p.topic.imageId && <Picture id={p.topic.imageId} alt={`Picture of ${p.topic.name}`} className="block max-h-56 w-full border-b border-line" />}
+      {p.topic.imageId && <Picture id={p.topic.imageId} alt={`Picture of ${p.topic.name}`} className="block max-h-40 w-full border-b border-line" />}
       <div className="divide-y-2 divide-dashed divide-line px-5 py-2">
         {p.criteria.map((c) => {
           const key = cellKey(p.topic.id, c.id);

@@ -18,6 +18,7 @@ export function ScreenHeader({
   decor,
   status,
   controls,
+  compact = false,
 }: {
   title: string;
   /** The design id (sessions.theme); picks the illustration. */
@@ -25,15 +26,17 @@ export function ScreenHeader({
   decor: boolean;
   status: React.ReactNode;
   controls: React.ReactNode;
+  /** Fit to screen is on: a smaller title and no illustration, so the results get the room. */
+  compact?: boolean;
 }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       {/* at least 34rem for the title (or the full width): when that and the controls don't fit side by side, the controls wrap below */}
       <div className="min-w-0 flex-[1_1_min(100%,34rem)]">
         <Logo />
-        <div className="mt-2 flex items-end gap-3">
-          <h1 className="font-display min-w-0 text-[clamp(2rem,3.6vw,4.2rem)] font-semibold leading-[0.98] tracking-tight break-words">{title}</h1>
-          {decor && <Doodle character={charactersFor(theme).screen} className="h-[clamp(4rem,8vw,8.5rem)] w-auto shrink-0" />}
+        <div className={`flex items-end gap-3 ${compact ? "mt-1" : "mt-2"}`}>
+          <h1 className={`font-display min-w-0 font-semibold leading-[0.98] tracking-tight break-words ${compact ? "text-[clamp(1.3rem,1.9vw,2.2rem)]" : "text-[clamp(2rem,3.6vw,4.2rem)]"}`}>{title}</h1>
+          {decor && !compact && <Doodle character={charactersFor(theme).screen} className="h-[clamp(4rem,8vw,8.5rem)] w-auto shrink-0" />}
         </div>
       </div>
       <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
@@ -65,13 +68,24 @@ type TabName = { key: string; name: string };
  * On a narrow screen the tabs fold into one button that opens a list (up and down, never sideways).
  * Container queries, not the viewport: the builder's preview draws this screen at 1280px on any device.
  */
-export function QuestionTabs({ names, active, onPick }: { names: TabName[]; active: number | null; onPick: (index: number | null) => void }) {
+export function QuestionTabs({
+  names,
+  active,
+  onPick,
+  compact = false,
+}: {
+  names: TabName[];
+  active: number | null;
+  onPick: (index: number | null) => void;
+  /** Fit to screen is on: always the one button, so several rows of tabs don't take the results' room. */
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const tab = (on: boolean) =>
     `flex items-center gap-2 rounded-full border border-line-strong px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${on ? "bg-ink text-white" : "bg-white"}`;
   return (
     <div className="@container mb-[clamp(0.6rem,1.4vh,1.25rem)]">
-      <nav aria-label="Questions" className="flex flex-wrap items-center gap-2 @max-xl:hidden">
+      <nav aria-label="Questions" className={compact ? "hidden" : "flex flex-wrap items-center gap-2 @max-xl:hidden"}>
         <button type="button" onClick={() => onPick(null)} aria-current={active === null ? "page" : undefined} className={tab(active === null)}>
           All questions
         </button>
@@ -89,7 +103,7 @@ export function QuestionTabs({ names, active, onPick }: { names: TabName[]; acti
         ))}
       </nav>
       <SheetButton
-        className="@xl:hidden"
+        className={compact ? "" : "@xl:hidden"}
         kicker={active === null ? "Showing" : `Question ${active + 1} of ${names.length}:`}
         label={active === null ? `All questions (${names.length})` : names[active]?.name ?? ""}
         onClick={() => setOpen(true)}

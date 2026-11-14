@@ -31,7 +31,7 @@ export function QuestionPicture({ id, question, where }: { id?: string | null; q
       className={
         where === "phone"
           ? "mx-auto mt-1 mb-2 block max-h-56 max-w-full rounded-xl border border-line-strong"
-          : "mb-[clamp(0.6rem,1.4vh,1.25rem)] block max-h-[clamp(8rem,26vh,20rem)] max-w-full rounded-xl border border-line-strong"
+          : "mb-[clamp(0.6rem,1.4vh,1.25rem)] block max-h-[clamp(6rem,18vh,14rem)] max-w-full rounded-xl border border-line-strong"
       }
     />
   );

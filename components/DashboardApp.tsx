@@ -275,6 +275,7 @@ function Stage({
         title={session.title}
         theme={session.theme}
         decor={session.decor}
+        compact={fit}
         status={
           <>
             <LiveBadge lastOkAt={lastOkAt} />
@@ -407,7 +408,7 @@ function Stage({
           {showPoints && <OpenPoints code={code} state={pointsState} groups={groups} onClose={() => setPointsOpen(false)} />}
           <div className={showPoints ? "hidden" : undefined}>
           {!single && (
-            <QuestionTabs names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />
+            <QuestionTabs compact={fit} names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />
           )}
 
           <FitToScreen on={fit && !showPoints}>
