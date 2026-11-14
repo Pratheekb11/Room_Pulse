@@ -80,11 +80,11 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
               {mine.map((l) => (
                 <li
                   key={l.slot}
-                  className={`flex items-start justify-between gap-2 border border-line-strong px-3 py-2 ${board === "tree" ? "rounded-[1.4rem_0.4rem]" : "rounded-lg"} ${editing === l.slot ? "ring-2 ring-primary" : ""}`}
+                  className={`flex flex-col gap-1 border border-line-strong px-3 py-2 ${board === "tree" ? "rounded-[1.4rem_0.4rem]" : "rounded-lg"} ${editing === l.slot ? "ring-2 ring-primary" : ""}`}
                   style={{ background: tinted(PAPER[board]), color: "#26251e" }}
                 >
-                  <span className="min-w-0 py-1 font-semibold [overflow-wrap:anywhere]">{l.text}</span>
-                  <span className="flex shrink-0 gap-1">
+                  <span className="line-clamp-4 min-w-0 pt-1 font-semibold [overflow-wrap:anywhere]">{l.text}</span>
+                  <span className="flex justify-end gap-1">
                     <button
                       type="button"
                       disabled={disabled}

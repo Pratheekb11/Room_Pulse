@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, pieceSize, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
+import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, pieceSize, pieceTextSize, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
 import { tinted } from "@/lib/colors";
 import { leafSide, TREE_BRANCHES, treeFork } from "@/lib/tree";
 import type { TextAnswer } from "@/lib/types";
@@ -525,9 +525,12 @@ function PieceDialog({
   }, [onClose, onStep]);
 
   const info = boardInfo(board);
+  // a paragraph gets smaller words and a plainer shape, so it all fits inside the box
+  const size = pieceTextSize(answer.text);
+  const textSize = { big: "text-[clamp(1.5rem,4vw,3.2rem)]", medium: "text-[clamp(1.25rem,2.8vw,2.2rem)]", small: "text-[clamp(1.05rem,1.9vw,1.6rem)]" }[size];
   const style =
     board === "tree"
-      ? { background: tinted(LEAVES[pieceShade(answer.id, LEAVES.length)]), color: LEAF_INK, borderRadius: "70% 0" }
+      ? { background: tinted(LEAVES[pieceShade(answer.id, LEAVES.length)]), color: LEAF_INK, borderRadius: size === "big" ? "70% 0" : "2.5rem 0.75rem" }
       : board === "wall"
         ? { background: tinted(NOTES[pieceShade(answer.id, NOTES.length)]), color: NOTE_INK, borderRadius: 4 }
         : { background: tinted("#141a33"), color: "#fdf7e3", borderRadius: 24 };
@@ -542,9 +545,13 @@ function PieceDialog({
           className="animate-pop flex w-full max-w-2xl flex-col gap-5"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-[clamp(1.5rem,4vw,3.5rem)] text-center shadow-2xl" style={style}>
+          {/* never taller than the screen (minus the buttons): a long one scrolls inside */}
+          <div
+            className="flex max-h-[calc(100dvh-9rem)] min-h-[min(40vh,20rem)] flex-col items-center gap-4 overflow-y-auto p-[clamp(1.5rem,4vw,3.5rem)] text-center shadow-2xl"
+            style={style}
+          >
             {board === "sky" && <Star size={48} />}
-            <p className="font-display text-[clamp(1.5rem,4vw,3.2rem)] leading-tight font-semibold [overflow-wrap:anywhere]">{answer.text}</p>
+            <p className={`font-display my-auto ${textSize} ${size === "small" ? "leading-snug" : "leading-tight"} font-semibold [overflow-wrap:anywhere]`}>{answer.text}</p>
             {answer.author && <p className="text-[clamp(1rem,1.8vw,1.6rem)] font-bold opacity-80">— {answer.author}</p>}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">

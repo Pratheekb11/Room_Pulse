@@ -38,6 +38,11 @@ export function parseLeafKey(key: string): { focusId: string; slot: number } | n
   return m && Number(m[2]) < MAX_LEAVES ? { focusId: m[1], slot: Number(m[2]) } : null;
 }
 
+/** How big to set a leaf's words when it's shown on its own: a few words big, a paragraph smaller. */
+export function pieceTextSize(text: string): "big" | "medium" | "small" {
+  return text.length <= 40 ? "big" : text.length <= 120 ? "medium" : "small";
+}
+
 /** Zoom steps on the tree and the sky. */
 export const ZOOMS = [1, 1.5, 2, 3] as const;
 
