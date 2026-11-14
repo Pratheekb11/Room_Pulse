@@ -23,6 +23,9 @@ interface Props {
   seeHref?: string;
   onSave: (slot: number, text: string, author: string) => void;
   onRemove: (slot: number) => void;
+  /** They said "That's all from me" (they can still add more until it's full). */
+  finished?: boolean;
+  onFinish?: () => void;
 }
 
 const PAPER: Record<BoardId, string> = { tree: "#e3f2cf", wall: "#fff4b8", sky: "#e6e9fb" };
@@ -35,7 +38,7 @@ const plural = (piece: string) => (piece === "leaf" ? "leaves" : `${piece}s`);
  * A team activity's board on the phone: each person can add several leaves (notes, stars),
  * change one, or take one back, and may sign them with a name.
  */
-export function BoardCard({ question, color, board, leaves, status, disabled, author = "", seeHref, onSave, onRemove }: Props) {
+export function BoardCard({ question, color, board, leaves, status, disabled, author = "", seeHref, onSave, onRemove, finished = false, onFinish }: Props) {
   const piece = boardInfo(board).piece;
   const pieces = plural(piece);
   const mine = leaves.map((text, slot) => ({ text, slot })).filter((l) => l.text);
@@ -173,6 +176,11 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
           </form>
         )}
 
+        {mine.length > 0 && !finished && !full && onFinish && (
+          <button type="button" onClick={onFinish} disabled={disabled} className="key w-full rounded-lg bg-ink py-2.5 font-medium text-white">
+            That&rsquo;s all from me
+          </button>
+        )}
         {saveText(status) && (
           <p aria-live="polite" className="text-right text-xs font-semibold text-ink-soft">
             {saveText(status)}

@@ -202,6 +202,7 @@ function PhoneSlide({
               disabled={false}
               onSave={(slot, text) => set(Object.assign([...(Array.isArray(value) ? (value as string[]) : [])], { [slot]: text }))}
               onRemove={(slot) => set(Object.assign([...(Array.isArray(value) ? (value as string[]) : [])], { [slot]: "" }))}
+              onFinish={() => {}}
             />
           ) : (
             <TextCard {...common} value={value as string | undefined} onSend={set} />

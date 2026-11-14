@@ -278,7 +278,10 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         case "poll":
           return typeof v === "string";
         case "text":
-          return g.board ? Array.isArray(v) && v.some((t) => t) : typeof v === "string";
+          // a board takes several leaves: done at the most allowed, or when the person says they're done
+          return g.board
+            ? Array.isArray(v) && (v.filter((t) => t).length >= MAX_LEAVES || (v.some((t) => t) && finished.includes(g.focus.id)))
+            : typeof v === "string";
         case "number":
           return typeof v === "number";
         case "rank":
@@ -689,6 +692,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                     onLeaf(here.gi, slot, text);
                   }}
                   onRemove={(slot) => onLeaf(here.gi, slot, "")}
+                  finished={finished.includes(group.focus.id)}
+                  onFinish={() => onFinish(here.gi)}
                 />
               ) : here.kind === "text" ? (
                 <TextCard

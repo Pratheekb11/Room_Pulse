@@ -33,6 +33,7 @@ const leafCard = (extra: Record<string, unknown>) =>
       disabled: false,
       onSave: () => {},
       onRemove: () => {},
+      onFinish: () => {},
       ...extra,
     }),
   );
@@ -65,6 +66,18 @@ describe("the phone's card for a board question", () => {
     expect(html).toContain('aria-label="Change leaf: Growth"');
     expect(html).toContain('aria-label="Take back leaf: Coffee"');
     expect(html).toContain("Add another leaf");
+  });
+
+  it("lets people say they're done once they've added a leaf (so one leaf doesn't end the activity)", () => {
+    expect(leafCard({})).not.toContain("all from me");
+    expect(leafCard({ leaves: ["Growth"] })).toContain("all from me");
+    expect(leafCard({ leaves: ["Growth"], finished: true })).not.toContain("all from me");
+  });
+
+  it("counts a board as done only at 5 leaves or when the person says so", () => {
+    const src = readFileSync(new URL("../components/VoteApp.tsx", import.meta.url), "utf8");
+    expect(src).toContain("v.filter((t) => t).length >= MAX_LEAVES || (v.some((t) => t) && finished.includes(g.focus.id))");
+    expect(src).toMatch(/<BoardCard[\s\S]*?finished=\{finished\.includes\(group\.focus\.id\)\}[\s\S]*?onFinish=\{\(\) => onFinish\(here\.gi\)\}/);
   });
 
   it("stops at 5 leaves", () => {
