@@ -17,6 +17,7 @@ import { MultiCard } from "../vote/MultiCard";
 import { NumberCard } from "../vote/NumberCard";
 import { RankCard } from "../vote/RankCard";
 import { TextCard } from "../vote/TextCard";
+import { BoardCard } from "../vote/BoardCard";
 import { BoardView } from "../results/BoardView";
 import { ThemePicker } from "./ThemePicker";
 import { LiveBadge } from "../LiveBadge";
@@ -192,7 +193,19 @@ function PhoneSlide({
         ) : q.kind === "words" ? (
           <WordsCard {...common} value={value as string[] | undefined} finished={false} onSend={set} onFinish={() => {}} />
         ) : (
-          <TextCard {...common} board={q.board ?? null} value={value as string | undefined} onSend={set} />
+          q.kind === "text" && q.board ? (
+            <BoardCard
+              question={q.name}
+              color={color}
+              board={q.board}
+              leaves={Array.isArray(value) ? (value as string[]) : []}
+              disabled={false}
+              onSave={(slot, text) => set(Object.assign([...(Array.isArray(value) ? (value as string[]) : [])], { [slot]: text }))}
+              onRemove={(slot) => set(Object.assign([...(Array.isArray(value) ? (value as string[]) : [])], { [slot]: "" }))}
+            />
+          ) : (
+            <TextCard {...common} value={value as string | undefined} onSend={set} />
+          )
         )}
         </div>
         {(q.kind === "quiz" || q.kind === "qa") && (

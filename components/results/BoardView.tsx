@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { arrivalOrder, boardInfo, boardSpot, leafTilt, pieceShade, type BoardId } from "@/lib/boards";
+import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
 import { tinted } from "@/lib/colors";
 import type { TextAnswer } from "@/lib/types";
 import { ToBody } from "../Portal";
@@ -100,20 +100,84 @@ export function BoardView({ board, answers, onHide }: { board: BoardId; answers:
   );
 }
 
-/** The tree or the sky, drawn to fit the width: tall on phones, wide on big screens. */
+/**
+ * The tree or the sky, drawn to fit: as wide as there's room for and never taller than the screen,
+ * so the whole picture is always in view. Zoom in (buttons, or pinch) to read small leaves; drag to look around.
+ */
 function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: TextAnswer[]; onOpen: (id: string) => void }) {
   const [ref, width] = useWidth<HTMLDivElement>();
+  const [screen, setScreen] = useState({ vh: 0, top: 0 });
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = ref.current;
+      if (el) setScreen({ vh: window.innerHeight, top: el.getBoundingClientRect().top + window.scrollY });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [ref, width]);
+  const { w, h } = sceneSize(width, screen.vh || 800, screen.top);
   const wide = width >= 560;
-  const ratio = wide ? 1.6 : 0.85; // width / height
-  const w = Math.min(width, wide ? Math.round(typeof window === "undefined" ? width : window.innerHeight * 0.62 * ratio) : width);
-  const h = Math.round(w / ratio);
+
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<{ x: number; y: number; pan: { x: number; y: number }; dist: number; zoom: number; moved: boolean } | null>(null);
+  const moved = useRef(false);
+  const maxZoom = ZOOMS[ZOOMS.length - 1];
+
+  /** Zoom to `z`, keeping the point (cx, cy) of the frame where it is. */
+  function zoomTo(z: number, cx = w / 2, cy = h / 2) {
+    const next = Math.min(maxZoom, Math.max(1, z));
+    setPan((p) => clampPan({ x: cx - ((cx - p.x) * next) / zoom, y: cy - ((cy - p.y) * next) / zoom }, next, w, h));
+    setZoom(next);
+  }
+  const stepIn = () => zoomTo(ZOOMS.find((z) => z > zoom + 0.01) ?? maxZoom);
+  const stepOut = () => zoomTo([...ZOOMS].reverse().find((z) => z < zoom - 0.01) ?? 1);
+
+  function onPointerDown(e: React.PointerEvent) {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = [...pointers.current.values()];
+    const dist = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+    gesture.current = { x: e.clientX, y: e.clientY, pan, dist, zoom, moved: false };
+    moved.current = false;
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!pointers.current.has(e.pointerId) || !gesture.current) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gesture.current;
+    const pts = [...pointers.current.values()];
+    if (pts.length > 1 && g.dist > 0) {
+      // pinch: zoom around the middle of the two fingers
+      const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      zoomTo((g.zoom * d) / g.dist, (pts[0].x + pts[1].x) / 2 - box.left, (pts[0].y + pts[1].y) / 2 - box.top);
+      moved.current = true;
+    } else if (zoom > 1) {
+      const dx = e.clientX - g.x;
+      const dy = e.clientY - g.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) moved.current = true;
+      setPan(clampPan({ x: g.pan.x + dx, y: g.pan.y + dy }, zoom, w, h));
+    }
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    gesture.current = pointers.current.size ? { ...gesture.current!, x: e.clientX, y: e.clientY, pan, zoom, dist: 0 } : null;
+  }
+  // a drag that ends on a leaf isn't a tap on it
+  const open = (id: string) => {
+    if (!moved.current) onOpen(id);
+  };
+
   const n = answers.length;
   const piece = Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
   const font = piece * 0.1;
-  const showText = font >= 9;
+  const showText = font * zoom >= 9;
   // where the pieces go: the canopy, or most of the sky
   const area = board === "tree" ? { l: 0.07, t: 0.05, w: 0.86, h: 0.58 } : { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
   const label = board === "tree" ? `A tree with ${plural(n, "leaf")}` : `A night sky with ${plural(n, "star")}`;
+  const zoomBtn =
+    "flex h-9 min-w-9 items-center justify-center rounded-full border border-line-strong bg-white px-2 text-lg font-bold text-ink shadow-sm disabled:opacity-40";
 
   return (
     <div ref={ref} className="w-full">
@@ -121,69 +185,77 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
         <div
           role="group"
           aria-label={label}
-          className="relative mx-auto overflow-hidden rounded-2xl border border-line-strong"
+          className="relative mx-auto overflow-hidden rounded-2xl border border-line-strong select-none"
           style={{
             width: w,
             height: h,
+            touchAction: zoom > 1 ? "none" : "pan-y",
+            cursor: zoom > 1 ? "grab" : undefined,
             background:
               board === "tree"
                 ? `linear-gradient(180deg, ${tinted("#e7f4fb")} 0%, ${tinted("#f6f9ec")} 70%, ${tinted("#e4efcf")} 100%)`
                 : `radial-gradient(120% 90% at 50% 100%, ${tinted("#2b3a6b")} 0%, ${tinted("#141a33")} 60%, ${tinted("#0c1024")} 100%)`,
           }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
         >
-          {board === "tree" ? <TreeArt w={w} h={h} n={n} /> : <SkyArt w={w} h={h} />}
-          {answers.map((a, i) => {
-            const p = boardSpot(board, i);
-            const left = (area.l + p.x * area.w) * w;
-            const top = (area.t + p.y * area.h) * h;
-            const name = a.author ? ` — ${a.author}` : "";
-            return board === "tree" ? (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => onOpen(a.id)}
-                aria-label={`Leaf: ${a.text}${name}`}
-                title={`${a.text}${name}`}
-                className="animate-grow absolute flex items-center justify-center text-center leading-tight font-bold shadow-[0_1px_2px_rgb(0_0_0/0.18)] hover:z-10 hover:scale-110 focus-visible:z-10"
-                style={{
-                  left,
-                  top,
-                  width: piece,
-                  height: piece * 0.68,
-                  padding: `${piece * 0.08}px ${piece * 0.14}px`,
-                  borderRadius: "75% 0",
-                  background: tinted(LEAVES[pieceShade(a.id, LEAVES.length)]),
-                  color: LEAF_INK,
-                  fontSize: font,
-                  transform: `translate(-50%, -50%) rotate(${leafTilt(a.id)}deg)`,
-                  animationDelay: `${Math.min(i * 40, 1200)}ms`,
-                  transition: "scale 150ms",
-                }}
-              >
-                {showText && <span className="line-clamp-3 [overflow-wrap:anywhere]">{a.text}</span>}
-              </button>
-            ) : (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => onOpen(a.id)}
-                aria-label={`Star: ${a.text}${name}`}
-                title={`${a.text}${name}`}
-                className="animate-grow absolute flex flex-col items-center gap-1 hover:z-10 focus-visible:z-10"
-                style={{ left, top, width: piece * 1.3, transform: "translate(-50%, -30%)", animationDelay: `${Math.min(i * 40, 1200)}ms` }}
-              >
-                <Star size={Math.max(14, piece * 0.32)} />
-                {showText && (
-                  <span
-                    className="line-clamp-2 rounded-md px-1.5 py-0.5 text-center leading-tight font-bold [overflow-wrap:anywhere]"
-                    style={{ fontSize: font, color: "#fdf7e3", background: "rgb(12 16 36 / 0.55)" }}
-                  >
-                    {a.text}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          <div className="absolute inset-0 origin-top-left" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
+            {board === "tree" ? <TreeArt w={w} h={h} n={n} /> : <SkyArt w={w} h={h} />}
+            {answers.map((a, i) => {
+              const p = boardSpot(board, i);
+              const left = (area.l + p.x * area.w) * w;
+              const top = (area.t + p.y * area.h) * h;
+              const name = a.author ? ` — ${a.author}` : "";
+              return board === "tree" ? (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => open(a.id)}
+                  aria-label={`Leaf: ${a.text}${name}`}
+                  title={`${a.text}${name}`}
+                  className="animate-grow absolute flex items-center justify-center text-center leading-tight font-bold shadow-[0_1px_2px_rgb(0_0_0/0.18)] hover:z-10 hover:scale-110 focus-visible:z-10"
+                  style={{
+                    left,
+                    top,
+                    width: piece,
+                    height: piece * 0.68,
+                    padding: `${piece * 0.08}px ${piece * 0.14}px`,
+                    borderRadius: "75% 0",
+                    background: tinted(LEAVES[pieceShade(a.id, LEAVES.length)]),
+                    color: LEAF_INK,
+                    fontSize: font,
+                    transform: `translate(-50%, -50%) rotate(${leafTilt(a.id)}deg)`,
+                    animationDelay: `${Math.min(i * 40, 1200)}ms`,
+                    transition: "scale 150ms",
+                  }}
+                >
+                  {showText && <span className="line-clamp-3 [overflow-wrap:anywhere]">{a.text}</span>}
+                </button>
+              ) : (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => open(a.id)}
+                  aria-label={`Star: ${a.text}${name}`}
+                  title={`${a.text}${name}`}
+                  className="animate-grow absolute flex flex-col items-center gap-1 hover:z-10 focus-visible:z-10"
+                  style={{ left, top, width: piece * 1.3, transform: "translate(-50%, -30%)", animationDelay: `${Math.min(i * 40, 1200)}ms` }}
+                >
+                  <Star size={Math.max(14, piece * 0.32)} />
+                  {showText && (
+                    <span
+                      className="line-clamp-2 rounded-md px-1.5 py-0.5 text-center leading-tight font-bold [overflow-wrap:anywhere]"
+                      style={{ fontSize: font, color: "#fdf7e3", background: "rgb(12 16 36 / 0.55)" }}
+                    >
+                      {a.text}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
           {n === 0 && (
             <p
               className="absolute inset-x-0 bottom-[6%] px-4 text-center text-[clamp(1rem,1.6vw,1.6rem)] font-bold"
@@ -192,7 +264,25 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
               {board === "tree" ? "Leaves will grow here as people answer." : "Stars will light up as people answer."}
             </p>
           )}
+          {n > 0 && (
+            <div className="absolute right-2 bottom-2 flex gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
+              {zoom > 1 && (
+                <button type="button" className={`${zoomBtn} text-sm`} onClick={() => zoomTo(1)} aria-label={`Show the whole ${board}`}>
+                  Fit
+                </button>
+              )}
+              <button type="button" className={zoomBtn} onClick={stepOut} disabled={zoom <= 1} aria-label="Zoom out">
+                −
+              </button>
+              <button type="button" className={zoomBtn} onClick={stepIn} disabled={zoom >= maxZoom} aria-label="Zoom in">
+                +
+              </button>
+            </div>
+          )}
         </div>
+      )}
+      {n > 0 && !showText && zoom === 1 && (
+        <p className="mt-2 text-center text-sm font-semibold text-ink-soft">Zoom in or tap a {board === "tree" ? "leaf" : "star"} to read it.</p>
       )}
     </div>
   );

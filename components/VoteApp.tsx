@@ -27,7 +27,14 @@ import { useDocumentTheme } from "./useDocumentTheme";
 import { Doodle } from "./Doodle";
 import { RaisePoint } from "./vote/RaisePoint";
 import { charactersFor, type Character } from "@/lib/decor";
-import { MAX_AUTHOR } from "@/lib/boards";
+import { leafKey, MAX_AUTHOR, MAX_LEAVES, parseLeafKey } from "@/lib/boards";
+import { BoardCard } from "./vote/BoardCard";
+
+/** The save state to show for a board: the most worrying of its leaves'. */
+function leafStatus(statuses: Record<string, SaveStatus>, focusId: string): SaveStatus | undefined {
+  const all = Array.from({ length: MAX_LEAVES }, (_, i) => statuses[leafKey(focusId, i)]);
+  return (["closed", "error", "retrying", "saving", "saved"] as const).find((s) => all.includes(s));
+}
 
 /** The stored name to sign board answers with, or null for none. */
 const signedName = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, MAX_AUTHOR) : null);
@@ -95,7 +102,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         case "number":
           return typeof v === "number" && v >= (g.min ?? 0) && v <= (g.max ?? 100);
         case "text":
-          return typeof v === "string" && v.length > 0;
+          // board questions keep each person's leaves by slot ("" = empty)
+          return g.board ? Array.isArray(v) && v.length <= MAX_LEAVES && v.every((t) => typeof t === "string") : typeof v === "string" && v.length > 0;
         case "qa":
           return false; // Q&A keeps its own state (QaCard)
         case "quiz":
@@ -160,16 +168,26 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         code,
         voterId,
         endpoint: "/api/answer",
-        toBody: (focusId, v) => {
+        toBody: (key, v) => {
+          // one leaf of a board: "<question>#<slot>", "" = take it back
+          const leaf = parseLeafKey(key);
+          if (leaf)
+            return typeof v === "string" && v
+              ? { kind: "text", focusId: leaf.focusId, slot: leaf.slot, text: v, author: signedName(readJSON<unknown>(authorKey, "")) }
+              : { kind: "text", focusId: leaf.focusId, slot: leaf.slot, remove: true };
+          const focusId = key;
           const kind = byFocus.get(focusId)?.kind;
           if (kind === "poll") return { kind, focusId, topicId: v };
           if (kind === "multi" || kind === "rank") return { kind, focusId, topicIds: v };
           if (kind === "number") return { kind, focusId, value: v };
-          if (kind === "text") return { kind, focusId, text: v, ...(byFocus.get(focusId)?.board ? { author: signedName(readJSON<unknown>(authorKey, "")) } : {}) };
+          if (kind === "text") return { kind, focusId, text: v };
           return { kind: "words", focusId, words: v };
         },
         initialPending: Object.fromEntries(
-          Object.entries(readJSON<Record<string, unknown>>(answersPendingKey, {})).filter(([k, v]) => validAnswer(k, v)),
+          Object.entries(readJSON<Record<string, unknown>>(answersPendingKey, {})).filter(([k, v]) => {
+            const leaf = parseLeafKey(k);
+            return leaf ? Boolean(byFocus.get(leaf.focusId)?.board) && typeof v === "string" : validAnswer(k, v);
+          }),
         ) as Record<string, Answer>,
         onStatus,
         onClosed: () => setIsOpen(false),
@@ -258,8 +276,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       const v = a[g.focus.id];
       switch (step.kind) {
         case "poll":
-        case "text":
           return typeof v === "string";
+        case "text":
+          return g.board ? Array.isArray(v) && v.some((t) => t) : typeof v === "string";
         case "number":
           return typeof v === "number";
         case "rank":
@@ -370,6 +389,25 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       answerQueue.set(focusId, value);
       // Most questions move on once answered; word clouds wait so people can add more answers.
       afterChange(i, ratings, next, wasDone, steps[i].kind !== "words");
+    },
+    [answers, ratings, groups, steps, stepDone, answersKey, answerQueue, afterChange, reward],
+  );
+
+  /** A team activity's board: add, change ("text") or take back ("") one of this person's leaves. */
+  const onLeaf = useCallback(
+    (gi: number, slot: number, text: string) => {
+      const focusId = groups[gi].focus.id;
+      const had = Array.isArray(answers[focusId]) ? (answers[focusId] as string[]) : [];
+      if (text && !had.some((t) => t)) reward();
+      const leaves = Array.from({ length: MAX_LEAVES }, (_, i) => (i === slot ? text : (had[i] ?? "")));
+      const next = { ...answers, [focusId]: leaves };
+      const i = steps.findIndex((s) => s.kind !== "rating" && s.gi === gi);
+      const wasDone = stepDone(steps[i], ratings, answers);
+      setAnswers(next);
+      writeJSON(answersKey, next);
+      answerQueue.set(leafKey(focusId, slot), text);
+      // people add several leaves, so stay on the board (Next moves on)
+      afterChange(i, ratings, next, wasDone, false);
     },
     [answers, ratings, groups, steps, stepDone, answersKey, answerQueue, afterChange, reward],
   );
@@ -635,6 +673,23 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   disabled={!isOpen}
                   onSend={(n) => onAnswer(here.gi, n)}
                 />
+              ) : here.kind === "text" && group.board ? (
+                <BoardCard
+                  question={group.focus.name}
+                  color={topicColor(here.gi)}
+                  board={group.board}
+                  leaves={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : []}
+                  status={leafStatus(statuses, group.focus.id)}
+                  disabled={!isOpen}
+                  author={author}
+                  seeHref={resultsHref}
+                  onSave={(slot, text, name) => {
+                    setAuthor(name);
+                    writeJSON(authorKey, name);
+                    onLeaf(here.gi, slot, text);
+                  }}
+                  onRemove={(slot) => onLeaf(here.gi, slot, "")}
+                />
               ) : here.kind === "text" ? (
                 <TextCard
                   question={group.focus.name}
@@ -642,16 +697,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   value={typeof answers[group.focus.id] === "string" ? (answers[group.focus.id] as string) : undefined}
                   status={statuses[group.focus.id]}
                   disabled={!isOpen}
-                  board={group.board ?? null}
-                  author={author}
-                  seeHref={resultsHref}
-                  onSend={(text, name) => {
-                    if (group.board) {
-                      setAuthor(name);
-                      writeJSON(authorKey, name);
-                    }
-                    onAnswer(here.gi, text);
-                  }}
+                  onSend={(text) => onAnswer(here.gi, text)}
                 />
               ) : here.kind === "quiz" ? (
                 <QuizCard

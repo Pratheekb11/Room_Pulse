@@ -26,6 +26,38 @@ export const boardInfo = (id: BoardId) => BOARDS.find((b) => b.id === id)!;
 /** Longest name someone may sign their answer with. */
 export const MAX_AUTHOR = 30;
 
+/** Leaves (notes, stars) one person may add to one board. */
+export const MAX_LEAVES = 5;
+
+/** The voter page's save key for one leaf: "<question id>#<slot>". */
+export const leafKey = (focusId: string, slot: number) => `${focusId}#${slot}`;
+export function parseLeafKey(key: string): { focusId: string; slot: number } | null {
+  const m = /^(.+)#([0-9])$/.exec(key);
+  return m && Number(m[2]) < MAX_LEAVES ? { focusId: m[1], slot: Number(m[2]) } : null;
+}
+
+/** Zoom steps on the tree and the sky. */
+export const ZOOMS = [1, 1.5, 2, 3] as const;
+
+/**
+ * How big to draw the tree or sky: as wide as there's room for, never taller than the screen,
+ * and if it starts in the top 60% of the screen, short enough to be seen whole without scrolling.
+ * Tall on phones (narrow space), wide on big screens.
+ */
+export function sceneSize(width: number, viewportH: number, top: number): { w: number; h: number; ratio: number } {
+  const ratio = width >= 560 ? 1.6 : 0.85;
+  const startsHigh = top >= 0 && top <= viewportH * 0.6;
+  const room = Math.max(160, startsHigh ? Math.max(viewportH - top, viewportH * 0.4) - 16 : viewportH - 16);
+  const h = Math.floor(Math.min(width / ratio, room));
+  return { w: Math.floor(h * ratio), h, ratio };
+}
+
+/** Keeps a zoomed picture covering its frame: it can't be dragged past its edges. */
+export function clampPan(pan: { x: number; y: number }, zoom: number, w: number, h: number): { x: number; y: number } {
+  const clamp = (v: number, size: number) => Math.min(0, Math.max(size - size * zoom, v)) || 0;
+  return { x: clamp(pan.x, w), y: clamp(pan.y, h) };
+}
+
 // R2 low-discrepancy sequence: evenly spread points that never move as more arrive.
 const G = 1.324717957244746;
 const A1 = 1 / G;

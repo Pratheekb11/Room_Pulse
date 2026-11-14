@@ -348,8 +348,8 @@ describe("fitting the tree on any screen", () => {
     }
   });
 
-  it("fits in the first screen when it starts in the top half", () => {
-    for (const c of cases.filter((c) => c.top <= c.viewportH * 0.45)) {
+  it("fits in the first screen when it starts in the top 60% (like under the presenter's header)", () => {
+    for (const c of cases.filter((c) => c.top <= c.viewportH * 0.6)) {
       const s = sceneSize(c.width, c.viewportH, c.top);
       expect(c.top + s.h, JSON.stringify(c)).toBeLessThanOrEqual(c.viewportH);
     }

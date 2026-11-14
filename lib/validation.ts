@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defaultChart, isChartFor } from "./charts";
 import { DEFAULT_THEME, THEME_IDS } from "./themes";
-import { BOARD_IDS, MAX_AUTHOR } from "./boards";
+import { BOARD_IDS, MAX_AUTHOR, MAX_LEAVES } from "./boards";
 import { MAX_POINT_ASSIGNEE, MAX_POINT_NAME, MAX_POINT_NOTE, MAX_POINT_TEXT } from "./points";
 
 export const codeSchema = z
@@ -313,11 +313,17 @@ export const answerSchema = z.discriminatedUnion("kind", [
     code: codeSchema,
     focusId: z.uuid(),
     voterId: z.uuid(),
+    /** Missing only when taking a leaf back (`remove`). */
     text: z
       .string()
       .max(MAX_TEXT_ANSWER * 4)
       .transform((t) => t.trim().replace(/\s+/g, " "))
-      .pipe(z.string().min(1, "Empty answer").max(MAX_TEXT_ANSWER, `Keep it under ${MAX_TEXT_ANSWER} characters`)),
+      .pipe(z.string().min(1, "Empty answer").max(MAX_TEXT_ANSWER, `Keep it under ${MAX_TEXT_ANSWER} characters`))
+      .optional(),
+    /** Board questions: which of the person's leaves this is (0…MAX_LEAVES-1). Plain open answers always use 0. */
+    slot: z.number().int().min(0).max(MAX_LEAVES - 1).default(0),
+    /** Board questions: take this leaf back. */
+    remove: z.boolean().optional(),
     /** Board questions: a name to sign the answer with. Blank = unsigned. Ignored on plain open answers. */
     author: z
       .string()

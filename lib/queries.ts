@@ -716,16 +716,36 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
   let saved: boolean;
   if (a.kind === "multi" || a.kind === "rank") {
     saved = await saveOptionList(a.kind, a.code, a.focusId, a.voterId, a.topicIds);
+  } else if (a.kind === "text" && a.remove) {
+    // Taking one of your own leaves back. The question must still be open, like any answer.
+    const rows = (await sql`
+      with q as (
+        select f.id, f.board
+        from live_sessions s
+        join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'text'
+        where s.code = ${a.code} and s.is_open
+      ), gone as (
+        delete from text_answers x using q
+        where x.focus_id = q.id and x.voter_id = ${a.voterId}::uuid
+          and x.slot = case when q.board is not null then ${a.slot}::int else 0 end
+      )
+      select 1 as ok from q
+    `) as { ok: number }[];
+    saved = rows.length > 0;
   } else if (a.kind === "text") {
+    if (!a.text) return "invalid";
     const rows = await sql`
-      insert into text_answers (session_id, focus_id, voter_id, body, author)
-      select s.id, f.id, ${a.voterId}::uuid, ${a.text},
+      insert into text_answers (session_id, focus_id, voter_id, slot, body, author)
+      select s.id, f.id, ${a.voterId}::uuid,
+             -- several leaves per person on a board; one answer per person otherwise
+             case when f.board is not null then ${a.slot}::int else 0 end,
+             ${a.text},
              -- only board questions are signed; plain open answers stay anonymous
              case when f.board is not null then ${a.author ?? null}::text end
       from live_sessions s
       join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'text'
       where s.code = ${a.code} and s.is_open
-      on conflict (focus_id, voter_id) do update set body = excluded.body, author = excluded.author, updated_at = now()
+      on conflict (focus_id, voter_id, slot) do update set body = excluded.body, author = excluded.author, updated_at = now()
       returning 1 as ok
     `;
     saved = rows.length > 0;
