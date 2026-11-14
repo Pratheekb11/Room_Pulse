@@ -150,7 +150,7 @@ describe("GET /api/session/[code]/status", () => {
   it("returns isOpen with a short CDN cache", async () => {
     const { code } = await demo();
     const res = await statusRoute.GET(new Request(url("/x")), ctx(code));
-    expect(await res.json()).toEqual({ isOpen: true, revision: 0, showResults: false, quiz: null });
+    expect(await res.json()).toEqual({ isOpen: true, revision: 0, showResults: false, openPoints: false, quiz: null });
     expect(res.headers.get("cache-control")).toBe("public, s-maxage=1, stale-while-revalidate=1");
     expect((await statusRoute.GET(new Request(url("/x")), ctx("zzzzzz"))).status).toBe(404);
   });

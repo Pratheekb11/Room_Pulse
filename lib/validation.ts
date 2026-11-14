@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defaultChart, isChartFor } from "./charts";
 import { DEFAULT_THEME, THEME_IDS } from "./themes";
+import { MAX_POINT_ASSIGNEE, MAX_POINT_NAME, MAX_POINT_NOTE, MAX_POINT_TEXT } from "./points";
 
 export const codeSchema = z
   .string()
@@ -214,10 +215,10 @@ export const editSessionSchema = z
 export type EditSessionInput = z.infer<typeof editSessionSchema>;
 
 export const patchSessionSchema = z
-  .object({ isOpen: z.boolean().optional(), showResults: z.boolean().optional(), aiEnabled: z.boolean().optional() })
-  .refine((p) => p.isOpen !== undefined || p.showResults !== undefined || p.aiEnabled !== undefined, "Nothing to change");
+  .object({ isOpen: z.boolean().optional(), showResults: z.boolean().optional(), aiEnabled: z.boolean().optional(), openPoints: z.boolean().optional() })
+  .refine((p) => p.isOpen !== undefined || p.showResults !== undefined || p.aiEnabled !== undefined || p.openPoints !== undefined, "Nothing to change");
 
-export const exportTypeSchema = z.enum(["summary", "raw", "markdown"]);
+export const exportTypeSchema = z.enum(["summary", "raw", "markdown", "points"]);
 
 /** Same cleaning the server applies, for the admin form preview. */
 export function splitLines(text: string): string[] {
@@ -355,3 +356,57 @@ export const aiActionSchema = z.object({ action: z.enum(["summary", "duplicates"
 
 /** "Write questions for me": what the presentation is for. */
 export const aiDraftSchema = z.object({ prompt: z.string().trim().min(3, "Say a little more").max(500, "Keep it under 500 characters") });
+
+// ---------------------------------------------------------------- open points
+
+/** Trimmed single-line text of at most `max` characters; empty becomes null. */
+const optionalLine = (max: number) =>
+  z
+    .string()
+    .max(max * 4)
+    .transform((t) => t.trim().replace(/\s+/g, " "))
+    .pipe(z.string().max(max))
+    .transform((t) => t || null)
+    .nullish()
+    .transform((t) => t ?? null);
+
+const pointText = z
+  .string()
+  .max(MAX_POINT_TEXT * 4)
+  .transform((t) => t.trim().replace(/\s+/g, " "))
+  .pipe(z.string().min(1, "Write the open point").max(MAX_POINT_TEXT, `Keep it under ${MAX_POINT_TEXT} characters`));
+
+/** A real calendar date as YYYY-MM-DD. */
+const dueDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((d) => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d), "Not a date");
+
+/** Raised from a phone. */
+export const raisePointSchema = z.object({ voterId: z.uuid(), text: pointText, name: optionalLine(MAX_POINT_NAME) });
+
+/** Added by the presenter: typed, or made from a result or an AI suggestion (then `originKey` names which). */
+export const addPointSchema = z.object({
+  title: pointText,
+  assignee: optionalLine(MAX_POINT_ASSIGNEE),
+  due: dueDate.nullish().transform((d) => d ?? null),
+  source: z.enum(["presenter", "result", "ai"]).default("presenter"),
+  originKey: z.string().trim().min(1).max(120).nullish().transform((k) => k ?? null),
+  focusId: z.uuid().nullish().transform((f) => f ?? null),
+});
+export type AddPointInput = z.infer<typeof addPointSchema>;
+
+/** The presenter's changes to a point: only the fields given change; null clears assignee, date or note. */
+export const changePointSchema = z
+  .object({
+    id: z.uuid(),
+    title: pointText.optional(),
+    status: z.enum(["open", "doing", "closed"]).optional(),
+    assignee: z.string().max(MAX_POINT_ASSIGNEE * 4).transform((t) => t.trim().replace(/\s+/g, " ") || null).pipe(z.string().max(MAX_POINT_ASSIGNEE).nullable()).nullable().optional(),
+    due: dueDate.nullable().optional(),
+    note: z.string().max(MAX_POINT_NOTE * 4).transform((t) => t.trim() || null).pipe(z.string().max(MAX_POINT_NOTE).nullable()).nullable().optional(),
+  })
+  .refine((c) => Object.keys(c).some((k) => k !== "id" && c[k as keyof typeof c] !== undefined), "Nothing to change");
+export type ChangePointInput = z.infer<typeof changePointSchema>;
+
+export const pointIdSchema = z.object({ id: z.uuid() });

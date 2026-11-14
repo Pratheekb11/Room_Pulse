@@ -193,5 +193,6 @@ export function audienceResults(r: ResultsPayload, quizFocusIds: Set<string>): R
     quizRevealed: [],
     leaderboard: [],
     quiz: null,
+    openPoints: 0,
   };
 }

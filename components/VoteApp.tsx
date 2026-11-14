@@ -25,6 +25,7 @@ import { useSession } from "./useSession";
 import { useClientValue } from "./useClientValue";
 import { useDocumentTheme } from "./useDocumentTheme";
 import { Doodle } from "./Doodle";
+import { RaisePoint } from "./vote/RaisePoint";
 import { charactersFor, type Character } from "@/lib/decor";
 
 export function VoteApp({ code, initial = null }: { code: string; initial?: SessionPayload | null }) {
@@ -120,6 +121,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const [isOpen, setIsOpen] = useState(session.isOpen);
   // The presenter lets people see live results on their phones.
   const [showResults, setShowResults] = useState(false);
+  // The presenter lets people raise open points (things to follow up); learned from the status poll.
+  const [canRaise, setCanRaise] = useState(false);
   const resultsHref = showResults ? `/s/${encodeURIComponent(code)}/results` : undefined;
 
   const onStatus = useCallback(
@@ -192,9 +195,10 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       try {
         const res = await fetch(`/api/session/${encodeURIComponent(code)}/status`, { cache: "no-store" });
         if (!res.ok) return;
-        const body = (await res.json()) as { isOpen: boolean; revision?: number; showResults?: boolean; quiz?: LiveQuiz | null };
+        const body = (await res.json()) as { isOpen: boolean; revision?: number; showResults?: boolean; openPoints?: boolean; quiz?: LiveQuiz | null };
         setIsOpen(body.isOpen);
         setShowResults(body.showResults === true);
+        setCanRaise(body.openPoints === true);
         if (body.quiz !== undefined) {
           setLiveQuiz((prev) => (JSON.stringify(prev) === JSON.stringify(body.quiz) ? prev : (body.quiz ?? null)));
           if (body.quiz) setQuizOffset(clockOffset(body.quiz.now, Date.now()));
@@ -463,6 +467,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         statuses={statuses}
         celebrate={celebrate}
         resultsHref={resultsHref}
+        raise={canRaise && isOpen ? <RaisePoint code={code} voterId={voterId} className="animate-rise mt-4 w-full max-w-sm [animation-delay:500ms]" /> : null}
         onSeeQuestions={
           qaStep === -1
             ? undefined
@@ -676,6 +681,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
             />
           </>
         )}
+        {canRaise && isOpen && <RaisePoint code={code} voterId={voterId} className="w-full" />}
       </main>
     </div>
   );
@@ -688,6 +694,7 @@ function ThankYou({
   statuses,
   celebrate,
   resultsHref,
+  raise,
   onSeeQuestions,
 }: {
   title: string;
@@ -697,6 +704,8 @@ function ThankYou({
   celebrate: boolean;
   /** Set when the presenter shows results on phones. */
   resultsHref?: string;
+  /** The "Raise an open point" button, when the presenter allows it. */
+  raise?: React.ReactNode;
   /** Set when the presentation has a Q&A: people come back to vote on new questions. */
   onSeeQuestions?: () => void;
 }) {
@@ -746,6 +755,7 @@ function ThankYou({
           See live results
         </a>
       )}
+      {raise}
       <p role="status" aria-live="polite" className="font-mono animate-fade mt-8 text-xs text-muted [animation-delay:600ms]">
         {closed ? (
           <span className="text-error">Voting closed before your last answer was saved.</span>

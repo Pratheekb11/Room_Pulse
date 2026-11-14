@@ -35,6 +35,7 @@ import { useResultsPoll } from "./useResultsPoll";
 import { useSession } from "./useSession";
 import { useDocumentTheme } from "./useDocumentTheme";
 import { FitToScreen } from "./FitToScreen";
+import { OpenPoints, useOpenPoints } from "./results/OpenPoints";
 import { readJSON, writeJSON } from "@/lib/storage";
 
 type View = "heatmap" | "ranking" | "breakdown" | "summary";
@@ -160,6 +161,10 @@ function Stage({
   const [overviewMode, setOverviewMode] = useState<"cards" | "heatmap">(() =>
     !new URLSearchParams(window.location.search).get("focus") && urlView === "heatmap" ? "heatmap" : "cards",
   );
+  // The presenter's open point list, shown in place of the results (kept in the URL as ?points=1).
+  const [pointsOpen, setPointsOpen] = useState(() => !audience && new URLSearchParams(window.location.search).get("points") === "1");
+  const pointsState = useOpenPoints(code, isOwner, { groups, criteria, cells, histograms, results: r, scaleMax: session.scaleMax });
+  const showPoints = pointsOpen && isOwner;
   const group = focusIndex === null ? null : (groups[focusIndex] ?? null);
   const view = group
     ? (viewByFocus[group.focus.id] ?? (urlView && isChartFor(group.kind, urlView) ? urlView : group.chart))
@@ -175,10 +180,12 @@ function Stage({
     else params.delete("view");
     if (pickedSort) params.set("sort", pickedSort);
     else params.delete("sort");
+    if (pointsOpen) params.set("points", "1");
+    else params.delete("points");
     const qs = params.toString();
     // keep the #k=… part: it's what lets this screen read the results
     window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
-  }, [focusIndex, view, single, pickedSort]);
+  }, [focusIndex, view, single, pickedSort, pointsOpen]);
 
   const groupId = group?.focus.id;
   const groupKind = group?.kind;
@@ -331,6 +338,22 @@ function Stage({
                 {showQr ? "Hide QR" : "Show QR"}
               </button>
             )}
+            {isOwner && (
+              <button
+                type="button"
+                aria-pressed={showPoints}
+                onClick={() => setPointsOpen((on) => !on)}
+                title={pointsState.signals.length ? "The results suggest follow-ups" : "Things to follow up after this session"}
+                className={`rounded-full border border-line-strong px-3 py-1 tabular-nums ${showPoints ? "bg-sun" : "bg-white hover:bg-canvas"}`}
+              >
+                Open points{(r.openPoints ?? 0) > 0 ? ` · ${r.openPoints}` : ""}
+                {pointsState.signals.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-xs font-bold text-white" aria-label={`${pointsState.signals.length} suggested`}>
+                    +{pointsState.signals.length}
+                  </span>
+                )}
+              </button>
+            )}
             {!audience && (
               <button
                 type="button"
@@ -356,11 +379,13 @@ function Stage({
 
       <div className="flex min-h-0 flex-1 flex-col gap-[clamp(0.75rem,1.6vw,2rem)] lg:flex-row">
         <main className="min-w-0 flex-1">
+          {showPoints && <OpenPoints code={code} state={pointsState} groups={groups} onClose={() => setPointsOpen(false)} />}
+          <div className={showPoints ? "hidden" : undefined}>
           {!single && (
             <QuestionTabs names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />
           )}
 
-          <FitToScreen on={fit}>
+          <FitToScreen on={fit && !showPoints}>
           <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
           <QuestionDescription text={group?.focus.description} image={group?.focus.imageId} question={group?.focus.name} />
           {groups.length === 0 ? (
@@ -538,6 +563,7 @@ function Stage({
               No answers yet. Ask people to scan the QR code.
             </p>
           )}
+          </div>
         </main>
 
         {showQr && joinUrl && (

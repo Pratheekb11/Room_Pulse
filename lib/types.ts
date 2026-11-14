@@ -133,7 +133,46 @@ export interface SessionStatus {
   revision: number;
   /** The owner lets voters see live results on their phones. */
   showResults: boolean;
+  /** The owner lets people raise open points from their phones. */
+  openPoints: boolean;
   quiz: LiveQuiz | null;
+}
+
+export type PointStatus = "open" | "doing" | "closed";
+
+/** An open point on the presenter's list. Never carries a voter id. */
+export interface OpenPoint {
+  id: string;
+  /** #1, #2, … within the presentation; never reused. */
+  number: number;
+  title: string;
+  /** audience = raised from a phone, presenter = typed by the owner, result / ai = made from a suggestion. */
+  source: "audience" | "presenter" | "result" | "ai";
+  originKey: string | null;
+  /** The question it belongs to, if any. */
+  focusId: string | null;
+  /** The name the person gave when raising it (optional). */
+  raisedBy: string | null;
+  status: PointStatus;
+  assignee: string | null;
+  /** YYYY-MM-DD */
+  due: string | null;
+  /** Progress or closing note; the person who raised the point can read it. */
+  note: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  /** Name of the question it belongs to (from the server's list). */
+  question?: string | null;
+}
+
+/** An open point as the person who raised it sees it on their phone. */
+export interface MyOpenPoint {
+  id: string;
+  number: number;
+  text: string;
+  status: PointStatus;
+  note: string | null;
+  at: string;
 }
 
 export interface QuizCount {
@@ -200,6 +239,8 @@ export interface ResultsPayload {
   quiz: LiveQuiz | null;
   /** Bumped whenever the presenter edits the questions. */
   revision: number;
+  /** Open points not closed yet (0 on voters' phones). */
+  openPoints?: number;
 }
 
 export interface AdminSessionRow {
@@ -220,4 +261,6 @@ export interface AdminSessionRow {
   showResults: boolean;
   /** AI insights are on (accounts only). */
   aiEnabled: boolean;
+  /** People may raise open points from their phones. */
+  openPoints: boolean;
 }

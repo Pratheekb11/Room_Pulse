@@ -402,3 +402,36 @@ alter table focus_topics add column if not exists image_id uuid references image
 alter table topics add column if not exists image_id uuid references images(id) on delete set null;
 create index if not exists focus_topics_image_idx on focus_topics(image_id) where image_id is not null;
 create index if not exists topics_image_idx on topics(image_id) where image_id is not null;
+
+-- Open points (an open point list): things to follow up after the poll (lib/points.ts).
+--   sessions.raise_points = people may raise open points from their phones
+--   sessions.point_seq    = the last number given out, so a deleted point's number is never reused
+alter table sessions add column if not exists raise_points boolean not null default false;
+alter table sessions add column if not exists point_seq int not null default 0;
+-- Recreate the view so it includes the columns above.
+create or replace view live_sessions as
+  select * from sessions where expires_at is null or expires_at > now();
+
+create table if not exists open_points (
+  id          uuid primary key default gen_random_uuid(),
+  session_id  uuid not null references sessions(id) on delete cascade,
+  number      int  not null,
+  -- who raised it from a phone (null = added by the presenter); never shown to anyone
+  voter_id    uuid,
+  source      text not null default 'audience' check (source in ('audience', 'presenter', 'result', 'ai')),
+  -- the result or AI suggestion it was made from, so the same one isn't added twice
+  origin_key  text check (length(origin_key) between 1 and 120),
+  focus_id    uuid references focus_topics(id) on delete set null,
+  title       text not null check (length(title) between 1 and 200),
+  raised_by   text check (length(raised_by) between 1 and 40),
+  status      text not null default 'open' check (status in ('open', 'doing', 'closed')),
+  assignee    text check (length(assignee) between 1 and 60),
+  due         date,
+  note        text check (length(note) between 1 and 500),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  closed_at   timestamptz,
+  unique (session_id, number)
+);
+create unique index if not exists open_points_origin_idx on open_points(session_id, origin_key) where origin_key is not null;
+create index if not exists open_points_voter_idx on open_points(session_id, voter_id) where voter_id is not null;

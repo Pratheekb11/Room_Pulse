@@ -1,4 +1,5 @@
-import { getChoiceSummaryRows, getRawRows, getSession, getSummaryRows } from "@/lib/queries";
+import { getChoiceSummaryRows, getRawRows, getSession, getSummaryRows, listOpenPoints } from "@/lib/queries";
+import { SOURCE_LABELS, statusLabel } from "@/lib/points";
 import { toMarkdown } from "@/lib/markdown";
 import { badRequest, logDbError, unavailable } from "@/lib/http";
 import { requireOwnedSession } from "@/lib/owned";
@@ -22,7 +23,25 @@ export async function GET(req: Request, ctx: RouteContext<"/api/admin/sessions/[
     }
 
     let csv: string;
-    if (type.data === "summary") {
+    if (type.data === "points") {
+      // The open point list, to carry on tracking in a spreadsheet.
+      csv = toCsv([
+        ["Number", "Open point", "Status", "Assigned to", "Due", "Raised by", "From", "Question", "Note", "Raised at", "Closed at"],
+        ...(await listOpenPoints(s.code)).map((p) => [
+          p.number,
+          p.title,
+          statusLabel(p.status),
+          p.assignee ?? "",
+          p.due ?? "",
+          p.raisedBy ?? "",
+          SOURCE_LABELS[p.source],
+          p.question ?? "",
+          p.note ?? "",
+          p.createdAt,
+          p.closedAt ?? "",
+        ]),
+      ]);
+    } else if (type.data === "summary") {
       const rows = await getSummaryRows(code.data);
       const out: (string | number)[][] = [["Question", "Item or option", "Measure", "Average score", "Answers"]];
       let i = 0;

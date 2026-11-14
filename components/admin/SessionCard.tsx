@@ -106,10 +106,11 @@ export function SessionCard({
     });
 
   // Ticks show at once; they go back if saving fails.
-  const [shown, setShown] = useState<{ showResults?: boolean; aiEnabled?: boolean }>({});
+  const [shown, setShown] = useState<{ showResults?: boolean; aiEnabled?: boolean; openPoints?: boolean }>({});
   const showResults = shown.showResults ?? s.showResults;
   const aiEnabled = shown.aiEnabled ?? s.aiEnabled;
-  const setting = async (kind: "results" | "ai", change: { showResults?: boolean; aiEnabled?: boolean }) => {
+  const openPoints = shown.openPoints ?? s.openPoints;
+  const setting = async (kind: "results" | "ai", change: { showResults?: boolean; aiEnabled?: boolean; openPoints?: boolean }) => {
     setShown((m) => ({ ...m, ...change }));
     await run(kind, async () => {
       await call(base, { method: "PATCH", body: JSON.stringify(change) });
@@ -286,6 +287,29 @@ export function SessionCard({
             <span>
               <span className="block font-semibold">Show live results on people&rsquo;s phones</span>
               <span className="block text-sm text-ink-soft">Handy when there&rsquo;s no big screen, like a video call. Hidden answers and quiz answers stay private.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={openPoints}
+              disabled={pending !== null}
+              onChange={() => void setting("results", { openPoints: !openPoints })}
+              className="mt-1 size-5 shrink-0 accent-primary"
+            />
+            <span>
+              <span className="block font-semibold">Let people raise open points</span>
+              <span className="block text-sm text-ink-soft">
+                People can send you things to follow up after the session. You give each one to someone and track it until it&rsquo;s closed, in{" "}
+                {urls ? (
+                  <a href={urls.dash.replace("#", "?points=1#")} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-4">
+                    Open points
+                  </a>
+                ) : (
+                  "Open points"
+                )}{" "}
+                on the results screen.
+              </span>
             </span>
           </label>
           {aiAvailable && (

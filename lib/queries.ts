@@ -12,6 +12,8 @@ import type {
   QaItem,
   LeaderRow,
   LiveQuiz,
+  MyOpenPoint,
+  OpenPoint,
   QuizCount,
   QuizMe,
   SessionStatus,
@@ -24,7 +26,7 @@ import type {
   WordCount,
 } from "./types";
 import type { AnswerInput, CreateSessionInput, EditSessionInput, QaAction, QuizAction, VoteInput } from "./validation";
-import type { QuizControl } from "./validation";
+import type { AddPointInput, ChangePointInput, QuizControl } from "./validation";
 import { itemKey, MAX_QA_PER_VOTER } from "./validation";
 import { generateCode, generateDashboardKey } from "./code";
 
@@ -109,14 +111,15 @@ const isoQuiz = (q: LiveQuiz | null): LiveQuiz | null =>
 
 /** Open/closed state, question revision and the running quiz question; `null` when the session does not exist. */
 export async function getSessionStatus(code: string): Promise<SessionStatus | null> {
-  const rows = (await sql`select s.is_open, s.revision, s.show_results, ${liveQuizJson()} as quiz from live_sessions s where s.code = ${code}`) as {
+  const rows = (await sql`select s.is_open, s.revision, s.show_results, s.raise_points, ${liveQuizJson()} as quiz from live_sessions s where s.code = ${code}`) as {
     is_open: boolean;
     revision: number;
     show_results: boolean;
+    raise_points: boolean;
     quiz: LiveQuiz | null;
   }[];
   const r = rows[0];
-  return r ? { isOpen: r.is_open, revision: r.revision, showResults: r.show_results, quiz: isoQuiz(r.quiz) } : null;
+  return r ? { isOpen: r.is_open, revision: r.revision, showResults: r.show_results, openPoints: r.raise_points, quiz: isoQuiz(r.quiz) } : null;
 }
 
 /** `null` when the session does not exist. */
@@ -256,6 +259,7 @@ export async function getResults(
                  and not (f.id = s.quiz_focus_id
                           and now() <= s.quiz_started_at + make_interval(secs => f.quiz_seconds + ${QUIZ_REVEAL_AFTER}::float8))),
                '[]'::json) as quiz_revealed,
+      (select count(*)::int from open_points p where p.session_id = s.id and p.status <> 'closed') as open_points,
       ${liveQuizJson()} as quiz
     from live_sessions s
     where s.code = ${code}
@@ -276,11 +280,13 @@ export async function getResults(
     quiz_counts: QuizCount[];
     quiz_revealed: { focusId: string; topicId: string }[];
     leaderboard: LeaderRow[];
+    open_points: number;
     quiz: LiveQuiz | null;
   }[];
   const r = rows[0];
   if (!r) return null;
   return {
+    openPoints: r.open_points,
     isOpen: r.is_open,
     voterCount: r.voter_count,
     cells: r.cells,
@@ -304,7 +310,7 @@ export async function getResults(
 
 export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> {
   const rows = (await sql`
-    select s.code, s.title, s.is_open, s.show_results, s.ai_enabled, s.created_at, s.expires_at, s.dashboard_key,
+    select s.code, s.title, s.is_open, s.show_results, s.ai_enabled, s.raise_points, s.created_at, s.expires_at, s.dashboard_key,
       (select count(*)::int from focus_topics f where f.session_id = s.id) as focus_count,
       (select count(*)::int from topics t where t.session_id = s.id)   as topic_count,
       (select count(*)::int from criteria c where c.session_id = s.id) as criterion_count,
@@ -333,6 +339,7 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     is_open: boolean;
     show_results: boolean;
     ai_enabled: boolean;
+    raise_points: boolean;
     created_at: Date | string;
     expires_at: Date | string | null;
     dashboard_key: string;
@@ -348,6 +355,7 @@ export async function listSessions(ownerId: string): Promise<AdminSessionRow[]> 
     isOpen: r.is_open,
     showResults: r.show_results,
     aiEnabled: r.ai_enabled,
+    openPoints: r.raise_points,
     createdAt: new Date(r.created_at).toISOString(),
     expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
     focusCount: r.focus_count,
@@ -423,12 +431,16 @@ export async function createSession(
 
 /** `false` when the session does not exist. */
 /** Owner settings; only the ones given change. */
-export async function setSessionSettings(code: string, change: { isOpen?: boolean; showResults?: boolean; aiEnabled?: boolean }): Promise<void> {
+export async function setSessionSettings(
+  code: string,
+  change: { isOpen?: boolean; showResults?: boolean; aiEnabled?: boolean; openPoints?: boolean },
+): Promise<void> {
   await sql`
     update sessions
        set is_open = coalesce(${change.isOpen ?? null}::boolean, is_open),
            show_results = coalesce(${change.showResults ?? null}::boolean, show_results),
-           ai_enabled = coalesce(${change.aiEnabled ?? null}::boolean, ai_enabled)
+           ai_enabled = coalesce(${change.aiEnabled ?? null}::boolean, ai_enabled),
+           raise_points = coalesce(${change.openPoints ?? null}::boolean, raise_points)
      where code = ${code}
   `;
 }
@@ -1404,4 +1416,140 @@ export async function saveImage(ownerId: string, base64: string, width: number, 
 export async function getImage(id: string): Promise<Buffer | null> {
   const rows = (await sql`select encode(bytes, 'base64') as data from images where id = ${id}::uuid`) as { data: string }[];
   return rows[0] ? Buffer.from(rows[0].data, "base64") : null;
+}
+
+// ---------------------------------------------------------------- open points
+
+export type RaiseOutcome = { outcome: "ok"; id: string; number: number } | { outcome: "not_found" | "closed" | "off" | "limit" };
+
+/** Someone raises an open point from their phone (the owner must have switched it on; up to `limit` each). */
+export async function raisePoint(code: string, voterId: string, text: string, name: string | null, limit: number): Promise<RaiseOutcome> {
+  // Taking the next number locks the presentation's row, so two phones never get the same one.
+  const rows = (await sql`
+    with s as (
+      update sessions set point_seq = point_seq + 1
+       where code = ${code} and is_open and raise_points and (expires_at is null or expires_at > now())
+         and (select count(*) from open_points p where p.session_id = sessions.id and p.voter_id = ${voterId}::uuid) < ${limit}::int
+      returning id, point_seq
+    )
+    insert into open_points (session_id, number, voter_id, source, title, raised_by)
+    select s.id, s.point_seq, ${voterId}::uuid, 'audience', ${text}, ${name}::text from s
+    returning id, number
+  `) as { id: string; number: number }[];
+  if (rows[0]) return { outcome: "ok", id: rows[0].id, number: rows[0].number };
+  const [st] = (await sql`select is_open, raise_points from live_sessions where code = ${code}`) as { is_open: boolean; raise_points: boolean }[];
+  if (!st) return { outcome: "not_found" };
+  if (!st.raise_points) return { outcome: "off" };
+  return { outcome: st.is_open ? "limit" : "closed" };
+}
+
+/** The open points one person raised, oldest first; null when there's no such presentation. */
+export async function listMyPoints(code: string, voterId: string): Promise<MyOpenPoint[] | null> {
+  const rows = (await sql`
+    select coalesce((select json_agg(json_build_object('id', p.id, 'number', p.number, 'text', p.title, 'status', p.status,
+                                                        'note', p.note, 'at', p.created_at) order by p.number)
+                       from open_points p where p.session_id = s.id and p.voter_id = ${voterId}::uuid), '[]'::json) as points
+    from live_sessions s where s.code = ${code}
+  `) as { points: MyOpenPoint[] }[];
+  if (!rows[0]) return null;
+  return rows[0].points.map((p) => ({ ...p, at: new Date(p.at).toISOString() }));
+}
+
+/** The presenter's whole list, by number (the caller checks ownership). `question` is the name of the question it belongs to. */
+export async function listOpenPoints(code: string): Promise<(OpenPoint & { question: string | null })[]> {
+  const rows = (await sql`
+    select p.id, p.number, p.title, p.source, p.origin_key, p.focus_id, p.raised_by, p.status, p.assignee,
+           to_char(p.due, 'YYYY-MM-DD') as due, p.note, p.created_at, p.closed_at, f.name as question
+      from open_points p
+      join live_sessions s on s.id = p.session_id and s.code = ${code}
+      left join focus_topics f on f.id = p.focus_id
+     order by p.number
+  `) as {
+    id: string;
+    number: number;
+    title: string;
+    source: OpenPoint["source"];
+    origin_key: string | null;
+    focus_id: string | null;
+    raised_by: string | null;
+    status: OpenPoint["status"];
+    assignee: string | null;
+    due: string | null;
+    note: string | null;
+    created_at: Date | string;
+    closed_at: Date | string | null;
+    question: string | null;
+  }[];
+  return rows.map((r) => ({
+    id: r.id,
+    number: r.number,
+    title: r.title,
+    source: r.source,
+    originKey: r.origin_key,
+    focusId: r.focus_id,
+    raisedBy: r.raised_by,
+    status: r.status,
+    assignee: r.assignee,
+    due: r.due,
+    note: r.note,
+    createdAt: new Date(r.created_at).toISOString(),
+    closedAt: r.closed_at ? new Date(r.closed_at).toISOString() : null,
+    question: r.question,
+  }));
+}
+
+/** The presenter adds a point. "exists" when one was already made from the same result or suggestion. */
+export async function addOpenPoint(code: string, p: AddPointInput): Promise<{ outcome: "ok"; id: string; number: number } | { outcome: "exists" | "not_found" }> {
+  try {
+    const rows = (await sql`
+      with s as (
+        update sessions set point_seq = point_seq + 1
+         where code = ${code} and (expires_at is null or expires_at > now())
+           and not exists (select 1 from open_points o where o.session_id = sessions.id and o.origin_key = ${p.originKey}::text)
+        returning id, point_seq
+      )
+      insert into open_points (session_id, number, source, origin_key, focus_id, title, assignee, due)
+      select s.id, s.point_seq, ${p.source}, ${p.originKey}::text,
+             (select f.id from focus_topics f where f.id = ${p.focusId}::uuid and f.session_id = s.id),
+             ${p.title}, ${p.assignee}::text, ${p.due}::date
+        from s
+      returning id, number
+    `) as { id: string; number: number }[];
+    if (rows[0]) return { outcome: "ok", id: rows[0].id, number: rows[0].number };
+  } catch (err) {
+    if ((err as { code?: string }).code !== "23505") throw err;
+    return { outcome: "exists" };
+  }
+  const found = await sql`select 1 from live_sessions where code = ${code}`;
+  return { outcome: found.length ? "exists" : "not_found" };
+}
+
+/** The presenter's changes: only the fields given; closing stamps the time, reopening clears it. */
+export async function changeOpenPoint(code: string, c: ChangePointInput): Promise<boolean> {
+  const { id, ...fields } = c;
+  const change = JSON.stringify(Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)));
+  const rows = await sql`
+    update open_points p
+       set title    = case when jsonb_exists(x.c, 'title') then x.c->>'title' else p.title end,
+           status   = case when jsonb_exists(x.c, 'status') then x.c->>'status' else p.status end,
+           assignee = case when jsonb_exists(x.c, 'assignee') then x.c->>'assignee' else p.assignee end,
+           due      = case when jsonb_exists(x.c, 'due') then (x.c->>'due')::date else p.due end,
+           note     = case when jsonb_exists(x.c, 'note') then x.c->>'note' else p.note end,
+           closed_at = case when not jsonb_exists(x.c, 'status') then p.closed_at
+                            when x.c->>'status' = 'closed' then coalesce(p.closed_at, now()) end,
+           updated_at = now()
+      from live_sessions s, (select ${change}::jsonb as c) x
+     where s.id = p.session_id and s.code = ${code} and p.id = ${id}::uuid
+    returning 1 as ok
+  `;
+  return rows.length > 0;
+}
+
+export async function deleteOpenPoint(code: string, id: string): Promise<boolean> {
+  const rows = await sql`
+    delete from open_points p using live_sessions s
+     where s.id = p.session_id and s.code = ${code} and p.id = ${id}::uuid
+    returning 1 as ok
+  `;
+  return rows.length > 0;
 }
