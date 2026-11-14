@@ -3,6 +3,7 @@ import { z } from "zod";
 import { askJson, type GeminiSchema } from "./ai";
 import { planToBody, type PresentationPlan } from "./templates";
 import { createSessionSchema, MAX_FOCUS_TOPICS, MAX_TOPICS_PER_FOCUS } from "./validation";
+import type { Digest } from "./ai-digest";
 
 // What people typed is data, never instructions: it goes in as JSON, and the system prompt says so.
 const GUARD =
@@ -49,6 +50,68 @@ export async function summarise(question: string, answers: string[]): Promise<Ai
   });
   const parsed = summarySchema.safeParse(reply);
   return parsed.success ? parsed.data : null;
+}
+
+// ---------------------------------------------------------------- the whole presentation
+
+const overviewSchema = z.object({
+  headline: z.string().trim().min(1).max(140),
+  summary: z.string().trim().min(1).max(900),
+  questions: z.array(z.object({ index: z.number().int(), insight: z.string().trim().min(1).max(400) })).max(MAX_FOCUS_TOPICS * 2),
+  actions: z.array(z.string().trim().min(1).max(200)).max(6),
+});
+
+const OVERVIEW_SCHEMA: GeminiSchema = {
+  type: "OBJECT",
+  properties: {
+    headline: { type: "STRING" },
+    summary: { type: "STRING" },
+    questions: {
+      type: "ARRAY",
+      maxItems: String(MAX_FOCUS_TOPICS),
+      items: { type: "OBJECT", properties: { index: { type: "INTEGER" }, insight: { type: "STRING" } }, required: ["index", "insight"] },
+    },
+    actions: { type: "ARRAY", maxItems: "5", items: { type: "STRING" } },
+  },
+  required: ["headline", "summary", "questions", "actions"],
+};
+
+export interface AiOverviewDraft {
+  headline: string;
+  summary: string;
+  questions: { focusId: string; insight: string }[];
+  actions: string[];
+}
+
+/**
+ * A summary of a whole presentation from its results: a headline, a short overview, one insight per
+ * question (matched back to real questions by their number; anything else is dropped) and next steps.
+ */
+export async function overview(digest: Digest): Promise<AiOverviewDraft | null> {
+  const reply = await askJson({
+    system:
+      "You help a presenter or team lead read the results of a live poll. You get the presentation's title, how many people answered, " +
+      "and each question with its results (averages, votes, average places, and the words people typed). " +
+      "Write: a headline of at most 12 words saying the single most important finding; a summary of 2 to 4 sentences covering the whole " +
+      "presentation; for each question that has answers, one insight of 1 or 2 sentences that says what the numbers mean (not just repeating them), " +
+      "giving the question's index; and up to 5 concrete next steps someone could be asked to do, each starting with a verb. " +
+      "Use only the data given. Don't invent numbers. Skip questions nobody answered. " +
+      GUARD,
+    prompt: JSON.stringify({ title: digest.title, people: digest.people, questions: digest.questions.map((q) => ({ index: q.index, question: q.question, type: q.type, results: q.results })) }),
+    schema: OVERVIEW_SCHEMA,
+  });
+  const parsed = overviewSchema.safeParse(reply);
+  if (!parsed.success) return null;
+  const byIndex = new Map(digest.questions.map((q) => [q.index, q.focusId]));
+  const seen = new Set<string>();
+  const questions: AiOverviewDraft["questions"] = [];
+  for (const q of parsed.data.questions) {
+    const focusId = byIndex.get(q.index);
+    if (!focusId || seen.has(focusId)) continue;
+    seen.add(focusId);
+    questions.push({ focusId, insight: q.insight });
+  }
+  return { headline: parsed.data.headline, summary: parsed.data.summary, questions, actions: [...new Set(parsed.data.actions)].slice(0, 5) };
 }
 
 // ---------------------------------------------------------------- duplicate Q&A questions

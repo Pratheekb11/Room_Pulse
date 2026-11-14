@@ -243,6 +243,20 @@ export interface ResultsPayload {
   openPoints?: number;
 }
 
+/** The AI's summary of a whole presentation (saved; the latest one is kept). */
+export interface AiReport {
+  headline: string;
+  summary: string;
+  /** One insight per question the AI had something to say about. */
+  questions: { focusId: string; insight: string }[];
+  /** Suggested next steps. */
+  actions: string[];
+  /** People who had answered when it was written. */
+  people: number;
+  /** ISO time it was written. */
+  at: string;
+}
+
 export interface AdminSessionRow {
   code: string;
   title: string;

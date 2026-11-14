@@ -11,6 +11,7 @@ import type {
   PublicQaItem,
   QaItem,
   LeaderRow,
+  AiReport,
   LiveQuiz,
   MyOpenPoint,
   OpenPoint,
@@ -464,6 +465,8 @@ export async function resetSession(code: string): Promise<void> {
     sql`update sessions set quiz_focus_id = null, quiz_started_at = null where code = ${code}`,
     sql`delete from results where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
+    // the AI summary was written from those answers
+    sql`delete from ai_reports where session_id = (select id from live_sessions where code = ${code})`,
   ]);
 }
 
@@ -1552,4 +1555,27 @@ export async function deleteOpenPoint(code: string, id: string): Promise<boolean
     returning 1 as ok
   `;
   return rows.length > 0;
+}
+
+// ---------------------------------------------------------------- AI summary of a presentation
+
+/** Keeps the latest AI summary of a presentation (replacing the one before). */
+export async function saveAiReport(code: string, body: Omit<AiReport, "people" | "at">, people: number): Promise<AiReport | null> {
+  const rows = (await sql`
+    insert into ai_reports (session_id, body, people)
+    select s.id, ${JSON.stringify(body)}::jsonb, ${people}::int from live_sessions s where s.code = ${code}
+    on conflict (session_id) do update set body = excluded.body, people = excluded.people, created_at = now()
+    returning created_at
+  `) as { created_at: Date | string }[];
+  return rows[0] ? { ...body, people, at: new Date(rows[0].created_at).toISOString() } : null;
+}
+
+export async function getAiReport(code: string): Promise<AiReport | null> {
+  const rows = (await sql`
+    select a.body, a.people, a.created_at
+      from ai_reports a join live_sessions s on s.id = a.session_id
+     where s.code = ${code}
+  `) as { body: Omit<AiReport, "people" | "at">; people: number; created_at: Date | string }[];
+  const r = rows[0];
+  return r ? { ...r.body, people: r.people, at: new Date(r.created_at).toISOString() } : null;
 }

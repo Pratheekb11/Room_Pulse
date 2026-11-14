@@ -435,3 +435,12 @@ create table if not exists open_points (
 );
 create unique index if not exists open_points_origin_idx on open_points(session_id, origin_key) where origin_key is not null;
 create index if not exists open_points_voter_idx on open_points(session_id, voter_id) where voter_id is not null;
+
+-- AI summary of a whole presentation (lib/ai-insights.ts `overview`): the latest one is kept, so it
+-- survives a refresh and goes into the report. Cleared with the answers.
+create table if not exists ai_reports (
+  session_id  uuid primary key references sessions(id) on delete cascade,
+  body        jsonb not null,
+  people      int  not null,
+  created_at  timestamptz not null default now()
+);

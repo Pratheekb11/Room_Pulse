@@ -6,7 +6,7 @@ import { indexCells, topicHistograms } from "@/lib/stats";
 import { defaultSort, isItemSort, ITEM_SORTS, rateItems, sortItems, type ItemSort } from "@/lib/rank-items";
 import { voterUrl } from "@/lib/site";
 import { readDashboardKey } from "@/lib/dashboard-key";
-import type { ResultsPayload, SessionPayload } from "@/lib/types";
+import type { AiReport, ResultsPayload, SessionPayload } from "@/lib/types";
 import { Breakdown } from "./Breakdown";
 import { ExecSummary } from "./ExecSummary";
 import { FocusOverview } from "./FocusOverview";
@@ -36,6 +36,7 @@ import { useSession } from "./useSession";
 import { useDocumentTheme } from "./useDocumentTheme";
 import { FitToScreen } from "./FitToScreen";
 import { OpenPoints, useOpenPoints } from "./results/OpenPoints";
+import { AiInsightLine, AiOverview } from "./results/AiOverview";
 import { readJSON, writeJSON } from "@/lib/storage";
 
 type View = "heatmap" | "ranking" | "breakdown" | "summary";
@@ -152,7 +153,7 @@ function Stage({
   // Voters on the audience page are never the owner: don't ask (it would cost a request and log a 401).
   const signedInOwner = useIsOwner(code, !audience);
   const isOwner = signedInOwner && !audience;
-  const aiOn = useAiOn(code, isOwner);
+  const { on: aiOn, report: aiReport, setReport: setAiReport } = useAiOn(code, isOwner);
 
   const cells = useMemo(() => indexCells(r.cells), [r.cells]);
   const histograms = useMemo(() => topicHistograms(r.dist, session.scaleMax), [r.dist, session.scaleMax]);
@@ -252,6 +253,19 @@ function Stage({
   }, [single, groups.length, setView, groupKind, audience, toggleFit]);
 
   const voters = r.voterCount;
+  // The AI's summary of the whole presentation: on "All questions", or under the only question.
+  const aiSummary = (
+    <AiOverview
+      code={code}
+      report={aiReport}
+      onReport={setAiReport}
+      questions={groups.map((g) => ({ id: g.focus.id, name: g.focus.name }))}
+      people={voters}
+      onOpen={single ? undefined : setFocusIndex}
+      taken={new Set((pointsState.points ?? []).map((p) => p.originKey).filter((k): k is string => Boolean(k)))}
+      onAddPoint={pointsState.add}
+    />
+  );
   /** People who answered one question. */
   const peopleIn = (focusId: string) => r.respondents.find((x) => x.focusId === focusId)?.n ?? 0;
 
@@ -388,6 +402,8 @@ function Stage({
           <FitToScreen on={fit && !showPoints}>
           <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
           <QuestionDescription text={group?.focus.description} image={group?.focus.imageId} question={group?.focus.name} />
+          {aiOn && <AiInsightLine report={aiReport} focusId={group?.focus.id} />}
+          {aiOn && !group && groups.length > 0 && aiSummary}
           {groups.length === 0 ? (
             <p className="text-xl text-ink-soft">This presentation has no questions yet. Use “Edit questions” to add some.</p>
           ) : !group && overviewMode === "heatmap" ? (
@@ -558,6 +574,7 @@ function Stage({
           )}
           </div>
           </FitToScreen>
+          {aiOn && single && groups.length > 0 && <div className="mt-[clamp(0.75rem,1.6vw,1.5rem)]">{aiSummary}</div>}
           {voters === 0 && (
             <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">
               No answers yet. Ask people to scan the QR code.
@@ -593,22 +610,26 @@ function Stage({
 
 /** True when the signed-in account owns this presentation (it can open the edit form). */
 /** Owner only: AI insights are switched on for this presentation and the site has a Gemini key. */
-function useAiOn(code: string, isOwner: boolean): boolean {
+function useAiOn(code: string, isOwner: boolean): { on: boolean; report: AiReport | null; setReport: (r: AiReport) => void } {
   const [on, setOn] = useState(false);
+  // The saved summary of the whole presentation, if one was made.
+  const [report, setReport] = useState<AiReport | null>(null);
   useEffect(() => {
     if (!isOwner) return;
     let cancelled = false;
     fetch(`/api/admin/sessions/${encodeURIComponent(code)}/ai`, { cache: "no-store", credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((body: { enabled?: boolean; available?: boolean } | null) => {
-        if (!cancelled) setOn(Boolean(body?.enabled && body.available));
+      .then((body: { enabled?: boolean; available?: boolean; report?: AiReport | null } | null) => {
+        if (cancelled) return;
+        setOn(Boolean(body?.enabled && body.available));
+        setReport(body?.report ?? null);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [code, isOwner]);
-  return isOwner && on;
+  return { on: isOwner && on, report: isOwner ? report : null, setReport };
 }
 
 function useIsOwner(code: string, ask: boolean): boolean {

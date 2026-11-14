@@ -352,7 +352,11 @@ export const qaModerateSchema = z
 export const textModerateSchema = z.object({ id: z.uuid(), hidden: z.boolean() });
 
 /** AI insights on one question's answers. */
-export const aiActionSchema = z.object({ action: z.enum(["summary", "duplicates"]), focusId: z.uuid() });
+export const aiActionSchema = z.union([
+  z.object({ action: z.enum(["summary", "duplicates"]), focusId: z.uuid() }),
+  /** A summary of the whole presentation, with an insight per question. */
+  z.object({ action: z.literal("overview") }),
+]);
 
 /** "Write questions for me": what the presentation is for. */
 export const aiDraftSchema = z.object({ prompt: z.string().trim().min(3, "Say a little more").max(500, "Keep it under 500 characters") });
