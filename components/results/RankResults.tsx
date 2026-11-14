@@ -1,6 +1,7 @@
 import { readableOn, topicColor } from "@/lib/colors";
 import { fmt1 } from "@/lib/stats";
 import type { RankTally } from "@/lib/answers";
+import { OptionPicture } from "../Picture";
 
 /** Dark ink for numbers on the places grid's light tints (the same in every design). */
 const INK = "#26251e";
@@ -24,6 +25,7 @@ export function RankList({ tally }: { tally: RankTally }) {
             >
               {r.average === null ? "–" : pos + 1}
             </span>
+            <OptionPicture id={r.imageId} size="screen" />
             <span className="w-[34%] shrink-0 text-[clamp(1rem,1.5vw,1.8rem)] font-bold leading-tight break-words">
               {r.name} {pos === 0 && r.average !== null && <span aria-label="top choice">👑</span>}
             </span>

@@ -5,6 +5,7 @@ import { Logo } from "./Logo";
 import { ListSheet, SheetButton } from "./ListSheet";
 import { Doodle } from "./Doodle";
 import { charactersFor } from "@/lib/decor";
+import { QuestionPicture } from "./Picture";
 import { showStepDots } from "@/lib/progress";
 
 // The frame of the voter's phone page, shared by the real page (VoteApp) and the builder's preview,
@@ -161,7 +162,22 @@ export function StepNav({ current, steps, onGo }: { current: number; steps: { la
 }
 
 /** "Level 2 of 5" (and the item's question for Score items), then the question's description. */
-export function StepIntro({ level, levels, name, description }: { level: number; levels: number; name?: string; description?: string | null }) {
+export function StepIntro({
+  level,
+  levels,
+  name,
+  description,
+  image,
+  question = "",
+}: {
+  level: number;
+  levels: number;
+  name?: string;
+  description?: string | null;
+  /** The question's picture, shown under the description. */
+  image?: string | null;
+  question?: string;
+}) {
   return (
     <>
       {levels > 1 && (
@@ -171,6 +187,7 @@ export function StepIntro({ level, levels, name, description }: { level: number;
         </p>
       )}
       {description && <p className="mt-1 mb-2 rounded-lg bg-white px-3 py-2 text-[15px] leading-snug text-ink break-words">{description}</p>}
+      <QuestionPicture id={image} question={question} where="phone" />
     </>
   );
 }

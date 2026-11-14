@@ -554,6 +554,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
               levels={groups.length}
               name={here.kind === "rating" ? group.focus.name : undefined}
               description={group.focus.description}
+              image={group.focus.imageId}
+              question={group.focus.name}
             />
             <div
               key={here.kind === "rating" ? here.item.id : group.focus.id}

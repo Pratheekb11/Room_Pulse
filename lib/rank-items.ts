@@ -19,7 +19,7 @@ export const isItemSort = (v: string | null): v is ItemSort => ITEM_SORTS.some((
 export const defaultSort = (view: string): ItemSort => (view === "ranking" || view === "summary" ? "top" : "order");
 
 export interface RatedItem {
-  item: NamedItem & { description?: string | null };
+  item: NamedItem & { description?: string | null; imageId?: string | null };
   /** Position in the whole presentation (drives its colour). */
   index: number;
   /** Average over every measure; null before anyone scores it. */

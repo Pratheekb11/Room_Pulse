@@ -6,8 +6,8 @@ import { PRESETS } from "./presets";
  * a presentation keeps the answers of items that were renamed or moved.
  */
 
-/** `description`: optional words under the item; undefined = no description box open. */
-export type Row = { id?: string; name: string; description?: string };
+/** `description`: optional words under the item; undefined = no description box open. `image`: the row's picture id. */
+export type Row = { id?: string; name: string; description?: string; image?: string };
 type Item = string | Row;
 
 const clean = (s: string) => s.trim().replace(/\s+/g, " ");
@@ -94,12 +94,16 @@ export function toItems(value: string[] | string | undefined): string[] {
 }
 
 /** Editable rows from saved items (or from a draft's plain strings); always at least one row. */
-export function rowsFrom(items: (Row | { id?: string; name: string; description?: string | null } | string)[] | string | undefined): Row[] {
+export function rowsFrom(
+  items: (Row | { id?: string; name: string; description?: string | null; imageId?: string | null } | string)[] | string | undefined,
+): Row[] {
   const list = typeof items === "string" ? toItems(items) : (items ?? []);
   const rows = list.map((x): Row => {
     if (typeof x === "string") return { name: x };
     const row: Row = x.id ? { id: x.id, name: x.name } : { name: x.name };
     if (x.description) row.description = x.description;
+    const image = "imageId" in x ? x.imageId : (x as Row).image;
+    if (image) row.image = image;
     return row;
   });
   const kept = rows.filter((r) => r.id || r.name);
@@ -113,6 +117,16 @@ export function descriptionsOf(rows: Row[]): Record<string, string> {
     const name = clean(r.name);
     const d = r.description?.trim();
     if (name && d) out[name] = d;
+  }
+  return out;
+}
+
+/** Pictures by item name, for saving (`itemImages`). */
+export function imagesOf(rows: Row[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const name = clean(r.name);
+    if (name && r.image) out[name] = r.image;
   }
   return out;
 }

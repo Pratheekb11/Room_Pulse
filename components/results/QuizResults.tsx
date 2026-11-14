@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { onSurface, topicColor } from "@/lib/colors";
 import { clockOffset, quizOwnerAction, quizStartConfirmed, quizTimeLeft, type PendingStart } from "@/lib/quiz";
+import { OptionPicture } from "../Picture";
 import type { LeaderRow, LiveQuiz, NamedItem, QuizCount } from "@/lib/types";
 
 const LETTERS = "ABCDEFGHIJ";
@@ -22,7 +23,7 @@ interface Props {
   code: string;
   focusId: string;
   question: string;
-  options: NamedItem[];
+  options: (NamedItem & { imageId?: string | null })[];
   seconds: number;
   live: LiveQuiz | null;
   /** When (this screen's clock) the latest results read arrived. */
@@ -134,6 +135,7 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
               >
                 {LETTERS[i]}
               </span>
+              <OptionPicture id={o.imageId} size="screen" className="relative" />
               <span className="relative min-w-0 flex-1 text-[clamp(1.05rem,1.7vw,2rem)] leading-tight font-bold break-words">{o.name}</span>
               {showAnswers && (
                 <span className="font-display relative shrink-0 text-[clamp(1.1rem,1.6vw,1.9rem)] font-semibold tabular-nums">

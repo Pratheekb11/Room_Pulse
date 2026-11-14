@@ -6,6 +6,7 @@ import { quizTimeLeft } from "@/lib/quiz";
 import { readJSON, writeJSON } from "@/lib/storage";
 import type { LiveQuiz, QuizMe, TopicItem } from "@/lib/types";
 import { Burst, haptic } from "../Burst";
+import { OptionPicture } from "../Picture";
 import { CardShell } from "./CardShell";
 
 const LETTERS = "ABCDEFGHIJ";
@@ -152,7 +153,7 @@ export function QuizCard({ code, voterId, focusId, question, options, color, liv
           </div>
         ) : (
           <>
-            <div role="radiogroup" aria-labelledby="quiz-q" className="grid grid-cols-1 gap-2.5">
+            <div role="radiogroup" aria-labelledby="quiz-q" className={`grid grid-cols-1 items-start gap-2.5 ${options.some((o) => o.imageId) ? "grid-cols-2" : ""}`}>
               {options.map((o, i) => {
                 const c = topicColor(i);
                 const picked = value === o.id;
@@ -167,20 +168,23 @@ export function QuizCard({ code, voterId, focusId, question, options, color, liv
                     disabled={disabled || !running || !!value}
                     onClick={() => pick(o.id)}
                     // not .key: its disabled fade and 1px border would hide which option was picked and which is right
-                    className={`relative flex min-h-14 items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-lg font-bold transition-[transform,opacity,border-color] duration-150 enabled:hover:border-ink enabled:active:scale-[0.97] disabled:cursor-default ${
+                    className={`relative flex min-h-14 rounded-xl border-2 text-left font-bold ${options.some((x) => x.imageId) ? "flex-col gap-2 p-2 text-base" : "items-center gap-3 px-3 py-2.5 text-lg"} transition-[transform,opacity,border-color] duration-150 enabled:hover:border-ink enabled:active:scale-[0.97] disabled:cursor-default ${
                       right ? "border-success bg-mint" : wrongPick ? "border-error bg-white" : picked ? "border-ink bg-white" : "border-line-strong bg-white"
                     } ${revealed && !right && !picked ? "opacity-50" : ""} ${value && !picked && !revealed ? "opacity-50" : ""}`}
                   >
                     {burst === o.id && <Burst key={o.id} color={c} />}
-                    <span
-                      className="font-display flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line-strong"
-                      style={{ backgroundColor: c, color: readableOn(c) }}
-                    >
-                      {LETTERS[i]}
+                    <OptionPicture id={o.imageId} size="tile" />
+                    <span className={options.some((x) => x.imageId) ? "flex w-full items-center gap-2" : "contents"}>
+                      <span
+                        className="font-display flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line-strong"
+                        style={{ backgroundColor: c, color: readableOn(c) }}
+                      >
+                        {LETTERS[i]}
+                      </span>
+                      <span className="min-w-0 flex-1 break-words">{o.name}</span>
+                      {right && <span aria-label="right answer">✓</span>}
+                      {wrongPick && <span aria-label="your answer">✗</span>}
                     </span>
-                    <span className="min-w-0 flex-1 break-words">{o.name}</span>
-                    {right && <span aria-label="right answer">✓</span>}
-                    {wrongPick && <span aria-label="your answer">✗</span>}
                   </button>
                 );
               })}

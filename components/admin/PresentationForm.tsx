@@ -20,6 +20,7 @@ import {
   filledItems,
   filledRows,
   descriptionsOf,
+  imagesOf,
   rowsForKind,
   rowsFrom,
   type Row,
@@ -27,6 +28,7 @@ import {
 import type { QuestionKind, SessionPayload } from "@/lib/types";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { ListEditor } from "./ListEditor";
+import { PicturePicker } from "./PicturePicker";
 import { ThemePicker } from "./ThemePicker";
 import { PresentationPreview } from "./PresentationPreview";
 import { isThemeId, recommendTheme, type ThemeId } from "@/lib/themes";
@@ -57,6 +59,8 @@ interface QuestionDraft {
   seconds: number;
   /** Optional extra words under the question; `null` = the box is closed. */
   description: string | null;
+  /** Optional picture shown with the question (an uploaded picture's id). */
+  image?: string | null;
 }
 
 export type FormMode =
@@ -192,7 +196,7 @@ function readDraft(): Draft | null {
     if (!d || !Array.isArray(d.focus) || !d.focus.length) return null;
     // a draft is never a saved presentation, so it carries no ids
     const plain = (list: (Row | string)[] | string | undefined) =>
-      rowsFrom(list).map((r) => ({ name: r.name }));
+      rowsFrom(list).map((r): Row => ({ name: r.name, ...(r.description ? { description: r.description } : {}), ...(r.image ? { image: r.image } : {}) }));
     return {
       ...d,
       focus: d.focus.map(({ topicsText, items, ...f }) => ({
@@ -236,6 +240,7 @@ function fromSession(s: SessionPayload): Draft {
           : "",
       seconds: f.seconds ?? 20,
       description: f.description ?? null,
+      image: f.imageId ?? null,
     })),
     criteria: rowsFrom(s.criteria),
     theme: isThemeId(s.session.theme) ? s.session.theme : "paper",
@@ -348,6 +353,8 @@ export function PresentationForm({
     seconds: f.kind === "quiz" ? f.seconds : null,
     description: f.description?.trim() || null,
     itemDescriptions: f.kind === "rating" ? descriptionsOf(f.items) : null,
+    image: f.image ?? null,
+    itemImages: hasOptions(f.kind) ? imagesOf(f.items) : null,
   });
   const hasRating = parsed.some((f) => f.kind === "rating");
 
@@ -444,6 +451,8 @@ export function PresentationForm({
         maxPicks: f.maxPicks,
         description: f.description?.trim() || null,
         itemDescriptions: f.kind === "rating" ? descriptionsOf(f.items) : undefined,
+        image: f.image ?? null,
+        itemImages: hasOptions(f.kind) ? imagesOf(f.items) : undefined,
       })),
     );
 
@@ -965,6 +974,8 @@ export function PresentationForm({
                     </div>
                   )}
 
+                  <PicturePicker value={f.image} what={`question ${i + 1}`} onChange={(image) => update(f.key, { image })} />
+
                   {hasOptions(f.kind) && (
                     <ListEditor
                       label={LIST_COPY[f.kind as OptionKind].label}
@@ -975,6 +986,7 @@ export function PresentationForm({
                       maxLength={120}
                       placeholders={EXAMPLES[f.kind].list}
                       answers={counts}
+                      pictures
                       describe={f.kind === "rating" ? { max: MAX_ITEM_DESCRIPTION, placeholder: "Description (optional), e.g. what it would change" } : undefined}
                     />
                   )}

@@ -34,7 +34,7 @@ const SAMPLE_QA = ["What's the plan for next quarter?", "Can we get the slides a
 function tally(q: PreviewQuestion): PollTally {
   const counts = sampleCounts(q.options.length);
   const total = counts.reduce((a, b) => a + b, 0);
-  const rows = q.options.map((o, index) => ({ id: o.id, name: o.name, n: counts[index], pct: Math.round((counts[index] / total) * 100), index }));
+  const rows = q.options.map((o, index) => ({ id: o.id, name: o.name, n: counts[index], pct: Math.round((counts[index] / total) * 100), index, imageId: o.imageId }));
   return { total, rows, leader: rows.length ? { id: rows[0].id, name: rows[0].name, n: rows[0].n } : null };
 }
 
@@ -114,7 +114,7 @@ function ScreenSlide({ title, questions, index, onPick, session }: { title: stri
           <div className="flex min-h-0 flex-1 flex-row gap-6">
             <main className="min-w-0 flex-1">
               {questions.length > 1 && <QuestionTabs names={questions.map((x, i) => ({ key: String(i), name: x.name }))} active={index} onPick={(i) => onPick(i ?? 0)} />}
-              <QuestionDescription text={q.description} />
+              <QuestionDescription text={q.description} image={q.image} question={q.name} />
               <ResultCard title={q.name}>
                 <SampleChart q={q} />
               </ResultCard>
@@ -165,7 +165,7 @@ function PhoneSlide({
       />
       <main className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-5">
         <div>
-          <StepIntro level={index + 1} levels={questions.length} name={q.kind === "rating" ? q.name : undefined} description={q.description} />
+          <StepIntro level={index + 1} levels={questions.length} name={q.kind === "rating" ? q.name : undefined} description={q.description} image={q.image} question={q.name} />
         {q.kind === "rating" ? (
           <TopicCard
             topic={q.options[0]}

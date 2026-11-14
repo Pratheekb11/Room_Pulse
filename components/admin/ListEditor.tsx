@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { PicturePicker } from "./PicturePicker";
 import { duplicateIndexes, filledItems, insertAfter, moveItem, pasteInto, removeAt, setAt, type Row } from "@/lib/list-edit";
 
 interface Props {
@@ -17,10 +18,12 @@ interface Props {
   answers?: Record<string, number>;
   /** Let each row have an optional description (Score items). */
   describe?: { max: number; placeholder?: string };
+  /** Let each row have a picture (options and items to score). */
+  pictures?: boolean;
 }
 
 /** One input per row. Enter adds a row, Backspace on an empty row removes it, a multi-line paste fills several rows. */
-export function ListEditor({ label, noun, items, onChange, max, maxLength, placeholders = [], hint, answers, describe }: Props) {
+export function ListEditor({ label, noun, items, onChange, max, maxLength, placeholders = [], hint, answers, describe, pictures = false }: Props) {
   const id = useId();
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const focusNext = useRef<number | null>(null);
@@ -118,6 +121,25 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
                   dupe ? "border-error" : "border-line-strong"
                 }`}
               />
+              {pictures && (
+                <PicturePicker
+                  compact
+                  value={row.image}
+                  what={`${noun} ${i + 1}`}
+                  onChange={(image, fileName) =>
+                    change(
+                      items.map((r, j) => {
+                        if (j !== i) return r;
+                        const { image: _old, ...rest } = r;
+                        void _old;
+                        // a row with only a picture still needs words: results, exports and screen readers name it
+                        const name = image && !r.name.trim() ? (fileName || `Picture ${i + 1}`).slice(0, maxLength) : r.name;
+                        return image ? { ...rest, name, image } : rest;
+                      }),
+                    )
+                  }
+                />
+              )}
               <span className="flex opacity-100 sm:opacity-40 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
                 <button type="button" className={`${iconButton} max-sm:hidden`} disabled={i === 0} onClick={() => change(moveItem(items, i, -1), i - 1)} aria-label={`Move ${noun} ${i + 1} up`}>
                   <Chevron up />
@@ -170,7 +192,16 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
                     <button
                       type="button"
                       className={iconButton}
-                      onClick={() => change(items.map((r, j) => (j === i ? { id: r.id, name: r.name } : r)))}
+                      onClick={() =>
+                        change(
+                          items.map((r, j) => {
+                            if (j !== i) return r;
+                            const { description: _gone, ...rest } = r;
+                            void _gone;
+                            return rest;
+                          }),
+                        )
+                      }
                       aria-label={`Remove the description of ${noun} ${i + 1}`}
                     >
                       <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>

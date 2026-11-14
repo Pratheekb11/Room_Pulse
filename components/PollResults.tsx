@@ -1,6 +1,7 @@
 import { readableOn, topicColor } from "@/lib/colors";
 import type { PollTally } from "@/lib/answers";
 import { CountUp } from "./CountUp";
+import { OptionPicture } from "./Picture";
 
 const LETTERS = "ABCDEFGHIJ";
 
@@ -23,6 +24,7 @@ export function PollBars({ tally, noun = VOTES }: { tally: PollTally; noun?: Nou
             >
               {LETTERS[r.index]}
             </span>
+            <OptionPicture id={r.imageId} size="screen" />
             <span className="w-[34%] shrink-0 text-[clamp(1rem,1.5vw,1.8rem)] sm:w-[26%] font-bold leading-tight break-words">
               {r.name} {lead && <span aria-label="leading">👑</span>}
             </span>
@@ -71,6 +73,7 @@ export function PollColumns({ tally, noun = VOTES }: { tally: PollTally; noun?: 
               style={{ height: `${Math.max(r.pct, r.n ? 2 : 0)}%`, backgroundColor: c }}
             />
             <div className="w-full border-t border-line-strong pt-2 text-center">
+              <OptionPicture id={r.imageId} size="screen" className="mx-auto mb-1 block" />
               <span className="font-display mr-1 font-semibold">{LETTERS[r.index]}</span>
               <span className={`${many ? "text-[clamp(0.75rem,0.85vw,1.05rem)]" : "text-[0.8rem] sm:text-[clamp(0.9rem,1.25vw,1.4rem)]"} font-bold break-words hyphens-auto`}>{r.name}</span>
               {tally.leader?.id === r.id && <span aria-label="leading"> 👑</span>}
@@ -130,6 +133,7 @@ export function PollPie({ tally, hole = true }: { tally: PollTally; hole?: boole
         {tally.rows.map((r) => (
           <li key={r.id} className="flex items-center gap-3 text-[clamp(1rem,1.4vw,1.6rem)] font-bold">
             <span aria-hidden className="h-6 w-6 shrink-0 rounded-md border border-line-strong" style={{ backgroundColor: topicColor(r.index) }} />
+            <OptionPicture id={r.imageId} size="screen" />
             <span className="max-w-[18ch] break-words">{r.name}</span>
             <span className="font-display ml-auto pl-6 font-semibold tabular-nums">{r.pct}%</span>
           </li>

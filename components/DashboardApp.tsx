@@ -34,6 +34,8 @@ import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { useResultsPoll } from "./useResultsPoll";
 import { useSession } from "./useSession";
 import { useDocumentTheme } from "./useDocumentTheme";
+import { FitToScreen } from "./FitToScreen";
+import { readJSON, writeJSON } from "@/lib/storage";
 
 type View = "heatmap" | "ranking" | "breakdown" | "summary";
 
@@ -137,6 +139,14 @@ function Stage({
   });
   const [showQr, setShowQr] = useState(() => !audience && window.matchMedia("(min-width: 1024px)").matches);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Fit to screen: shrink a question's results so all of them show at once. Remembered on this device.
+  const [fit, setFit] = useState(() => !audience && readJSON<boolean>("liverate:fit", false) === true);
+  const toggleFit = useCallback(() => {
+    setFit((on) => {
+      writeJSON("liverate:fit", !on);
+      return !on;
+    });
+  }, []);
   const joinUrl = useClientValue(() => voterUrl(code));
   // Voters on the audience page are never the owner: don't ask (it would cost a request and log a 401).
   const signedInOwner = useIsOwner(code, !audience);
@@ -190,6 +200,7 @@ function Stage({
     id: r.item.id,
     name: r.item.name,
     description: r.item.description,
+    imageId: r.item.imageId,
     value: r.value,
     n: r.n,
     index: r.index,
@@ -215,7 +226,7 @@ function Stage({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  // Presenter shortcuts: 1–5 switch views, ←/→ move between focus topics, Esc = overview, Q = QR.
+  // Presenter shortcuts: 1–5 switch views, ←/→ move between focus topics, Esc = overview, Q = QR, F = fit to screen.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -224,13 +235,14 @@ function Stage({
       const v = VIEWS.find((x) => x.key === e.key);
       if (v && groupKind === "rating") setView(v.id);
       else if (!audience && e.key.toLowerCase() === "q") setShowQr((s) => !s);
+      else if (!audience && e.key.toLowerCase() === "f") toggleFit();
       else if (!single && e.key === "Escape") setFocusIndex(null);
       else if (!single && e.key === "ArrowRight") setFocusIndex((i) => (i === null ? 0 : Math.min(groups.length - 1, i + 1)));
       else if (!single && e.key === "ArrowLeft") setFocusIndex((i) => (i === null || i === 0 ? null : i - 1));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [single, groups.length, setView, groupKind, audience]);
+  }, [single, groups.length, setView, groupKind, audience, toggleFit]);
 
   const voters = r.voterCount;
   /** People who answered one question. */
@@ -319,6 +331,17 @@ function Stage({
                 {showQr ? "Hide QR" : "Show QR"}
               </button>
             )}
+            {!audience && (
+              <button
+                type="button"
+                aria-pressed={fit}
+                title="Shrink the results so they all show at once, without scrolling. Shortcut: F"
+                onClick={toggleFit}
+                className={`rounded-full border border-line-strong px-3 py-1 ${fit ? "bg-sun" : "bg-white hover:bg-canvas"}`}
+              >
+                Fit to screen
+              </button>
+            )}
             <button type="button" onClick={toggleFullscreen} className="hidden rounded-full border border-line-strong bg-white px-3 py-1 sm:inline-block">
               {isFullscreen ? "Exit full screen" : "Full screen"}
             </button>
@@ -337,8 +360,9 @@ function Stage({
             <QuestionTabs names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />
           )}
 
+          <FitToScreen on={fit}>
           <div key={`${focusIndex ?? "all"}:${view}`} className="animate-rise">
-          <QuestionDescription text={group?.focus.description} />
+          <QuestionDescription text={group?.focus.description} image={group?.focus.imageId} question={group?.focus.name} />
           {groups.length === 0 ? (
             <p className="text-xl text-ink-soft">This presentation has no questions yet. Use “Edit questions” to add some.</p>
           ) : !group && overviewMode === "heatmap" ? (
@@ -508,6 +532,7 @@ function Stage({
             />
           )}
           </div>
+          </FitToScreen>
           {voters === 0 && (
             <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">
               No answers yet. Ask people to scan the QR code.

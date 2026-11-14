@@ -2,7 +2,7 @@ import type { NamedItem, NumberCount, PollCount, PublicQaItem, RankCount, Result
 
 export interface PollTally {
   total: number;
-  rows: { id: string; name: string; n: number; pct: number; index: number }[];
+  rows: { id: string; name: string; n: number; pct: number; index: number; imageId?: string | null }[];
   /** Option with the most votes, or null on a tie / no votes. */
   leader: { id: string; name: string; n: number } | null;
 }
@@ -11,13 +11,15 @@ export interface PollTally {
  * Counts per option. Percentages are shares of all choices, or, for pick-several questions
  * (pass `people`), shares of the people who answered, so they can add up to more than 100%.
  */
-export function pollTally(options: NamedItem[], polls: PollCount[], focusId: string, people?: number): PollTally {
+type Option = NamedItem & { imageId?: string | null };
+
+export function pollTally(options: Option[], polls: PollCount[], focusId: string, people?: number): PollTally {
   const counts = new Map(polls.filter((p) => p.focusId === focusId).map((p) => [p.topicId, p.n]));
   const total = options.reduce((s, o) => s + (counts.get(o.id) ?? 0), 0);
   const base = people ?? total;
   const rows = options.map((o, index) => {
     const n = counts.get(o.id) ?? 0;
-    return { id: o.id, name: o.name, n, pct: base ? Math.round((n / base) * 100) : 0, index };
+    return { id: o.id, name: o.name, n, pct: base ? Math.round((n / base) * 100) : 0, index, imageId: o.imageId ?? null };
   });
   const max = Math.max(0, ...rows.map((r) => r.n));
   const top = rows.filter((r) => r.n === max);
@@ -40,6 +42,7 @@ export interface RankTally {
   rows: {
     id: string;
     name: string;
+    imageId?: string | null;
     /** Position in the presenter's list (drives the colour). */
     index: number;
     /** Average place, 1 = first. */
@@ -51,7 +54,7 @@ export interface RankTally {
   }[];
 }
 
-export function rankTally(options: NamedItem[], ranks: RankCount[], focusId: string): RankTally {
+export function rankTally(options: Option[], ranks: RankCount[], focusId: string): RankTally {
   const k = options.length;
   const mine = ranks.filter((r) => r.focusId === focusId);
   const rows = options.map((o, index) => {
@@ -66,7 +69,7 @@ export function rankTally(options: NamedItem[], ranks: RankCount[], focusId: str
       }
     const average = n ? sum / n : null;
     const score = average === null || k < 2 ? 0 : (k - average) / (k - 1);
-    return { id: o.id, name: o.name, index, average, score, places };
+    return { id: o.id, name: o.name, imageId: o.imageId ?? null, index, average, score, places };
   });
   const people = Math.max(0, ...rows.map((r) => r.places.reduce((a, b) => a + b, 0)));
   rows.sort((a, b) => (a.average ?? Infinity) - (b.average ?? Infinity) || a.index - b.index);

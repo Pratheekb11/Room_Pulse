@@ -36,6 +36,8 @@ export interface FocusItem extends NamedItem {
   seconds?: number | null;
   /** Optional extra words under the question. */
   description?: string | null;
+  /** Picture shown with the question (lib/images.ts). */
+  imageId?: string | null;
   /** Quiz: index of the right option. Only in the owner's copy, never sent to voters. */
   correct?: number | null;
 }
@@ -43,6 +45,8 @@ export interface FocusItem extends NamedItem {
 export interface TopicItem extends NamedItem {
   /** Optional words under the item on phones. */
   description?: string | null;
+  /** Picture of the option or item. */
+  imageId?: string | null;
   /** null only for sessions created before focus topics existed */
   focusId: string | null;
 }

@@ -40,11 +40,11 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
       coalesce((select json_agg(jsonb_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
                   'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end),
                   'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit,
-                  'seconds', f.quiz_seconds, 'description', f.description)
+                  'seconds', f.quiz_seconds, 'description', f.description, 'imageId', f.image_id)
                   || case when ${withAnswers}::boolean then jsonb_build_object('correct', f.quiz_correct) else '{}'::jsonb end
                   order by f.position)
                 from focus_topics f where f.session_id = s.id), '[]'::json) as focus_topics,
-      coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'focusId', t.focus_id, 'description', t.description) order by t.position)
+      coalesce((select json_agg(json_build_object('id', t.id, 'name', t.name, 'focusId', t.focus_id, 'description', t.description, 'imageId', t.image_id) order by t.position)
                 from topics t where t.session_id = s.id), '[]'::json)   as topics,
       coalesce((select json_agg(json_build_object('id', c.id, 'name', c.name) order by c.position)
                 from criteria c where c.session_id = s.id), '[]'::json) as criteria
@@ -388,17 +388,20 @@ export async function createSession(
           select e.val, e.ord - 1 as pos
           from jsonb_array_elements(${JSON.stringify(input.focusTopics)}::jsonb) with ordinality as e(val, ord)
         ), f as (
-          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description)
+          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description, image_id)
           select s.id, input.val->>'name', input.val->>'kind', input.val->>'chart', input.pos,
                  (input.val->>'maxPicks')::int, (input.val->>'min')::double precision,
                  (input.val->>'max')::double precision, input.val->>'unit',
-                 (input.val->>'correctIndex')::int, (input.val->>'seconds')::int, input.val->>'description'
+                 (input.val->>'correctIndex')::int, (input.val->>'seconds')::int, input.val->>'description',
+                 -- only the owner's own pictures; anything else is left off
+                 (select i.id from images i where i.id = (input.val->>'image')::uuid and i.owner_id = ${ownerId}::uuid)
           from s, input
           returning id, position
         ), t as (
-          insert into topics (session_id, focus_id, name, position, description)
+          insert into topics (session_id, focus_id, name, position, description, image_id)
           select s.id, f.id, tt.name, f.position * 100 + tt.ord - 1,
-                 input.val->'itemDescriptions'->>lower(tt.name)  -- names are already cleaned (validation)
+                 input.val->'itemDescriptions'->>lower(tt.name),  -- names are already cleaned (validation)
+                 (select i.id from images i where i.id = (input.val->'itemImages'->>lower(tt.name))::uuid and i.owner_id = ${ownerId}::uuid)
           from s
           join f on true
           join input on input.pos = f.position
@@ -1156,8 +1159,8 @@ export async function countOwnedSessions(ownerId: string): Promise<number> {
  * expired sign-ins, and guest accounts older than `guestDays` that are signed out and own nothing still live.
  * Saved accounts' presentations never expire, so they are never touched.
  */
-export async function purgeExpiredGuestData(guestDays: number): Promise<{ sessions: number; users: number }> {
-  const [sessions, , users] = (await sql.transaction([
+export async function purgeExpiredGuestData(guestDays: number): Promise<{ sessions: number; users: number; images: number }> {
+  const [sessions, , users, images] = (await sql.transaction([
     sql`delete from sessions where expires_at < now() returning id`,
     sql`delete from auth_sessions where expires_at < now()`,
     // a guest's presentation made late lives its full time: the account (which cascades to it) waits
@@ -1166,8 +1169,14 @@ export async function purgeExpiredGuestData(guestDays: number): Promise<{ sessio
            and not exists (select 1 from auth_sessions a where a.user_id = u.id)
            and not exists (select 1 from sessions s where s.owner_id = u.id)
          returning id`,
+    // pictures on no question or option for a day: a deleted presentation's, or uploaded and never used
+    sql`delete from images i
+         where i.created_at < now() - interval '1 day'
+           and not exists (select 1 from focus_topics f where f.image_id = i.id)
+           and not exists (select 1 from topics t where t.image_id = i.id)
+         returning id`,
   ])) as unknown[][];
-  return { sessions: sessions.length, users: users.length };
+  return { sessions: sessions.length, users: users.length, images: images.length };
 }
 
 /**
@@ -1277,6 +1286,7 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
       name: t.name,
       pos: f.pos * 100 + i,
       description: f.itemDescriptions[itemKey(t.name)] ?? null,
+      image: f.itemImages[itemKey(t.name)] ?? null,
     })),
   );
   const crit = input.criteria.map((c, pos) => ({ id: c.id ?? crypto.randomUUID(), isNew: !c.id, name: c.name, pos }));
@@ -1298,20 +1308,24 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
     sql`delete from criteria where session_id = ${sid}::uuid and not (id = any(${keepCriteria}::uuid[]))`,
     sql`update focus_topics f set name = x.name, chart = x.chart, position = x.pos,
           max_picks = x."maxPicks", num_min = x.min, num_max = x.max, num_unit = x.unit,
-          quiz_correct = x."correctIndex", quiz_seconds = x.seconds, description = x.description
+          quiz_correct = x."correctIndex", quiz_seconds = x.seconds, description = x.description,
+          image_id = (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid)
         from jsonb_to_recordset(${rows(focus.filter((f) => !f.isNew))}::jsonb)
-          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text)
+          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text, image uuid)
         where f.id = x.id and f.session_id = ${sid}::uuid`,
-    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description)
-        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit, x."correctIndex", x.seconds, x.description
+    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description, image_id)
+        select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit, x."correctIndex", x.seconds, x.description,
+               (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid)
         from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb)
-          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text)`,
-    sql`update topics t set name = x.name, position = x.pos, description = x.description
-        from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int, description text)
+          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text, image uuid)`,
+    sql`update topics t set name = x.name, position = x.pos, description = x.description,
+          image_id = (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid)
+        from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int, description text, image uuid)
         where t.id = x.id and t.session_id = ${sid}::uuid`,
-    sql`insert into topics (id, session_id, focus_id, name, position, description)
-        select x.id, ${sid}::uuid, x."focusId", x.name, x.pos, x.description
-        from jsonb_to_recordset(${rows(topics.filter((t) => t.isNew))}::jsonb) as x(id uuid, "focusId" uuid, name text, pos int, description text)`,
+    sql`insert into topics (id, session_id, focus_id, name, position, description, image_id)
+        select x.id, ${sid}::uuid, x."focusId", x.name, x.pos, x.description,
+               (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid)
+        from jsonb_to_recordset(${rows(topics.filter((t) => t.isNew))}::jsonb) as x(id uuid, "focusId" uuid, name text, pos int, description text, image uuid)`,
     sql`update criteria c set name = x.name, position = x.pos
         from jsonb_to_recordset(${rows(crit.filter((c) => !c.isNew))}::jsonb) as x(id uuid, name text, pos int)
         where c.id = x.id and c.session_id = ${sid}::uuid`,
@@ -1372,4 +1386,22 @@ export async function getAiSource(
     where s.code = ${code}
   `) as { kind: string; name: string; texts: string[]; questions: { id: string; text: string }[] }[];
   return rows[0] ?? null;
+}
+
+// ---------------------------------------------------------------- pictures
+
+/** Stores a checked JPEG (base64); null when the account already keeps `limit` pictures. */
+export async function saveImage(ownerId: string, base64: string, width: number, height: number, limit: number): Promise<string | null> {
+  const rows = (await sql`
+    insert into images (owner_id, bytes, width, height)
+    select ${ownerId}::uuid, decode(${base64}, 'base64'), ${width}::int, ${height}::int
+     where (select count(*) from images where owner_id = ${ownerId}::uuid) < ${limit}::int
+    returning id
+  `) as { id: string }[];
+  return rows[0]?.id ?? null;
+}
+
+export async function getImage(id: string): Promise<Buffer | null> {
+  const rows = (await sql`select encode(bytes, 'base64') as data from images where id = ${id}::uuid`) as { data: string }[];
+  return rows[0] ? Buffer.from(rows[0].data, "base64") : null;
 }

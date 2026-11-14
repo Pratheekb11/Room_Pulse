@@ -70,6 +70,10 @@ const settingsShape = {
   itemDescriptions: z
     .record(z.string().max(480), z.string().trim().max(MAX_ITEM_DESCRIPTION, `Keep item descriptions under ${MAX_ITEM_DESCRIPTION} characters`))
     .nullish(),
+  /** Any type: a picture shown with the question (an id from POST /api/admin/images). */
+  image: z.uuid().nullish(),
+  /** Options' and items' pictures, keyed by name like `itemDescriptions`. */
+  itemImages: z.record(z.string().max(480), z.uuid()).nullish(),
 };
 
 /** "  Offline  Mode " → "offline mode": how an item description finds its item. */
@@ -77,7 +81,7 @@ export const itemKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowe
 
 export const QUIZ_SECONDS_DEFAULT = 20;
 
-type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null };
+type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null; image?: string | null; itemImages?: Record<string, string> | null };
 const topicName = (t: unknown) => cleanName(typeof t === "string" ? t : (t as { name: string }).name);
 
 function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] } & Settings>(f: T) {
@@ -99,6 +103,8 @@ function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] 
         .filter(([, d]) => d)
         .map(([name, d]) => [itemKey(name), d]),
     ),
+    image: f.image ?? null,
+    itemImages: hasOptions(f.kind) ? Object.fromEntries(Object.entries(f.itemImages ?? {}).map(([name, id]) => [itemKey(name), id])) : {},
     // the right option's index; -1 = missing or not one of the options
     correctIndex: isQuiz ? (correct ? f.topics.map(topicName).indexOf(cleanName(correct)) : -1) : null,
   };

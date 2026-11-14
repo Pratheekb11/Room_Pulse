@@ -1,10 +1,12 @@
 import { topicColor } from "@/lib/colors";
 import { CountUp } from "./CountUp";
+import { OptionPicture } from "./Picture";
 
 export interface BarDatum {
   id: string;
   name: string;
   description?: string | null;
+  imageId?: string | null;
   value: number | null;
   n: number;
   /** Original topic index, for its identity colour. */
@@ -55,6 +57,7 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
                 {rank ?? "–"}
               </span>
             )}
+            {large && <OptionPicture id={d.imageId} size="screen" />}
             <span className={`flex min-w-0 shrink-0 flex-col ${large ? "w-[32%]" : "w-[34%]"}`}>
               <span
                 className={`leading-tight font-bold break-words ${large ? "text-[clamp(1.1rem,1.6vw,2rem)]" : "text-[clamp(0.95rem,1.1vw,1.3rem)]"}`}

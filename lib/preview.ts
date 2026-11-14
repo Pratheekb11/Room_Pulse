@@ -36,11 +36,14 @@ export interface PreviewQuestion {
   description?: string | null;
   /** Score items: descriptions by item name. */
   itemDescriptions?: Record<string, string>;
+  /** The question's picture, and options' pictures by name. */
+  image?: string | null;
+  itemImages?: Record<string, string>;
 }
 
 /** Builder drafts as preview slides: blank names and option lists get placeholders. */
 export function previewQuestions(
-  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null; description?: string | null; itemDescriptions?: Record<string, string> }[],
+  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null; description?: string | null; itemDescriptions?: Record<string, string>; image?: string | null; itemImages?: Record<string, string> }[],
 ): PreviewQuestion[] {
   return drafts.map((d, i) => {
     const focusId = `preview-${i}`;
@@ -49,7 +52,7 @@ export function previewQuestions(
     return {
       ...d,
       name: d.name.trim() || `Question ${i + 1}`,
-      options: names.map((name, j) => ({ id: `${focusId}-${j}`, name, focusId, description: d.itemDescriptions?.[name] ?? null })),
+      options: names.map((name, j) => ({ id: `${focusId}-${j}`, name, focusId, description: d.itemDescriptions?.[name] ?? null, imageId: d.itemImages?.[name] ?? null })),
     };
   });
 }

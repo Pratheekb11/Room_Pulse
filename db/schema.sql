@@ -386,3 +386,19 @@ create or replace view live_sessions as
 alter table focus_topics add column if not exists description text check (length(description) <= 200);
 -- Optional description under each item to score (or option), shown on phones.
 alter table topics add column if not exists description text check (length(description) <= 140);
+
+-- Pictures on questions and options (lib/images.ts). The browser shrinks each one to a small JPEG
+-- before upload; the bytes live here and are served from /api/img/[id].
+create table if not exists images (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null references users(id) on delete cascade,
+  bytes       bytea not null check (octet_length(bytes) between 1 and 200000),
+  width       int  not null check (width between 1 and 1280),
+  height      int  not null check (height between 1 and 1280),
+  created_at  timestamptz not null default now()
+);
+create index if not exists images_owner_idx on images(owner_id);
+alter table focus_topics add column if not exists image_id uuid references images(id) on delete set null;
+alter table topics add column if not exists image_id uuid references images(id) on delete set null;
+create index if not exists focus_topics_image_idx on focus_topics(image_id) where image_id is not null;
+create index if not exists topics_image_idx on topics(image_id) where image_id is not null;

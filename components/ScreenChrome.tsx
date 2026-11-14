@@ -6,6 +6,7 @@ import { ListSheet, SheetButton } from "./ListSheet";
 import { Doodle } from "./Doodle";
 import { CountUp } from "./CountUp";
 import { charactersFor } from "@/lib/decor";
+import { QuestionPicture } from "./Picture";
 
 // The frame of the big-screen results page, shared by the real page (DashboardApp) and the builder's
 // preview, so the preview always looks like the real thing.
@@ -114,10 +115,15 @@ export function QuestionList({ names, active, onPick, onClose }: { names: TabNam
   );
 }
 
-/** The question's description, above its card. */
-export function QuestionDescription({ text }: { text?: string | null }) {
-  if (!text) return null;
-  return <p className="mb-[clamp(0.6rem,1.4vh,1.25rem)] max-w-[70ch] text-[clamp(1rem,1.3vw,1.5rem)] leading-snug text-ink-soft break-words">{text}</p>;
+/** The question's description and picture, above its card. */
+export function QuestionDescription({ text, image, question = "" }: { text?: string | null; image?: string | null; question?: string }) {
+  if (!text && !image) return null;
+  return (
+    <>
+      {text && <p className="mb-[clamp(0.6rem,1.4vh,1.25rem)] max-w-[70ch] text-[clamp(1rem,1.3vw,1.5rem)] leading-snug text-ink-soft break-words">{text}</p>}
+      <QuestionPicture id={image} question={question} where="screen" />
+    </>
+  );
 }
 
 /** A question's results card with its title. */

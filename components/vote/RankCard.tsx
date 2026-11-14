@@ -5,6 +5,7 @@ import { readableOn, topicColor } from "@/lib/colors";
 import type { TopicItem } from "@/lib/types";
 import type { SaveStatus } from "@/lib/vote-queue";
 import { haptic } from "../Burst";
+import { OptionPicture } from "../Picture";
 import { CardShell, saveText } from "./CardShell";
 
 interface Props {
@@ -61,6 +62,7 @@ export function RankCard({ question, options, color, value, status, disabled, on
                   <span className="font-display flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-lg font-semibold text-ink">
                     {pos + 1}
                   </span>
+                  <OptionPicture id={o.imageId} size="thumb" />
                   <span className="min-w-0 flex-1 text-lg font-bold break-words">{o.name}</span>
                   <span className="flex shrink-0 gap-1">
                     <button
@@ -114,6 +116,7 @@ export function RankCard({ question, options, color, value, status, disabled, on
                   <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-line-strong text-ink-soft">
                     +
                   </span>
+                  <OptionPicture id={o.imageId} size="thumb" />
                   <span className="min-w-0 flex-1 break-words">{o.name}</span>
                 </button>
               ))}
