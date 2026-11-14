@@ -303,7 +303,7 @@ describe("pictures in the builder and on screen", () => {
     const pic = read("components/Picture.tsx");
     expect(pic).toContain("imageUrl(id)");
     expect(imageUrl("abc")).toBe("/api/img/abc");
-    expect(pic).toContain('loading="lazy"');
+    expect(pic).toContain('"lazy"');
     expect(pic).toMatch(/alt=/);
   });
 

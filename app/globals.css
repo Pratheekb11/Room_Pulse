@@ -250,3 +250,37 @@ body,
   }
   .confetti-piece, .spark { display: none; }
 }
+
+/* The report (components/admin/ReportApp.tsx): one page that prints well and saves as a PDF. */
+.report-keep {
+  break-inside: avoid;
+}
+.report h2,
+.report h3 {
+  break-after: avoid;
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .report {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+  /* keep bar and chip colours on paper */
+  .report,
+  .report * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

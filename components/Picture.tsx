@@ -2,8 +2,8 @@
 import { imageUrl } from "@/lib/images";
 
 /** A stored picture (lib/images.ts). Always on real white, whole picture showing, loaded when it nears the screen. */
-export function Picture({ id, alt, className = "" }: { id: string; alt: string; className?: string }) {
-  return <img src={imageUrl(id)} alt={alt} loading="lazy" decoding="async" draggable={false} className={`bg-[#fff] object-contain ${className}`} />;
+export function Picture({ id, alt, className = "", eager = false }: { id: string; alt: string; className?: string; /** Load straight away (the report must have every picture before it prints). */ eager?: boolean }) {
+  return <img src={imageUrl(id)} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" draggable={false} className={`bg-[#fff] object-contain ${className}`} />;
 }
 
 const OPTION_SIZES = {

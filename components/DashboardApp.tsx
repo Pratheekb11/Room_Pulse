@@ -383,6 +383,17 @@ function Stage({
               {isFullscreen ? "Exit full screen" : "Full screen"}
             </button>
             {isOwner && (
+              <a
+                href={`/admin/report/${code}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Every result with a short analysis, ready to save as a PDF"
+                className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas"
+              >
+                Report (PDF)
+              </a>
+            )}
+            {isOwner && (
               <a href={`/admin/edit/${code}?back=results`} className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas">
                 Edit questions
               </a>

@@ -233,6 +233,10 @@ export function SessionCard({
               {pending === "markdown" ? "Copying…" : "Copy results as text"}
               <span className="block text-xs font-normal text-ink-soft">Markdown, for Slack, Notion or Jira.</span>
             </button>
+            <a href={`/admin/report/${s.code}?print=1`} target="_blank" rel="noopener noreferrer" className={menuItem}>
+              Download report (PDF)
+              <span className="block text-xs font-normal text-ink-soft">Every result with a short analysis, plus open points.</span>
+            </a>
             <button type="button" onClick={() => exportCsv("summary")} disabled={pending !== null} className={menuItem}>
               {pending === "summary" ? "Downloading…" : "Download results (CSV)"}
             </button>
