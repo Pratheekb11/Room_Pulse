@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, pieceSize, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
 import { tinted } from "@/lib/colors";
 import type { TextAnswer } from "@/lib/types";
 import { ToBody } from "../Portal";
@@ -107,15 +107,24 @@ export function BoardView({ board, answers, onHide }: { board: BoardId; answers:
 function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: TextAnswer[]; onOpen: (id: string) => void }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [screen, setScreen] = useState({ vh: 0, top: 0 });
-  useLayoutEffect(() => {
-    const measure = () => {
-      const el = ref.current;
-      if (el) setScreen({ vh: window.innerHeight, top: el.getBoundingClientRect().top + window.scrollY });
-    };
-    measure();
+  // Where the picture starts moves as things above it load (description, picture, live pills), so measure
+  // after every render and on resize; only a real change re-renders.
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const next = { vh: window.innerHeight, top: Math.round(el.getBoundingClientRect().top + window.scrollY) };
+    setScreen((cur) => (Math.abs(cur.vh - next.vh) > 2 || Math.abs(cur.top - next.top) > 2 ? next : cur));
+  }, [ref]);
+  useLayoutEffect(measure);
+  useEffect(() => {
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [ref, width]);
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.body);
+    return () => {
+      window.removeEventListener("resize", measure);
+      ro.disconnect();
+    };
+  }, [measure]);
   const { w, h } = sceneSize(width, screen.vh || 800, screen.top);
   const wide = width >= 560;
 
@@ -170,7 +179,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   };
 
   const n = answers.length;
-  const piece = Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
+  const piece = board === "tree" ? pieceSize(w, h, n) : Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
   const font = piece * 0.1;
   const showText = font * zoom >= 9;
   // where the pieces go: the canopy, or most of the sky
@@ -264,6 +273,11 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
               {board === "tree" ? "Leaves will grow here as people answer." : "Stars will light up as people answer."}
             </p>
           )}
+          {n > 0 && !showText && zoom === 1 && (
+            <p className="pointer-events-none absolute inset-x-0 top-2 text-center">
+              <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold text-ink">Zoom in or tap a {board === "tree" ? "leaf" : "star"} to read it</span>
+            </p>
+          )}
           {n > 0 && (
             <div className="absolute right-2 bottom-2 flex gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
               {zoom > 1 && (
@@ -281,9 +295,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
           )}
         </div>
       )}
-      {n > 0 && !showText && zoom === 1 && (
-        <p className="mt-2 text-center text-sm font-semibold text-ink-soft">Zoom in or tap a {board === "tree" ? "leaf" : "star"} to read it.</p>
-      )}
+
     </div>
   );
 }

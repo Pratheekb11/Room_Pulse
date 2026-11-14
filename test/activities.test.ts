@@ -12,7 +12,7 @@ import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as publicResults from "@/app/api/results/[code]/public/route";
 import * as answerRoute from "@/app/api/answer/route";
 import { ACTIVITIES, activityToBody } from "@/lib/activities";
-import { arrivalOrder, BOARDS, boardSpot, clampPan, leafTilt, MAX_AUTHOR, MAX_LEAVES, sceneSize, ZOOMS } from "@/lib/boards";
+import { arrivalOrder, BOARDS, boardSpot, clampPan, pieceSize, leafTilt, MAX_AUTHOR, MAX_LEAVES, sceneSize, ZOOMS } from "@/lib/boards";
 import { createSessionSchema } from "@/lib/validation";
 import { chartsFor } from "@/lib/charts";
 import { groupByFocus } from "@/lib/focus";
@@ -358,6 +358,17 @@ describe("fitting the tree on any screen", () => {
   it("is tall on phones and wide on big screens", () => {
     expect(sceneSize(357, 844, 0).ratio).toBeLessThan(1);
     expect(sceneSize(1200, 900, 0).ratio).toBeGreaterThan(1);
+  });
+
+  it("makes leaves as big as the canopy allows, so the words show on a laptop and when zoomed on a phone", () => {
+    // a laptop's results screen with 15 leaves: words readable (font = a tenth of the leaf, at least 9px)
+    expect(pieceSize(740, 463, 15)).toBeGreaterThanOrEqual(90);
+    // a phone with 15 leaves: readable at 2x zoom
+    expect(pieceSize(294, 346, 15) * 2).toBeGreaterThanOrEqual(90);
+    // fewer leaves, bigger leaves; never huge
+    expect(pieceSize(740, 463, 3)).toBeGreaterThan(pieceSize(740, 463, 30));
+    expect(pieceSize(740, 463, 1)).toBeLessThanOrEqual(740 * 0.22);
+    expect(pieceSize(740, 463, 200)).toBeGreaterThanOrEqual(740 * 0.05);
   });
 
   it("zooms in steps and never pans past the edges", () => {

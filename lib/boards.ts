@@ -52,6 +52,16 @@ export function sceneSize(width: number, viewportH: number, top: number): { w: n
   return { w: Math.floor(h * ratio), h, ratio };
 }
 
+/**
+ * How wide each leaf (or star) is: its share of the canopy, so leaves are as big as there's room for
+ * (a little overlap is fine), between 5% and 22% of the picture's width.
+ */
+export function pieceSize(w: number, h: number, n: number): number {
+  const canopy = (Math.PI / 4) * (0.86 * w) * (0.58 * h);
+  const each = Math.sqrt(canopy / Math.max(1, n) / 0.5);
+  return Math.floor(Math.min(0.22 * w, Math.max(0.05 * w, each * 0.9)));
+}
+
 /** Keeps a zoomed picture covering its frame: it can't be dragged past its edges. */
 export function clampPan(pan: { x: number; y: number }, zoom: number, w: number, h: number): { x: number; y: number } {
   const clamp = (v: number, size: number) => Math.min(0, Math.max(size - size * zoom, v)) || 0;
