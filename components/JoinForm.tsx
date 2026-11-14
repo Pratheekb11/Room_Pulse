@@ -20,8 +20,8 @@ export function JoinForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 max-w-md" noValidate>
-      <div className="flex flex-col gap-3 sm:flex-row">
+    <form onSubmit={onSubmit} className="mt-2 max-w-md" noValidate>
+      <div className="flex gap-2">
       <label htmlFor="code" className="sr-only">
         Presentation code
       </label>
@@ -41,9 +41,9 @@ export function JoinForm() {
         placeholder="k7m2qp"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? "code-error" : undefined}
-        className="font-mono h-14 min-w-0 flex-1 rounded-lg border border-line-strong bg-white px-4 text-2xl tracking-[0.18em] placeholder:text-muted-soft focus:border-ink focus:outline-none"
+        className="font-mono h-12 min-w-0 flex-1 rounded-lg border border-line-strong bg-white px-4 text-xl tracking-[0.18em] placeholder:text-muted-soft focus:border-ink focus:outline-none"
       />
-      <button type="submit" className="key h-14 rounded-lg bg-primary px-7 text-base font-medium text-white">
+      <button type="submit" className="key h-12 rounded-lg border border-line-strong bg-white px-6 text-base font-semibold text-ink hover:bg-line-soft">
         Join
       </button>
       </div>

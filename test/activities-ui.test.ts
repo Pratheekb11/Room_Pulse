@@ -243,6 +243,9 @@ describe("phone wording for signed answers", () => {
 
   it("opens the list of leaves on phones, where leaves are too small to read", () => {
     const src = readFileSync(new URL("../components/results/BoardView.tsx", import.meta.url), "utf8");
-    expect(src).toMatch(/useState\(\(\) => typeof window !== "undefined" && window\.innerWidth < 560\)/);
+    expect(src).toContain('const NARROW = "(max-width: 559px)"');
+    expect(src).toContain("const listOpen = listChoice ?? narrow;");
+    // the server and the browser draw the same thing first (no window check while rendering)
+    expect(src).not.toMatch(/useState\(\(\) => typeof window/);
   });
 });

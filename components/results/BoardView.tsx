@@ -1,15 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, pieceSize, pieceTextSize, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, pieceTextSize, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
 import { tinted } from "@/lib/colors";
-import { leafPose, TREE_BRANCHES, treeFork, treeLeafAt } from "@/lib/tree";
+import { tree, treeShape } from "@/lib/tree";
 import type { TextAnswer } from "@/lib/types";
 import { ToBody } from "../Portal";
+import { FONT_SHARE, LEAF_INK, LEAVES, LeafShape, leafStyle, TREE_SKY, TreeArt } from "../TreeArt";
 
-// Leaves are fresh greens (a few turning yellow) with dark green ink; notes are pastel; stars are gold.
-const LEAVES = ["#bfe39a", "#a9d983", "#97cf72", "#d3eaa0", "#b4de8c", "#ecdc8a"] as const;
-const LEAF_INK = "#1f3b16";
+// Notes are pastel; stars are gold. (Leaves: components/TreeArt.tsx)
 const NOTES = ["#fff1a8", "#ffd6e0", "#cfe8ff", "#d6f5c9", "#ffe0bf", "#e8dcff"] as const;
 const NOTE_INK = "#2b2620";
 
@@ -29,7 +28,22 @@ function useWidth<T extends HTMLElement>() {
   return [ref, w] as const;
 }
 
-/** How wide each leaf or star is, as a share of the board's width: fewer answers, bigger pieces. */
+const NARROW = "(max-width: 559px)";
+const watchNarrow = (changed: () => void) => {
+  const mq = window.matchMedia(NARROW);
+  mq.addEventListener("change", changed);
+  return () => mq.removeEventListener("change", changed);
+};
+/** Is this a phone-sized screen? False while the server draws the page, so both draw the same thing. */
+function useNarrowScreen() {
+  return useSyncExternalStore(
+    watchNarrow,
+    () => window.matchMedia(NARROW).matches,
+    () => false,
+  );
+}
+
+/** How wide each star is, as a share of the board's width: fewer answers, bigger pieces. */
 function pieceShare(n: number): number {
   if (n <= 6) return 0.2;
   if (n <= 14) return 0.15;
@@ -45,8 +59,10 @@ function pieceShare(n: number): number {
 export function BoardView({ board, answers, onHide }: { board: BoardId; answers: TextAnswer[]; onHide?: (id: string) => void }) {
   const ordered = arrivalOrder(answers);
   const [openId, setOpenId] = useState<string | null>(null);
-  // phones draw leaves too small to read, so the list starts open there
-  const [listOpen, setListOpen] = useState(() => typeof window !== "undefined" && window.innerWidth < 560);
+  // phones draw leaves too small to read, so the list starts open there (until it's opened or closed by hand)
+  const narrow = useNarrowScreen();
+  const [listChoice, setListOpen] = useState<boolean | null>(null);
+  const listOpen = listChoice ?? narrow;
   const info = boardInfo(board);
   const openIndex = openId ? ordered.findIndex((a) => a.id === openId) : -1;
 
@@ -61,7 +77,7 @@ export function BoardView({ board, answers, onHide }: { board: BoardId; answers:
         <div className="mt-4 text-center">
           <button
             type="button"
-            onClick={() => setListOpen((v) => !v)}
+            onClick={() => setListOpen(!listOpen)}
             aria-expanded={listOpen}
             className="rounded-full border border-line-strong bg-white px-4 py-2 text-[clamp(0.9rem,1vw,1.1rem)] font-bold hover:bg-canvas"
           >
@@ -129,8 +145,13 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   const { w, h } = sceneSize(width, screen.vh || 800, screen.top);
   const wide = width >= 560;
 
+  // the tree, drawn for this picture's shape (wide on big screens, tall on phones)
+  const art = board === "tree" ? tree(treeShape(w, h)) : null;
+
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [rawPan, setPan] = useState({ x: 0, y: 0 });
+  // the picture may have been resized since it was dragged: it still has to cover its frame
+  const pan = clampPan(rawPan, zoom, w, h);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<{ x: number; y: number; pan: { x: number; y: number }; dist: number; zoom: number; moved: boolean } | null>(null);
   const moved = useRef(false);
@@ -143,7 +164,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
     setZoom(next);
   }
   // the buttons zoom towards the leaves (the tree's crown), not the trunk
-  const focusY = board === "tree" ? h * 0.3 : h / 2;
+  const focusY = art ? art.crown.cy * w : h / 2;
   const stepIn = () => zoomTo(ZOOMS.find((z) => z > zoom + 0.01) ?? maxZoom, w / 2, focusY);
   const stepOut = () => zoomTo([...ZOOMS].reverse().find((z) => z < zoom - 0.01) ?? 1, w / 2, focusY);
 
@@ -168,7 +189,11 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
     } else if (zoom > 1) {
       const dx = e.clientX - g.x;
       const dy = e.clientY - g.y;
-      if (Math.abs(dx) + Math.abs(dy) > 4) moved.current = true;
+      if (Math.abs(dx) + Math.abs(dy) > 4 && !moved.current) {
+        moved.current = true;
+        // keep following the finger outside the picture, and don't count the drag as a tap on a leaf
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      }
       setPan(clampPan({ x: g.pan.x + dx, y: g.pan.y + dy }, zoom, w, h));
     }
   }
@@ -182,11 +207,12 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   };
 
   const n = answers.length;
-  const piece = board === "tree" ? Math.min(pieceSize(w, h, n), Math.round(w * 0.12)) : Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
-  const font = piece * (board === "tree" ? 0.115 : 0.1);
+  // every leaf is the same size: the biggest at which none of them touch (lib/tree.ts)
+  const piece = art ? Math.floor(art.leafSize(n) * w) : Math.round(w * pieceShare(n) * (wide ? 0.8 : 1));
+  const font = piece * (art ? FONT_SHARE : 0.1);
   const showText = font * zoom >= 9;
-  // where the pieces go: the canopy, or most of the sky
-  const area = board === "tree" ? crownBox(w, h, piece) : { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
+  // where the stars go: most of the sky
+  const area = { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
   const label = board === "tree" ? `A tree with ${plural(n, "leaf")}` : `A night sky with ${plural(n, "star")}`;
   const zoomBtn =
     "flex h-9 min-w-9 items-center justify-center rounded-full border border-line-strong bg-white px-2 text-lg font-bold text-ink shadow-sm disabled:opacity-40";
@@ -205,7 +231,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
             cursor: zoom > 1 ? "grab" : undefined,
             background:
               board === "tree"
-                ? `linear-gradient(180deg, ${tinted("#e7f4fb")} 0%, ${tinted("#f6f9ec")} 70%, ${tinted("#e4efcf")} 100%)`
+                ? TREE_SKY
                 : `radial-gradient(120% 90% at 50% 100%, ${tinted("#2b3a6b")} 0%, ${tinted("#141a33")} 60%, ${tinted("#0c1024")} 100%)`,
           }}
           onPointerDown={onPointerDown}
@@ -214,18 +240,13 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
           onPointerCancel={onPointerUp}
         >
           <div className="absolute inset-0 origin-top-left" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-            {board === "tree" ? <TreeArt w={w} h={h} box={area} /> : <SkyArt w={w} h={h} />}
+            {art ? <TreeArt art={art} w={w} h={h} /> : <SkyArt w={w} h={h} />}
             {answers.map((a, i) => {
-              const p = boardSpot(board, i);
-              const left = (area.l + p.x * area.w) * w;
-              const top = (area.t + p.y * area.h) * h;
               const name = a.author ? ` — ${a.author}` : "";
-              if (board === "tree") {
-                // the leaf's stalk sits on its branch and the leaf grows out of it like a real one:
-                // turned off the branch, pointing the way the branch grows, nearly level
-                const { side, angle: tip } = leafPose(treeLeafAt(i), a.id, area.w * w, area.h * h);
-                // the flipped leaf's tip is on its left, so tipping it down turns it the other way
-                const angle = side === 1 ? tip : -tip;
+              if (art) {
+                // the leaf's stalk sits on its twig and the leaf grows out of it like a real one:
+                // turned off the twig, pointing the way the twig grows, nearly level
+                const leaf = art.leaf(i);
                 return (
                   <button
                     key={a.id}
@@ -235,26 +256,19 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
                     title={`${a.text}${name}`}
                     className="animate-grow absolute flex items-center justify-center text-center leading-tight font-bold hover:z-10 hover:scale-110 focus-visible:z-10"
                     style={{
-                      left,
-                      top,
-                      width: piece,
-                      height: piece * LEAF_RATIO,
-                      paddingBlock: piece * 0.06,
-                      paddingLeft: piece * (side === 1 ? 0.2 : 0.1),
-                      paddingRight: piece * (side === 1 ? 0.1 : 0.2),
-                      color: LEAF_INK,
-                      fontSize: font,
-                      transformOrigin: side === 1 ? "0% 50%" : "100% 50%",
-                      transform: `translate(${side === 1 ? 0 : -100}%, -50%) rotate(${angle}deg)`,
+                      ...leafStyle(leaf, piece / w, (share) => share * w),
                       animationDelay: `${Math.min(i * 40, 1200)}ms`,
-                      transition: "scale 150ms",
+                      transition: "scale 150ms, width 400ms, height 400ms, font-size 400ms, padding 400ms",
                     }}
                   >
-                    <LeafShape color={LEAVES[pieceShade(a.id, LEAVES.length)]} flip={side === -1} />
+                    <LeafShape color={LEAVES[pieceShade(a.id, LEAVES.length)]} flip={leaf.side === -1} />
                     {showText && <span className="relative line-clamp-3 [overflow-wrap:anywhere]">{a.text}</span>}
                   </button>
                 );
               }
+              const p = boardSpot(board, i);
+              const left = (area.l + p.x * area.w) * w;
+              const top = (area.t + p.y * area.h) * h;
               return (
                 <button
                   key={a.id}
@@ -280,14 +294,14 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
           </div>
           {n === 0 && (
             <p
-              className="absolute inset-x-0 bottom-[6%] px-4 text-center text-[clamp(1rem,1.6vw,1.6rem)] font-bold"
+              className="absolute inset-x-0 bottom-[1.5%] px-4 text-center text-[clamp(0.95rem,1.5vw,1.5rem)] font-bold"
               style={{ color: board === "tree" ? "#41552f" : "#e9e6ff" }}
             >
               {board === "tree" ? "Leaves will grow here as people answer." : "Stars will light up as people answer."}
             </p>
           )}
           {n > 0 && !showText && zoom === 1 && (
-            <p className="pointer-events-none absolute inset-x-0 top-2 text-center">
+            <p className="pointer-events-none absolute bottom-3.5 left-2 right-24">
               <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold text-ink">Zoom in or tap a {board === "tree" ? "leaf" : "star"} to read it</span>
             </p>
           )}
@@ -310,130 +324,6 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
       )}
 
     </div>
-  );
-}
-
-const LEAF_RATIO = 0.56;
-/**
- * Where the crown's box sits in the picture (the same box the leaf spots use). On a tall picture
- * (phones) the crown takes more of the height and the trunk is shorter, so leaves get more room.
- */
-function crownBox(w: number, h: number, piece: number) {
-  const b = h > w ? { l: 0.05, t: 0.03, w: 0.9, h: 0.78 } : { l: 0.08, t: 0.04, w: 0.84, h: 0.64 };
-  // room at the sides and top for a leaf pointing out from the outermost twigs, so none is cut off
-  const side = Math.max(b.l, Math.min(0.2, (piece * 0.95) / w));
-  const top = Math.max(b.t, Math.min(0.2, (piece * 0.8) / h));
-  return { l: side, t: top, w: 1 - 2 * side, h: b.h - (top - b.t) };
-}
-
-/** A leaf: a pointed blade with a stem on the left (or right when flipped), a middle vein and a few side veins. */
-function LeafShape({ color, flip }: { color: string; flip: boolean }) {
-  const id = useId();
-  const light = tinted(color);
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 100 56"
-      preserveAspectRatio="none"
-      className="absolute inset-0 h-full w-full overflow-visible drop-shadow-[0_1.5px_1.5px_rgb(40_60_20/0.28)]"
-      style={flip ? { transform: "scaleX(-1)" } : undefined}
-    >
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={light} />
-          <stop offset="1" stopColor={light} stopOpacity={0.82} />
-        </linearGradient>
-      </defs>
-      <path data-part="stem" d="M0 28 Q 7 26.5 14 27.5" stroke={tinted("#5d3b25")} strokeWidth={3.5} strokeLinecap="round" fill="none" />
-      <path d="M10 28 C 24 6, 66 -2, 99 20 C 90 42, 56 60, 10 28 Z" fill={tinted("#3f6b25")} opacity={0.25} transform="translate(0 1.5)" />
-      <path d="M10 28 C 24 6, 66 -2, 99 20 C 90 42, 56 60, 10 28 Z" fill={`url(#${id})`} stroke={tinted("#5b8a3a")} strokeOpacity={0.45} strokeWidth={1} />
-      <path data-part="vein" d="M11 28 Q 52 25 96 21" stroke={tinted("#5b8a3a")} strokeOpacity={0.5} strokeWidth={1.4} fill="none" />
-      <g stroke={tinted("#5b8a3a")} strokeOpacity={0.2} strokeWidth={1} fill="none">
-        <path d="M32 26.6 Q 40 18 48 12" />
-        <path d="M54 25 Q 62 17 70 10" />
-        <path d="M36 27 Q 46 35 54 42" />
-        <path d="M60 24.6 Q 70 31 78 35" />
-      </g>
-    </svg>
-  );
-}
-
-/** The tree: sky, sun, clouds and hills, a flared trunk and tapering branches (lib/tree.ts). */
-function TreeArt({ w, h, box: CROWN }: { w: number; h: number; box: { l: number; t: number; w: number; h: number } }) {
-  const X = (x: number) => (CROWN.l + x * CROWN.w) * w;
-  const Y = (y: number) => (CROWN.t + y * CROWN.h) * h;
-  const W = (k: number) => Math.max(1.2, k * CROWN.w * w);
-  const bark = tinted("#7a5034");
-  const barkDark = tinted("#5d3b25");
-  const barkLight = tinted("#a07150");
-  // the trunk runs straight up to where it first splits (the stem that carries on from it isn't drawn again)
-  const stem = TREE_BRANCHES.filter((b) => b.level === 0);
-  const fork = treeFork();
-  const fx = X(fork.x);
-  const fy = Y(stem[stem.length - 1].y2);
-  const top = W(stem[stem.length - 1].w2) / 2;
-  const ground = h * 0.9;
-  const base = Math.max(top * 1.7, w * 0.04);
-  // a tapering piece of branch: a four-sided shape from width w1 to w2, with round joints
-  const limb = (x1: number, y1: number, x2: number, y2: number, r1: number, r2: number) => {
-    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
-    const nx = -(y2 - y1) / len;
-    const ny = (x2 - x1) / len;
-    return `M ${x1 + nx * r1} ${y1 + ny * r1} L ${x2 + nx * r2} ${y2 + ny * r2} L ${x2 - nx * r2} ${y2 - ny * r2} L ${x1 - nx * r1} ${y1 - ny * r1} Z`;
-  };
-  const cloud = (cx: number, cy: number, s: number) => (
-    <g fill="#fff" opacity={0.85}>
-      <ellipse cx={cx} cy={cy} rx={s * 1.6} ry={s * 0.55} />
-      <circle cx={cx - s * 0.6} cy={cy - s * 0.25} r={s * 0.5} />
-      <circle cx={cx + s * 0.25} cy={cy - s * 0.45} r={s * 0.65} />
-    </g>
-  );
-  return (
-    <svg aria-hidden="true" width={w} height={h} className="absolute inset-0">
-      <circle cx={w * 0.86} cy={h * 0.13} r={Math.max(14, Math.min(w, h) * 0.07)} fill={tinted("#ffe8a3")} opacity={0.9} />
-      {cloud(w * 0.16, h * 0.12, Math.max(12, w * 0.04))}
-      {cloud(w * 0.7, h * 0.07, Math.max(10, w * 0.03))}
-      <g data-part="hills">
-        <path d={`M 0 ${h * 0.8} Q ${w * 0.22} ${h * 0.7} ${w * 0.48} ${h * 0.8} T ${w} ${h * 0.76} L ${w} ${h} L 0 ${h} Z`} fill={tinted("#c9e3a6")} />
-        <path d={`M 0 ${h * 0.9} Q ${w * 0.3} ${h * 0.84} ${w * 0.6} ${h * 0.89} T ${w} ${h * 0.87} L ${w} ${h} L 0 ${h} Z`} fill={tinted("#9fcd78")} />
-        <ellipse cx={fx} cy={ground + h * 0.012} rx={base * 3.2} ry={h * 0.022} fill={tinted("#6f9f4f")} opacity={0.45} />
-      </g>
-      {/* trunk, flaring into roots at the ground */}
-      <path
-        d={`M ${fx - top} ${fy - top} C ${fx - top * 1.2} ${fy + (ground - fy) * 0.55}, ${fx - base * 0.8} ${ground - h * 0.05}, ${fx - base * 1.6} ${ground + h * 0.01}
-            L ${fx + base * 1.6} ${ground + h * 0.01} C ${fx + base * 0.8} ${ground - h * 0.05}, ${fx + top * 1.2} ${fy + (ground - fy) * 0.55}, ${fx + top} ${fy - top} Z`}
-        fill={bark}
-      />
-      <path d={`M ${fx + top * 0.25} ${fy + h * 0.02} C ${fx + top * 0.4} ${(fy + ground) / 2}, ${fx + base * 0.45} ${ground - h * 0.06}, ${fx + base * 0.8} ${ground}`} stroke={barkLight} strokeOpacity={0.6} strokeWidth={Math.max(1.5, top * 0.35)} fill="none" strokeLinecap="round" />
-      <path d={`M ${fx - top * 0.5} ${fy + h * 0.06} C ${fx - top * 0.6} ${(fy + ground) / 2}, ${fx - base * 0.6} ${ground - h * 0.08}, ${fx - base * 1.1} ${ground}`} stroke={barkDark} strokeOpacity={0.45} strokeWidth={Math.max(1, top * 0.25)} fill="none" strokeLinecap="round" />
-      <g fill={bark}>
-        {TREE_BRANCHES.map((b, i) => {
-          if (b.level === 0) return null;
-          const r1 = W(b.w1) / 2;
-          const r2 = W(b.w2) / 2;
-          return (
-            <g key={i}>
-              <path d={limb(X(b.x1), Y(b.y1), X(b.x2), Y(b.y2), r1, r2)} />
-              <circle cx={X(b.x2)} cy={Y(b.y2)} r={r2} />
-            </g>
-          );
-        })}
-      </g>
-      {/* little leaf buds on the twig tips, so the tree looks alive before many answers arrive */}
-      <g fill={tinted("#6fa84a")} opacity={0.75}>
-        {TREE_BRANCHES.filter((b) => b.tip).map((b, i) => {
-          const s = Math.max(3, w * 0.009);
-          const a = (Math.atan2(Y(b.y2) - Y(b.y1), X(b.x2) - X(b.x1)) * 180) / Math.PI;
-          return <ellipse key={i} cx={X(b.x2)} cy={Y(b.y2)} rx={s * 1.5} ry={s * 0.7} transform={`rotate(${a} ${X(b.x2)} ${Y(b.y2)})`} />;
-        })}
-      </g>
-      {/* a light edge along the bigger branches */}
-      <g stroke={barkLight} strokeOpacity={0.45} strokeLinecap="round" fill="none">
-        {TREE_BRANCHES.filter((b) => b.level > 0 && b.level < 3).map((b, i) => (
-          <path key={i} d={`M ${X(b.x1)} ${Y(b.y1) - W(b.w1) * 0.18} L ${X(b.x2)} ${Y(b.y2) - W(b.w2) * 0.18}`} strokeWidth={Math.max(0.8, W(b.w2) * 0.22)} />
-        ))}
-      </g>
-    </svg>
   );
 }
 

@@ -235,6 +235,9 @@ body,
 .stagger > *:nth-child(7) { animation-delay: 360ms; }
 .stagger > *:nth-child(n + 8) { animation-delay: 420ms; }
 
+/* Things that grow in when scrolled to (components/GrowOnView.tsx): hidden until seen, then the animation starts */
+[data-seen="false"] .animate-grow { animation: none; opacity: 0; }
+
 /* "Show me how" walkthrough (components/HowToDemo.tsx) */
 .demo-click { animation: demo-click 600ms var(--ease-out-soft) forwards; }
 @keyframes demo-click {

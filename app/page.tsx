@@ -9,15 +9,14 @@ import { Logo } from "@/components/Logo";
 import { WarmUp } from "@/components/WarmUp";
 import { KIND_INFO } from "@/lib/kinds";
 import { ACTIVITIES } from "@/lib/activities";
+import { MiniTree } from "@/components/MiniTree";
 
-const TYPE_COLORS = ["bg-peach", "bg-sky", "bg-mint", "bg-lavender"];
-
-const GUEST_POINTS = ["No sign-up or email", "Free", "Your audience needs no app"];
+const CHIP_COLORS = ["bg-peach", "bg-sky", "bg-mint", "bg-lavender"];
 
 const STEPS = [
-  { title: "Write your questions", body: "Make a presentation with up to 10 questions. It takes a couple of minutes." },
-  { title: "Show the QR code", body: "People scan it with their phone camera, or type the short code. That's all they need." },
-  { title: "Watch the answers", body: "Results appear on your screen as people answer. Show them to the room or keep them to yourself." },
+  { title: "Write your questions", body: "Up to 10. It takes a couple of minutes." },
+  { title: "Show the QR code", body: "People scan it with their phone. No app." },
+  { title: "Watch the answers", body: "Results appear on your screen as people tap." },
 ];
 
 export default function Home() {
@@ -38,7 +37,7 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-[1200px] px-5 sm:px-8">
-        <section className="stagger grid grid-cols-1 gap-12 pt-14 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
+        <section className="stagger grid grid-cols-1 gap-10 pt-12 pb-14 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-16">
           <div className="min-w-0">
             <h1 className="font-display text-[clamp(2.5rem,5.6vw,4rem)] leading-[1.04] text-ink">
               <span className="block">Know what the room thinks.</span>
@@ -48,30 +47,16 @@ export default function Home() {
               Ask your audience questions. They answer on their phones, and the results show up on your screen straight away.
             </p>
 
-            <div className="mt-8 max-w-md rounded-xl border border-line-strong bg-white p-4 sm:p-5">
-              <p className="inline-flex items-center gap-1.5 rounded-full bg-mint px-2.5 py-1 text-xs font-bold text-ink">
-                <span aria-hidden>✓</span> Guest mode: no sign-up needed
-              </p>
-              <Link href="/admin" className="key mt-3 flex h-12 items-center justify-center rounded-lg bg-primary px-5 text-base font-bold text-white">
+            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <Link href="/admin" className="key flex h-12 items-center justify-center rounded-lg bg-primary px-6 text-base font-bold text-white">
                 Create a presentation
               </Link>
-              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft">
-                {GUEST_POINTS.map((p) => (
-                  <li key={p} className="flex items-center gap-1.5">
-                    <span aria-hidden className="text-success">✓</span>
-                    {p}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-xs text-muted">Start as a guest in one tap. Save an account later if you want to keep your presentations.</p>
-              <p className="mt-3 text-sm">
-                <HowToButton label="▶ See how it works" />
-              </p>
+              <HowToButton label="▶ See how it works" />
             </div>
+            <p className="mt-3 text-sm text-ink-soft">Free. Start as a guest: no sign-up, nothing to install.</p>
 
-            <div className="mt-8 max-w-md">
-              <p className="text-sm font-semibold text-ink">Joining someone else&rsquo;s presentation?</p>
-              <p className="text-sm text-muted">Type the code shown on their screen.</p>
+            <div className="mt-9 max-w-md border-t border-line pt-5">
+              <p className="text-sm font-semibold text-ink">Have a code? Join a presentation.</p>
               <JoinForm />
             </div>
           </div>
@@ -80,81 +65,68 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="border-t border-line py-20" aria-labelledby="how-h">
-          <h2 id="how-h" className="font-display text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
+        <section className="border-t border-line py-14" aria-labelledby="how-h">
+          <h2 id="how-h" className="font-display text-[clamp(1.5rem,2.6vw,2rem)] leading-tight text-ink">
             How it works
           </h2>
-          <ol className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <ol className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
             {STEPS.map((step, i) => (
-              <li key={step.title} className="flex gap-4">
-                <span className="font-display grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line-strong text-ink">{i + 1}</span>
+              <li key={step.title} className="flex items-start gap-3">
+                <span className="font-display grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-white">{i + 1}</span>
                 <div>
                   <h3 className="font-semibold text-ink">{step.title}</h3>
-                  <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">{step.body}</p>
+                  <p className="text-[15px] leading-snug text-ink-soft">{step.body}</p>
                 </div>
               </li>
             ))}
           </ol>
         </section>
 
-        <section className="border-t border-line py-20" aria-labelledby="activities-h">
+        <section className="border-t border-line py-14" aria-labelledby="activities-h">
           <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
             <div>
               <h2 id="activities-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
                 Team activities everyone can join
               </h2>
               <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-ink-soft">
-                Team building that works for the people in the room and the ones on a call. Everyone writes from their phone, and the tree, the
-                wall or the night sky fills up live, on the big screen and on every phone.
+                In the room or on a call, everyone writes from their phone and the picture fills up live.
               </p>
-              <Link href="/admin" className="key mt-6 inline-flex h-11 items-center rounded-lg bg-primary px-5 font-semibold text-white">
+              <ul className="mt-6 flex max-w-xl flex-wrap gap-2" aria-label="Team activities">
+                {ACTIVITIES.map((a) => (
+                  <li key={a.id} title={a.blurb} className="flex items-center gap-1.5 rounded-full border border-line bg-white py-1.5 pr-3.5 pl-2.5 text-sm font-semibold text-ink">
+                    <span aria-hidden>{a.icon}</span>
+                    {a.label}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/admin" className="key mt-7 inline-flex h-11 items-center rounded-lg bg-primary px-5 font-semibold text-white">
                 Start an activity
               </Link>
             </div>
             <MiniTree />
           </div>
-          <ul className="stagger mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {ACTIVITIES.map((a) => (
-              <li key={a.id} className="flex gap-3 rounded-xl border border-line bg-white p-5">
-                <span aria-hidden className="text-2xl leading-none">
-                  {a.icon}
-                </span>
-                <span className="min-w-0">
-                  <span className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="font-semibold text-ink">{a.label}</span>
-                    <span className="text-xs font-semibold text-ink-soft tabular-nums">{a.minutes} min</span>
-                  </span>
-                  <span className="mt-1 block text-[15px] leading-relaxed text-ink-soft">{a.blurb}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
         </section>
 
-        <section className="border-t border-line py-20" aria-labelledby="features-h">
+        <section className="border-t border-line py-14" aria-labelledby="features-h">
           <h2 id="features-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
             What you can do
           </h2>
           <FeatureList ai={aiAvailable()} />
+          <div className="mt-10 rounded-2xl border border-line bg-white p-5">
+            <h3 className="font-semibold text-ink">Ask it your way: {KIND_INFO.length} kinds of question</h3>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {KIND_INFO.map((k, i) => (
+                <li key={k.id} title={k.hint} className={`${CHIP_COLORS[i % CHIP_COLORS.length]} rounded-full px-3 py-1.5 text-sm font-semibold text-ink`}>
+                  {k.label}
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
 
-        <section className="border-t border-line py-20" aria-labelledby="types-h">
-          <h2 id="types-h" className="font-display max-w-xl text-[clamp(1.75rem,3vw,2.25rem)] leading-tight text-ink">
-            {KIND_INFO.length} kinds of question
-          </h2>
-          <ul className="stagger mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {KIND_INFO.map((k, i) => (
-              <li key={k.id} className="rounded-xl border border-line bg-white p-5">
-                <span className={`${TYPE_COLORS[i % TYPE_COLORS.length]} rounded-full px-2.5 py-1 text-xs font-semibold text-ink`}>{k.label}</span>
-                <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">{k.hint}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="border-t border-line py-24 text-center">
+        <section className="border-t border-line py-16 text-center">
           <h2 className="font-display text-[clamp(1.75rem,3.4vw,2.5rem)] leading-tight text-ink">Ready to try it?</h2>
-          <Link href="/admin" className="key mt-8 inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-white">
+          <Link href="/admin" className="key mt-7 inline-flex h-12 items-center rounded-lg bg-primary px-6 text-base font-bold text-white">
             Create a presentation
           </Link>
           <p className="mt-3 text-sm text-muted">Free. Start as a guest: no sign-up, no email.</p>
@@ -169,50 +141,5 @@ export default function Home() {
         <Credit />
       </footer>
     </div>
-  );
-}
-
-/** A small drawn Motivation tree with a few leaves, to show what an activity looks like. */
-function MiniTree() {
-  const leaves: [number, number, number, string, string][] = [
-    [190, 62, -4, "#b4dc92", "Learning"],
-    [112, 92, -12, "#cdeab0", "My team"],
-    [270, 92, 10, "#dcecaa", "Customers"],
-    [150, 132, 8, "#efe3a0", "Autonomy"],
-    [236, 136, -8, "#a3d48a", "Shipping"],
-    [76, 150, 10, "#c3e3a0", "Growth"],
-    [306, 152, -10, "#b4dc92", "Coffee"],
-    [130, 182, -6, "#dcecaa", "Kind people"],
-    [252, 186, 6, "#cdeab0", "Hard problems"],
-  ];
-  return (
-    <figure className="mx-auto w-full max-w-md">
-      <svg viewBox="0 0 380 300" role="img" aria-label="A tree whose leaves are people's answers: My team, Learning, Customers, Growth and more" className="w-full">
-        <rect x="0" y="0" width="380" height="300" rx="20" fill="#eef6f9" />
-        <ellipse cx="190" cy="306" rx="230" ry="40" fill="#a9cf7d" />
-        <g fill="#9fd08a" opacity="0.3">
-          <ellipse cx="190" cy="120" rx="150" ry="95" />
-          <ellipse cx="100" cy="150" rx="80" ry="60" />
-          <ellipse cx="280" cy="150" rx="80" ry="60" />
-        </g>
-        <path d="M176 292 C181 262 182 245 184 222 L196 222 C198 245 199 262 204 292 Z" fill="#8a5a3b" />
-        <path
-          d="M190 226 Q150 200 112 150 M190 226 Q232 196 270 150 M190 226 Q188 150 190 80 M190 226 Q120 205 80 170 M190 226 Q262 205 304 172"
-          stroke="#8a5a3b"
-          strokeWidth="8"
-          strokeLinecap="round"
-          fill="none"
-        />
-        {leaves.map(([x, y, r, fill, text]) => (
-          <g key={text} transform={`translate(${x} ${y}) rotate(${r})`}>
-            <path d="M -50 0 Q -6 -34 50 0 Q 6 34 -50 0 Z" fill={fill} />
-            <path d="M -42 0 L 42 0" stroke="#1f3b16" strokeOpacity="0.15" strokeWidth="1" />
-            <text textAnchor="middle" dominantBaseline="middle" fontSize="11" fontWeight="700" fill="#1f3b16">
-              {text}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </figure>
   );
 }

@@ -12,7 +12,8 @@ import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as publicResults from "@/app/api/results/[code]/public/route";
 import * as answerRoute from "@/app/api/answer/route";
 import { ACTIVITIES, activityToBody } from "@/lib/activities";
-import { arrivalOrder, BOARDS, boardSpot, clampPan, pieceSize, leafTilt, MAX_AUTHOR, MAX_LEAVES, sceneSize, ZOOMS } from "@/lib/boards";
+import { arrivalOrder, BOARDS, boardSpot, clampPan, leafTilt, MAX_AUTHOR, MAX_LEAVES, sceneSize, ZOOMS } from "@/lib/boards";
+import { tree as drawnTree } from "@/lib/tree";
 import { createSessionSchema } from "@/lib/validation";
 import { chartsFor } from "@/lib/charts";
 import { groupByFocus } from "@/lib/focus";
@@ -312,13 +313,14 @@ describe("board layout", () => {
     expect(later).toEqual(first);
   });
 
-  it("spreads the first 40 leaves so none sit on top of each other", () => {
-    for (const id of ["tree", "sky"] as const) {
+  it("spreads the first 40 stars so none sit on top of each other, and gives every leaf its own spot", () => {
+    // (leaves point different ways from their stalks: test/tree-art.test.ts checks that none touch)
+    for (const [id, gap] of [["sky", 0.04], ["tree", 0.008]] as const) {
       const pts = Array.from({ length: 40 }, (_, i) => boardSpot(id, i));
       let closest = Infinity;
       for (let i = 0; i < pts.length; i++)
         for (let j = i + 1; j < pts.length; j++) closest = Math.min(closest, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
-      expect(closest).toBeGreaterThan(0.04);
+      expect(closest, id).toBeGreaterThan(gap);
     }
   });
 
@@ -328,14 +330,16 @@ describe("board layout", () => {
     expect(arrivalOrder([b, a]).map((t) => t.id)).toEqual(["a", "b"]);
   });
 
-  it("uses the whole canopy from the first few leaves, not just the middle", () => {
+  it("uses the whole crown from the first few leaves, not just the middle", () => {
     const first = Array.from({ length: 12 }, (_, i) => boardSpot("tree", i));
-    const far = Math.max(...first.map((p) => Math.hypot(p.x - 0.5, p.y - 0.5)));
-    expect(far).toBeGreaterThan(0.38);
-    // and stays inside the round canopy
+    expect(Math.min(...first.map((p) => p.x))).toBeLessThan(0.3);
+    expect(Math.max(...first.map((p) => p.x))).toBeGreaterThan(0.7);
+    // and every leaf stays in the crown: above the ground, off the picture's edges
     for (let i = 0; i < 200; i++) {
       const p = boardSpot("tree", i);
-      expect(Math.hypot(p.x - 0.5, p.y - 0.5)).toBeLessThanOrEqual(0.5);
+      expect(p.x).toBeGreaterThan(0.05);
+      expect(p.x).toBeLessThan(0.95);
+      expect(p.y).toBeLessThan(0.8);
     }
   });
 
@@ -378,15 +382,17 @@ describe("fitting the tree on any screen", () => {
     expect(sceneSize(1200, 900, 0).ratio).toBeGreaterThan(1);
   });
 
-  it("makes leaves as big as the canopy allows, so the words show on a laptop and when zoomed on a phone", () => {
-    // a laptop's results screen with 15 leaves: words readable (font = a tenth of the leaf, at least 9px)
-    expect(pieceSize(740, 463, 15)).toBeGreaterThanOrEqual(90);
+  it("makes leaves as big as they can be without touching, so the words show on a laptop and when zoomed on a phone", () => {
+    const wide = drawnTree("wide");
+    const tall = drawnTree("tall");
+    // a laptop's results screen with 15 leaves: words readable (font = about a tenth of the leaf, at least 9px)
+    expect(wide.leafSize(15) * 740).toBeGreaterThanOrEqual(86);
     // a phone with 15 leaves: readable at 2x zoom
-    expect(pieceSize(294, 346, 15) * 2).toBeGreaterThanOrEqual(90);
-    // fewer leaves, bigger leaves; never huge
-    expect(pieceSize(740, 463, 3)).toBeGreaterThan(pieceSize(740, 463, 30));
-    expect(pieceSize(740, 463, 1)).toBeLessThanOrEqual(740 * 0.22);
-    expect(pieceSize(740, 463, 200)).toBeGreaterThanOrEqual(740 * 0.05);
+    expect(tall.leafSize(15) * 294 * 2).toBeGreaterThanOrEqual(90);
+    // fewer leaves, bigger leaves; never huge, never tiny
+    expect(wide.leafSize(3)).toBeGreaterThan(wide.leafSize(60));
+    expect(wide.leafSize(1)).toBeLessThanOrEqual(0.12);
+    expect(wide.leafSize(400)).toBeGreaterThanOrEqual(0.03);
   });
 
   it("zooms in steps and never pans past the edges", () => {

@@ -2,7 +2,7 @@
 // (leaves on a tree, sticky notes on a wall, stars in a sky) instead of a list.
 // Used by the team activities (lib/activities.ts).
 
-import { treeLeafSpot } from "./tree";
+import { tree } from "./tree";
 
 export const BOARD_IDS = ["tree", "wall", "sky"] as const;
 export type BoardId = (typeof BOARD_IDS)[number];
@@ -59,16 +59,6 @@ export function sceneSize(width: number, viewportH: number, top: number): { w: n
   return { w: Math.floor(h * ratio), h, ratio };
 }
 
-/**
- * How wide each leaf (or star) is: its share of the canopy, so leaves are as big as there's room for
- * (a little overlap is fine), between 5% and 22% of the picture's width.
- */
-export function pieceSize(w: number, h: number, n: number): number {
-  const canopy = (Math.PI / 4) * (0.86 * w) * (0.58 * h);
-  const each = Math.sqrt(canopy / Math.max(1, n) / 0.5);
-  return Math.floor(Math.min(0.22 * w, Math.max(0.05 * w, each * 0.8)));
-}
-
 /** Keeps a zoomed picture covering its frame: it can't be dragged past its edges. */
 export function clampPan(pan: { x: number; y: number }, zoom: number, w: number, h: number): { x: number; y: number } {
   const clamp = (v: number, size: number) => Math.min(0, Math.max(size - size * zoom, v)) || 0;
@@ -84,11 +74,15 @@ const r2 = (k: number) => ({ x: frac(0.5 + A1 * k), y: frac(0.5 + A2 * k) });
 
 /**
  * Where the answer that arrived `index`-th (0 = first) sits, as 0..1 across and down the board's
- * fill area (on a branch of the tree, lib/tree.ts). Evenly spread from the first answer on, and depends
+ * fill area (for the tree: where the leaf's stalk joins its twig, as shares of the wide picture, lib/tree.ts). Evenly spread from the first answer on, and depends
  * only on the index, so earlier answers never move when new ones come in.
  */
 export function boardSpot(board: BoardId, index: number): { x: number; y: number } {
-  if (board === "tree") return treeLeafSpot(index);
+  if (board === "tree") {
+    const t = tree("wide");
+    const leaf = t.leaf(index);
+    return { x: leaf.x, y: leaf.y / t.aspect };
+  }
   const m = 0.04;
   const p = r2(index + 1);
   return { x: m + (1 - 2 * m) * p.x, y: m + (1 - 2 * m) * p.y };
