@@ -59,7 +59,7 @@ export function sceneSize(width: number, viewportH: number, top: number): { w: n
 export function pieceSize(w: number, h: number, n: number): number {
   const canopy = (Math.PI / 4) * (0.86 * w) * (0.58 * h);
   const each = Math.sqrt(canopy / Math.max(1, n) / 0.5);
-  return Math.floor(Math.min(0.22 * w, Math.max(0.05 * w, each * 0.9)));
+  return Math.floor(Math.min(0.22 * w, Math.max(0.05 * w, each * 0.8)));
 }
 
 /** Keeps a zoomed picture covering its frame: it can't be dragged past its edges. */
