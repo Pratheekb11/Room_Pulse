@@ -43,7 +43,7 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
       coalesce((select json_agg(jsonb_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
                   'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end),
                   'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit,
-                  'seconds', f.quiz_seconds, 'description', f.description, 'imageId', f.image_id)
+                  'seconds', f.quiz_seconds, 'description', f.description, 'imageId', f.image_id, 'board', f.board)
                   || case when ${withAnswers}::boolean then jsonb_build_object('correct', f.quiz_correct) else '{}'::jsonb end
                   order by f.position)
                 from focus_topics f where f.session_id = s.id), '[]'::json) as focus_topics,
@@ -213,9 +213,10 @@ export async function getResults(
                 from (select focus_id, value, count(*)::int as n
                         from number_answers where session_id = s.id
                        group by focus_id, value) x), '[]'::json) as numbers,
-      coalesce((select json_agg(json_build_object('id', x.id, 'focusId', x.focus_id, 'text', x.body, 'hidden', x.hidden, 'at', x.updated_at)
+      coalesce((select json_agg(json_build_object('id', x.id, 'focusId', x.focus_id, 'text', x.body, 'author', x.author, 'hidden', x.hidden,
+                                                  'at', x.updated_at, 'created', x.created_at)
                                 order by x.updated_at desc)
-                from (select id, focus_id, body, hidden, updated_at,
+                from (select id, focus_id, body, author, hidden, updated_at, created_at,
                              row_number() over (partition by focus_id order by updated_at desc) as rk
                         from text_answers where session_id = s.id) x
                where x.rk <= 200), '[]'::json) as texts,
@@ -296,7 +297,7 @@ export async function getResults(
     words: r.words,
     ranks: r.ranks,
     numbers: r.numbers.map((x) => ({ ...x, value: Number(x.value) })),
-    texts: r.texts.map((t) => ({ ...t, at: new Date(t.at).toISOString() })),
+    texts: r.texts.map((t) => ({ ...t, author: t.author ?? null, at: new Date(t.at).toISOString(), ...(t.created ? { created: new Date(t.created).toISOString() } : {}) })),
     respondents: r.respondents,
     questions: r.questions.map((q) => ({ ...q, at: new Date(q.at).toISOString() })),
     quizCounts: r.quiz_counts,
@@ -389,21 +390,22 @@ export async function createSession(
     try {
       await sql`
         with s as (
-          insert into sessions (code, dashboard_key, title, scale_max, low_label, high_label, theme, decor, owner_id, expires_at)
-          values (${code}, ${dashboardKey}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${input.theme}, ${input.decor}, ${ownerId},
+          insert into sessions (code, dashboard_key, title, scale_max, low_label, high_label, theme, decor, show_results, owner_id, expires_at)
+          values (${code}, ${dashboardKey}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${input.theme}, ${input.decor}, ${input.showResults}, ${ownerId},
                   case when ${expiresInDays}::int is null then null else now() + make_interval(days => ${expiresInDays}::int) end)
           returning id
         ), input as (
           select e.val, e.ord - 1 as pos
           from jsonb_array_elements(${JSON.stringify(input.focusTopics)}::jsonb) with ordinality as e(val, ord)
         ), f as (
-          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description, image_id)
+          insert into focus_topics (session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description, image_id, board)
           select s.id, input.val->>'name', input.val->>'kind', input.val->>'chart', input.pos,
                  (input.val->>'maxPicks')::int, (input.val->>'min')::double precision,
                  (input.val->>'max')::double precision, input.val->>'unit',
                  (input.val->>'correctIndex')::int, (input.val->>'seconds')::int, input.val->>'description',
                  -- only the owner's own pictures; anything else is left off
-                 (select i.id from images i where i.id = (input.val->>'image')::uuid and i.owner_id = ${ownerId}::uuid)
+                 (select i.id from images i where i.id = (input.val->>'image')::uuid and i.owner_id = ${ownerId}::uuid),
+                 input.val->>'board'
           from s, input
           returning id, position
         ), t as (
@@ -567,7 +569,7 @@ export async function getRawRows(code: string): Promise<RawRow[]> {
         join topics t on t.id = c.topic_id
       union all
       select x.voter_id, x.created_at, x.updated_at, f.position, 0, 0,
-             f.name, x.body, case when x.hidden then 'Hidden answer' else 'Answer' end, ''
+             f.name, x.body || coalesce(' — ' || x.author, ''), case when x.hidden then 'Hidden answer' else 'Answer' end, ''
         from text_answers x
         join s on x.session_id = s.id
         join focus_topics f on f.id = x.focus_id
@@ -716,12 +718,14 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
     saved = await saveOptionList(a.kind, a.code, a.focusId, a.voterId, a.topicIds);
   } else if (a.kind === "text") {
     const rows = await sql`
-      insert into text_answers (session_id, focus_id, voter_id, body)
-      select s.id, f.id, ${a.voterId}::uuid, ${a.text}
+      insert into text_answers (session_id, focus_id, voter_id, body, author)
+      select s.id, f.id, ${a.voterId}::uuid, ${a.text},
+             -- only board questions are signed; plain open answers stay anonymous
+             case when f.board is not null then ${a.author ?? null}::text end
       from live_sessions s
       join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'text'
       where s.code = ${a.code} and s.is_open
-      on conflict (focus_id, voter_id) do update set body = excluded.body, updated_at = now()
+      on conflict (focus_id, voter_id) do update set body = excluded.body, author = excluded.author, updated_at = now()
       returning 1 as ok
     `;
     saved = rows.length > 0;
@@ -1051,7 +1055,7 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
         cross join lateral (values (0::float8, 'Average', x.mean), (1::float8, 'Middle value', x.median)) as m(ord, kind, value)
        where s.code = ${code}
       union all
-      select f.position, extract(epoch from a.updated_at)::float8 + case when a.hidden then 1e12 else 0 end, f.name, a.body,
+      select f.position, extract(epoch from a.updated_at)::float8 + case when a.hidden then 1e12 else 0 end, f.name, a.body || coalesce(' — ' || a.author, ''),
              case when a.hidden then 'Hidden answer' else 'Answer' end, null, 1
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'text'
@@ -1323,16 +1327,16 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
     sql`delete from criteria where session_id = ${sid}::uuid and not (id = any(${keepCriteria}::uuid[]))`,
     sql`update focus_topics f set name = x.name, chart = x.chart, position = x.pos,
           max_picks = x."maxPicks", num_min = x.min, num_max = x.max, num_unit = x.unit,
-          quiz_correct = x."correctIndex", quiz_seconds = x.seconds, description = x.description,
+          quiz_correct = x."correctIndex", quiz_seconds = x.seconds, description = x.description, board = x.board,
           image_id = (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid)
         from jsonb_to_recordset(${rows(focus.filter((f) => !f.isNew))}::jsonb)
-          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text, image uuid)
+          as x(id uuid, name text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text, image uuid, board text)
         where f.id = x.id and f.session_id = ${sid}::uuid`,
-    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description, image_id)
+    sql`insert into focus_topics (id, session_id, name, kind, chart, position, max_picks, num_min, num_max, num_unit, quiz_correct, quiz_seconds, description, image_id, board)
         select x.id, ${sid}::uuid, x.name, x.kind, x.chart, x.pos, x."maxPicks", x.min, x.max, x.unit, x."correctIndex", x.seconds, x.description,
-               (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid)
+               (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid), x.board
         from jsonb_to_recordset(${rows(focus.filter((f) => f.isNew))}::jsonb)
-          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text, image uuid)`,
+          as x(id uuid, name text, kind text, chart text, pos int, "maxPicks" int, min float8, max float8, unit text, "correctIndex" int, seconds int, description text, image uuid, board text)`,
     sql`update topics t set name = x.name, position = x.pos, description = x.description,
           image_id = (select i.id from images i where i.id = x.image and i.owner_id = ${ownerId}::uuid)
         from jsonb_to_recordset(${rows(topics.filter((t) => !t.isNew))}::jsonb) as x(id uuid, name text, pos int, description text, image uuid)

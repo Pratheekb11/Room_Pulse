@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defaultChart, isChartFor } from "./charts";
 import { DEFAULT_THEME, THEME_IDS } from "./themes";
+import { BOARD_IDS, MAX_AUTHOR } from "./boards";
 import { MAX_POINT_ASSIGNEE, MAX_POINT_NAME, MAX_POINT_NOTE, MAX_POINT_TEXT } from "./points";
 
 export const codeSchema = z
@@ -75,6 +76,8 @@ const settingsShape = {
   image: z.uuid().nullish(),
   /** Options' and items' pictures, keyed by name like `itemDescriptions`. */
   itemImages: z.record(z.string().max(480), z.uuid()).nullish(),
+  /** Open answers: show them as a board (lib/boards.ts). null = a plain list. */
+  board: z.enum(BOARD_IDS).nullish(),
 };
 
 /** "  Offline  Mode " → "offline mode": how an item description finds its item. */
@@ -82,7 +85,7 @@ export const itemKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowe
 
 export const QUIZ_SECONDS_DEFAULT = 20;
 
-type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null; image?: string | null; itemImages?: Record<string, string> | null };
+type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null; image?: string | null; itemImages?: Record<string, string> | null; board?: string | null };
 const topicName = (t: unknown) => cleanName(typeof t === "string" ? t : (t as { name: string }).name);
 
 function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] } & Settings>(f: T) {
@@ -105,6 +108,7 @@ function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] 
         .map(([name, d]) => [itemKey(name), d]),
     ),
     image: f.image ?? null,
+    board: f.kind === "text" ? (f.board ?? null) : null,
     itemImages: hasOptions(f.kind) ? Object.fromEntries(Object.entries(f.itemImages ?? {}).map(([name, id]) => [itemKey(name), id])) : {},
     // the right option's index; -1 = missing or not one of the options
     correctIndex: isQuiz ? (correct ? f.topics.map(topicName).indexOf(cleanName(correct)) : -1) : null,
@@ -148,6 +152,8 @@ export const createSessionSchema = z.object({
   theme: z.enum(THEME_IDS).default(DEFAULT_THEME),
   /** Fun illustrations (lib/decor.ts) on the big screen and phones. */
   decor: z.boolean().default(true),
+  /** Voters may see the results on their phones from the start (team activities). */
+  showResults: z.boolean().default(false),
   focusTopics: z
     .array(focusTopicSchema)
     .min(1, "Add at least 1 focus topic")
@@ -305,6 +311,14 @@ export const answerSchema = z.discriminatedUnion("kind", [
       .max(MAX_TEXT_ANSWER * 4)
       .transform((t) => t.trim().replace(/\s+/g, " "))
       .pipe(z.string().min(1, "Empty answer").max(MAX_TEXT_ANSWER, `Keep it under ${MAX_TEXT_ANSWER} characters`)),
+    /** Board questions: a name to sign the answer with. Blank = unsigned. Ignored on plain open answers. */
+    author: z
+      .string()
+      .max(MAX_AUTHOR * 4)
+      .transform((t) => t.trim().replace(/\s+/g, " "))
+      .pipe(z.string().max(MAX_AUTHOR, `Keep your name under ${MAX_AUTHOR} characters`))
+      .transform((t) => t || null)
+      .nullish(),
   }),
 ]);
 export type AnswerInput = z.infer<typeof answerSchema>;

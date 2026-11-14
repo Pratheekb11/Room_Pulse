@@ -1,3 +1,4 @@
+import type { BoardId } from "./boards";
 // Shapes returned by the public API. Safe to import from client components.
 
 export interface SessionInfo {
@@ -40,6 +41,8 @@ export interface FocusItem extends NamedItem {
   imageId?: string | null;
   /** Quiz: index of the right option. Only in the owner's copy, never sent to voters. */
   correct?: number | null;
+  /** Open answers: shown as a board (lib/boards.ts); null = a plain list. */
+  board?: BoardId | null;
 }
 
 export interface TopicItem extends NamedItem {
@@ -204,8 +207,12 @@ export interface TextAnswer {
   /** Hidden by the owner: kept in results and exports, never on the big screen. */
   hidden: boolean;
   text: string;
+  /** Board questions: the name the answer is signed with; null = unsigned. */
+  author?: string | null;
   /** ISO time of the latest change. */
   at: string;
+  /** ISO time it was first sent: a board keeps each answer in its spot by this. */
+  created?: string;
 }
 
 /** People who answered a question (pick several, open answer, ranking, number). */

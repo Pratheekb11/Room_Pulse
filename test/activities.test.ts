@@ -12,7 +12,7 @@ import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as publicResults from "@/app/api/results/[code]/public/route";
 import * as answerRoute from "@/app/api/answer/route";
 import { ACTIVITIES, activityToBody } from "@/lib/activities";
-import { BOARDS, boardSpot, leafTilt, MAX_AUTHOR } from "@/lib/boards";
+import { arrivalOrder, BOARDS, boardSpot, leafTilt, MAX_AUTHOR } from "@/lib/boards";
 import { createSessionSchema } from "@/lib/validation";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
 
@@ -193,6 +193,12 @@ describe("board layout", () => {
         for (let j = i + 1; j < pts.length; j++) closest = Math.min(closest, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
       expect(closest).toBeGreaterThan(0.04);
     }
+  });
+
+  it("keeps a leaf in its spot when its answer is edited (ordered by when it was first sent)", () => {
+    const a = { id: "a", at: "2026-11-14T10:05:00.000Z", created: "2026-11-14T10:00:00.000Z" };
+    const b = { id: "b", at: "2026-11-14T10:02:00.000Z", created: "2026-11-14T10:02:00.000Z" };
+    expect(arrivalOrder([b, a]).map((t) => t.id)).toEqual(["a", "b"]);
   });
 
   it("tilts each leaf a little, the same way every time", () => {

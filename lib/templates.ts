@@ -1,3 +1,4 @@
+import type { BoardId } from "./boards";
 import type { QuestionKind } from "./types";
 
 /** One question of a ready-made (or AI-drafted) presentation. */
@@ -10,6 +11,10 @@ export interface QuestionPlan {
   min?: number;
   max?: number;
   unit?: string;
+  /** Open answers: show them as a board (lib/boards.ts). */
+  board?: BoardId;
+  /** Extra words under the question. */
+  description?: string;
 }
 
 export interface PresentationPlan {
@@ -95,6 +100,8 @@ export function planToBody(plan: PresentationPlan) {
       topics: WITH_OPTIONS.includes(q.kind) ? (q.options ?? []) : [],
       ...(q.kind === "number" ? { min: q.min ?? 0, max: q.max ?? 100, unit: q.unit ?? null } : {}),
       ...(q.kind === "quiz" ? { correct: q.options?.[0] ?? null } : {}),
+      ...(q.kind === "text" && q.board ? { board: q.board } : {}),
+      ...(q.description ? { description: q.description } : {}),
     })),
     criteria: hasRating ? ["Impact", "Effort"] : [],
   };

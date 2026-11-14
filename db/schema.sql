@@ -444,3 +444,8 @@ create table if not exists ai_reports (
   people      int  not null,
   created_at  timestamptz not null default now()
 );
+
+-- Team activities (lib/activities.ts, lib/boards.ts): an open answer question can be shown as a
+-- board (leaves on a tree, sticky notes, stars), and each answer on a board can be signed with a name.
+alter table focus_topics add column if not exists board text check (board in ('tree', 'wall', 'sky'));
+alter table text_answers add column if not exists author text check (length(author) between 1 and 30);
