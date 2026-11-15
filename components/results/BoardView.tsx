@@ -7,11 +7,9 @@ import { tree, treeShape } from "@/lib/tree";
 import type { TextAnswer } from "@/lib/types";
 import { useFit } from "../FitToScreen";
 import { ToBody } from "../Portal";
+import { CORK, NIGHT_SKY, NOTE_INK, NOTES, SKY_AREA, SkyArt, Star } from "../BoardArt";
 import { FONT_SHARE, LEAF_INK, LEAVES, LeafShape, leafStyle, TREE_SKY, TreeArt } from "../TreeArt";
 
-// Notes are pastel; stars are gold. (Leaves: components/TreeArt.tsx)
-const NOTES = ["#fff1a8", "#ffd6e0", "#cfe8ff", "#d6f5c9", "#ffe0bf", "#e8dcff"] as const;
-const NOTE_INK = "#2b2620";
 
 const plural = (n: number, w: string) => `${n} ${n === 1 ? w : w === "leaf" ? "leaves" : `${w}s`}`;
 
@@ -59,7 +57,18 @@ function pieceShare(n: number): number {
  * Open answers as a picture: leaves on a tree, sticky notes on a wall or stars in a night sky.
  * Each answer keeps its spot as more arrive. Tap one to show it big (the owner can hide it there).
  */
-export function BoardView({ board, answers, onHide }: { board: BoardId; answers: TextAnswer[]; onHide?: (id: string) => void }) {
+export function BoardView({
+  board,
+  answers,
+  onHide,
+  onNameHidden,
+}: {
+  board: BoardId;
+  answers: TextAnswer[];
+  onHide?: (id: string) => void;
+  /** The owner: hide only the name on a piece, or show it again. */
+  onNameHidden?: (id: string, hidden: boolean) => void;
+}) {
   const ordered = arrivalOrder(answers);
   const [openId, setOpenId] = useState<string | null>(null);
   // phones draw leaves too small to read, so the list starts open there (until it's opened or closed by hand)
@@ -114,6 +123,7 @@ export function BoardView({ board, answers, onHide }: { board: BoardId; answers:
                 }
               : undefined
           }
+          onNameHidden={onNameHidden}
         />
       )}
     </div>
@@ -229,7 +239,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   const font = piece * (art ? FONT_SHARE : 0.1);
   const showText = font * zoom >= 9;
   // where the stars go: most of the sky
-  const area = { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
+  const area = SKY_AREA;
   const label = board === "tree" ? `A tree with ${plural(n, "leaf")}` : `A night sky with ${plural(n, "star")}`;
   // one line beside the zoom buttons: the long wording wrapped on a phone-sized picture
   const one = board === "tree" ? "leaf" : "star";
@@ -257,7 +267,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
             background:
               board === "tree"
                 ? TREE_SKY
-                : `radial-gradient(120% 90% at 50% 100%, ${tinted("#2b3a6b")} 0%, ${tinted("#141a33")} 60%, ${tinted("#0c1024")} 100%)`,
+                : NIGHT_SKY(),
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -352,35 +362,10 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   );
 }
 
-function SkyArt({ w, h }: { w: number; h: number }) {
-  // faint background stars, the same every time
-  const dots = Array.from({ length: 70 }, (_, i) => {
-    const p = boardSpot("sky", i + 400);
-    return { x: p.x * w, y: p.y * h, r: 0.6 + ((i * 7) % 5) * 0.25 };
-  });
-  return (
-    <svg aria-hidden="true" width={w} height={h} className="absolute inset-0">
-      {dots.map((d, i) => (
-        <circle key={i} cx={d.x} cy={d.y} r={d.r} fill="#fff" opacity={0.35} />
-      ))}
-      <circle cx={w * 0.9} cy={h * 0.12} r={Math.max(12, w * 0.035)} fill={tinted("#fbe7a1")} />
-      <circle cx={w * 0.9 + Math.max(12, w * 0.035) * 0.45} cy={h * 0.12 - 4} r={Math.max(12, w * 0.035)} fill={tinted("#141a33")} />
-    </svg>
-  );
-}
-
-function Star({ size }: { size: number }) {
-  return (
-    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" className="drop-shadow-[0_0_6px_rgb(255_220_120/0.7)]">
-      <path d="M12 1.8l2.9 6.6 7.2.7-5.4 4.8 1.6 7.1L12 17.3 5.7 21l1.6-7.1L1.9 9.1l7.2-.7z" fill={tinted("#ffd45e")} />
-    </svg>
-  );
-}
-
 /** Sticky notes on a cork wall, in the order they arrived. */
 function NoteWall({ answers, onOpen }: { answers: TextAnswer[]; onOpen: (id: string) => void }) {
   return (
-    <div className="@container rounded-2xl border border-line-strong p-[clamp(0.75rem,1.6vw,1.6rem)]" style={{ background: tinted("#e9d8b8") }}>
+    <div className="@container rounded-2xl border border-line-strong p-[clamp(0.75rem,1.6vw,1.6rem)]" style={{ background: CORK() }}>
       {answers.length === 0 ? (
         <p className="py-14 text-center text-[clamp(1rem,1.6vw,1.6rem)] font-bold" style={{ color: "#5b4a2e" }}>
           Sticky notes will appear here as people answer.
@@ -422,6 +407,7 @@ function PieceDialog({
   onStep,
   onClose,
   onHide,
+  onNameHidden,
 }: {
   board: BoardId;
   answer: TextAnswer;
@@ -430,6 +416,7 @@ function PieceDialog({
   onStep: (d: number) => void;
   onClose: () => void;
   onHide?: (id: string) => void;
+  onNameHidden?: (id: string, hidden: boolean) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   // the latest handlers: they change on every refresh of the results, and the box must not start over then
@@ -482,6 +469,7 @@ function PieceDialog({
             {board === "sky" && <Star size={48} />}
             <p className={`font-display my-auto ${textSize} ${size === "small" ? "leading-snug" : "leading-tight"} font-semibold [overflow-wrap:anywhere]`}>{answer.text}</p>
             {answer.author && <p className="text-[clamp(1rem,1.8vw,1.6rem)] font-bold opacity-80">— {answer.author}</p>}
+            {!answer.author && answer.nameHidden && onNameHidden && <p className="text-[clamp(0.9rem,1.4vw,1.2rem)] font-bold italic opacity-60">(name hidden)</p>}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button type="button" className={btn} onClick={() => onStep(-1)} aria-label={`Previous ${info.piece}`} disabled={count < 2}>
@@ -496,6 +484,11 @@ function PieceDialog({
             {onHide && (
               <button type="button" className={btn} onClick={() => onHide(answer.id)}>
                 Hide
+              </button>
+            )}
+            {onNameHidden && (answer.author || answer.nameHidden) && (
+              <button type="button" className={btn} onClick={() => onNameHidden(answer.id, !answer.nameHidden)}>
+                {answer.nameHidden ? "Show name" : "Hide name"}
               </button>
             )}
             <button ref={closeRef} type="button" className={btn} onClick={onClose}>

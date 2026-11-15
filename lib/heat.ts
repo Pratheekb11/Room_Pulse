@@ -3,6 +3,7 @@ import { pollTally, rankTally, wordWeights } from "./answers";
 import type { FocusGroup } from "./focus";
 import { avg, cellKey, fmt1, sumAggs, type Agg } from "./stats";
 import type { NamedItem, QuestionKind, ResultsPayload } from "./types";
+import { arrivalOrder, type BoardId } from "./boards";
 
 export interface HeatTile {
   id: string;
@@ -25,6 +26,8 @@ export interface HeatRow {
   name: string;
   kind: QuestionKind;
   tiles: HeatTile[];
+  /** Board questions (team activities): drawn as their board instead of tiles. No hidden answers or names. */
+  board?: { id: BoardId; pieces: { id: string; text: string; author: string | null }[] };
 }
 
 /** Question types with options or words to compare; the others (open answers, Q&A, numbers) are listed as left out. */
@@ -67,6 +70,15 @@ export function heatRows(
   const rows: HeatRow[] = [];
   const skipped: string[] = [];
   groups.forEach((g, groupIndex) => {
+    if (g.kind === "text" && g.board) {
+      const pieces = arrivalOrder(results.texts.filter((t) => t.focusId === g.focus.id && !t.hidden)).map((t) => ({
+        id: t.id,
+        text: t.text,
+        author: t.nameHidden ? null : (t.author ?? null),
+      }));
+      rows.push({ focusId: g.focus.id, groupIndex, name: g.focus.name, kind: g.kind, tiles: [], board: { id: g.board, pieces } });
+      return;
+    }
     if (!SHOWN.has(g.kind)) {
       skipped.push(g.focus.name);
       return;

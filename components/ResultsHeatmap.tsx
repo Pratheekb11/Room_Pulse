@@ -1,6 +1,8 @@
 import { useScaleColor } from "./HeatScale";
 import type { HeatRow } from "@/lib/heat";
 import { kindLabel } from "@/lib/kinds";
+import { countPieces } from "@/lib/boards";
+import { BoardThumb } from "./BoardThumb";
 
 interface Props {
   rows: HeatRow[];
@@ -49,7 +51,16 @@ export function ResultsHeatmap({ rows, skipped, scaleMax, onOpen }: Props) {
               Open
             </button>
           </div>
-          {row.tiles.length === 0 ? (
+          {row.board ? (
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
+              <BoardThumb board={row.board.id} pieces={row.board.pieces} notes={6} className="max-w-[min(100%,26rem)]" />
+              <p className="font-semibold text-ink-soft">
+                {row.board.pieces.length === 0
+                  ? "No answers yet"
+                  : countPieces(row.board.id, row.board.pieces.length)}
+              </p>
+            </div>
+          ) : row.tiles.length === 0 ? (
             <p className="text-ink-soft">No answers yet</p>
           ) : (
             <ul className="grid grid-cols-2 gap-2 sm:[grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr))]">
@@ -86,7 +97,7 @@ export function ResultsHeatmap({ rows, skipped, scaleMax, onOpen }: Props) {
 
       {skipped.length > 0 && (
         <p className="text-[clamp(0.85rem,1vw,1.1rem)] text-ink-soft">
-          Not shown here: {skipped.map((s) => `“${s}”`).join(", ")}. Open answers, Q&amp;A and numbers have no options to compare; see them under “Cards”.
+          Not shown here: {skipped.map((s) => `“${s}”`).join(", ")}. Plain open answers, Q&amp;A and numbers have no options to compare; see them under “Cards”.
         </p>
       )}
     </div>

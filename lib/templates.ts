@@ -13,6 +13,8 @@ export interface QuestionPlan {
   unit?: string;
   /** Open answers: show them as a board (lib/boards.ts). */
   board?: BoardId;
+  /** Boards: how many leaves each person may add (1–10; lib/boards.ts leafLimit, 5 if not set). */
+  maxLeaves?: number;
   /** Extra words under the question. */
   description?: string;
 }
@@ -100,7 +102,7 @@ export function planToBody(plan: PresentationPlan) {
       topics: WITH_OPTIONS.includes(q.kind) ? (q.options ?? []) : [],
       ...(q.kind === "number" ? { min: q.min ?? 0, max: q.max ?? 100, unit: q.unit ?? null } : {}),
       ...(q.kind === "quiz" ? { correct: q.options?.[0] ?? null } : {}),
-      ...(q.kind === "text" && q.board ? { board: q.board } : {}),
+      ...(q.kind === "text" && q.board ? { board: q.board, ...(q.maxLeaves ? { maxLeaves: q.maxLeaves } : {}) } : {}),
       ...(q.description ? { description: q.description } : {}),
     })),
     criteria: hasRating ? ["Impact", "Effort"] : [],

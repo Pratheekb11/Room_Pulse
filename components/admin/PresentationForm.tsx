@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { chartsFor, defaultChart } from "@/lib/charts";
 import { ACTIVITIES } from "@/lib/activities";
-import { BOARDS, isBoard, type BoardId } from "@/lib/boards";
+import { BOARDS, isBoard, MAX_LEAVES, MAX_LEAVES_LIMIT, type BoardId } from "@/lib/boards";
 import { topicColor } from "@/lib/colors";
 import {
   hasOptions,
@@ -65,6 +65,8 @@ interface QuestionDraft {
   image?: string | null;
   /** Open answers: shown as a board (tree, sticky notes, sky); null = a plain list. */
   board?: BoardId | null;
+  /** Boards: how many leaves each person may add; null = the usual 5. */
+  maxLeaves?: number | null;
 }
 
 export type FormMode =
@@ -149,6 +151,7 @@ export function draftsFromPlan(plan: PresentationPlan, firstKey: number): Questi
       correct: q.kind === "quiz" ? (q.options?.[0] ?? "") : d.correct,
       description: q.description ?? null,
       board: q.kind === "text" && isBoard(q.board) ? q.board : null,
+      maxLeaves: q.kind === "text" && isBoard(q.board) ? (q.maxLeaves ?? null) : null,
       chart: q.kind === "text" && isBoard(q.board) ? "board" : d.chart,
     };
   });
@@ -187,7 +190,8 @@ interface Draft {
   showResults?: boolean;
 }
 
-type StartChoice = null | "blank" | { label: string; snapshot: string };
+/** For an activity, `steps` is how to run it, shown to the host under "Started from". */
+type StartChoice = null | "blank" | { label: string; snapshot: string; steps?: string[] };
 
 /** Older drafts kept lists as one-per-line text (topicsText / criteriaText) or plain strings. */
 type StoredDraft = Omit<Draft, "focus" | "criteria"> & {
@@ -252,6 +256,7 @@ function fromSession(s: SessionPayload): Draft {
       description: f.description ?? null,
       image: f.imageId ?? null,
       board: f.board ?? null,
+      maxLeaves: f.maxLeaves ?? null,
     })),
     criteria: rowsFrom(s.criteria),
     theme: isThemeId(s.session.theme) ? s.session.theme : "paper",
@@ -369,6 +374,7 @@ export function PresentationForm({
     image: f.image ?? null,
     itemImages: hasOptions(f.kind) ? imagesOf(f.items) : null,
     board: f.kind === "text" ? (f.board ?? null) : null,
+    maxLeaves: f.kind === "text" && f.board ? (f.maxLeaves ?? null) : null,
   });
   const hasRating = parsed.some((f) => f.kind === "rating");
 
@@ -468,6 +474,7 @@ export function PresentationForm({
         image: f.image ?? null,
         itemImages: hasOptions(f.kind) ? imagesOf(f.items) : undefined,
         board: f.kind === "text" ? (f.board ?? null) : null,
+        maxLeaves: f.kind === "text" && f.board ? (f.maxLeaves ?? null) : null,
       })),
     );
 
@@ -515,12 +522,12 @@ export function PresentationForm({
   const [confirmRestart, setConfirmRestart] = useState(false);
   // Keys differ between renders of the same questions, so leave them out of the comparison.
   const snapshotOf = (t: string, f: QuestionDraft[]) => JSON.stringify([t, f.map((q) => ({ ...q, key: 0 }))]);
-  function applyPlan(plan: PresentationPlan, label: string, shareResults = false) {
+  function applyPlan(plan: PresentationPlan, label: string, shareResults = false, steps?: string[]) {
     const drafts = draftsFromPlan(plan, nextKey.current);
     setTitle(plan.title);
     setFocus(drafts);
     nextKey.current += plan.questions.length;
-    setStart({ label, snapshot: snapshotOf(plan.title, drafts) });
+    setStart({ label, snapshot: snapshotOf(plan.title, drafts), ...(steps?.length ? { steps } : {}) });
     // activities are watched together: everyone sees the tree fill up on their phone
     setShowResults(shareResults);
   }
@@ -711,6 +718,17 @@ export function PresentationForm({
             </button>
           </div>
         )}
+        {/* An activity: how to run it, for the host (kept with the start, so a refresh keeps it). */}
+        {!editing && start !== null && start !== "blank" && start.steps && (
+          <details className="mt-2 rounded-lg border border-line px-3 py-2 text-sm">
+            <summary className="cursor-pointer font-semibold">How to run it</summary>
+            <ol className="mt-2 mb-1 list-decimal space-y-1 pl-5">
+              {start.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </details>
+        )}
         {!editing && start === "blank" && pristine && (
           <p className="mt-4 text-sm text-ink-soft">
             Writing your own questions.{" "}
@@ -763,7 +781,7 @@ export function PresentationForm({
                 <button
                   key={a.id}
                   type="button"
-                  onClick={() => applyPlan(a.plan, `the “${a.label}” activity`, true)}
+                  onClick={() => applyPlan(a.plan, `the “${a.label}” activity`, true, a.steps)}
                   className="rounded-lg border border-line-strong bg-white px-3 py-2.5 text-left hover:bg-canvas"
                 >
                   <span className="flex items-baseline justify-between gap-2">
@@ -1182,9 +1200,28 @@ export function PresentationForm({
                       </div>
                       <p className="mt-1 text-xs text-ink-soft">
                         {f.board
-                          ? `${BOARDS.find((b) => b.id === f.board)!.blurb}. People can sign theirs with a name if they like.`
-                          : "Answers are anonymous. Pick a picture for team activities: people can sign theirs with a name."}
+                          ? `${BOARDS.find((b) => b.id === f.board)!.blurb}. Each one shows its writer's name.`
+                          : "Answers are anonymous. Pick a picture for team activities: each answer shows its writer's name."}
                       </p>
+                      {f.board && (
+                        <label className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                          <span className="font-semibold">How many {f.board === "tree" ? "leaves" : f.board === "wall" ? "notes" : "stars"} each person can add</span>
+                          <select
+                            value={f.maxLeaves ?? MAX_LEAVES}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              update(f.key, { maxLeaves: n === MAX_LEAVES ? null : n });
+                            }}
+                            className="rounded-md border border-line-strong bg-white px-2 py-1 font-bold tabular-nums"
+                          >
+                            {Array.from({ length: MAX_LEAVES_LIMIT }, (_, i) => i + 1).map((n) => (
+                              <option key={n} value={n}>
+                                {n}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                     </div>
                   )}
 

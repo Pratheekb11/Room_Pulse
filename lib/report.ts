@@ -8,6 +8,7 @@ import { rateItems } from "./rank-items";
 import { resultSignals } from "./signals";
 import { avg, cellKey, indexCells, topicHistograms } from "./stats";
 import type { AiReport, LeaderRow, OpenPoint, QuestionKind, ResultsPayload, SessionPayload } from "./types";
+import { arrivalOrder, countPieces, type BoardId } from "./boards";
 
 export interface ReportRow {
   name: string;
@@ -39,8 +40,11 @@ export interface ReportSection {
   /** The analysis: what the numbers say, most important first. */
   highlights: string[];
   rows: ReportRow[];
-  /** What people wrote: open answers, or audience questions. */
+  /** What people wrote: open answers (with the name on a board, "Growth — Ana"), or audience questions. */
   texts: string[];
+  /** Open answers shown as a board (team activities): which one, and its pieces in the order they arrived. */
+  board: BoardId | null;
+  pieces: { id: string; text: string; author: string | null }[];
   /** A footnote, e.g. about hidden answers. */
   note: string | null;
   /** The AI's insight for this question, when a summary was made. */
@@ -69,7 +73,7 @@ const andList = (names: string[]) => (names.length <= 1 ? names.join("") : `${na
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const f1 = (v: number) => v.toFixed(1);
 
-type Built = Pick<ReportSection, "people" | "highlights" | "rows" | "texts" | "note"> & { answered: boolean };
+type Built = Pick<ReportSection, "people" | "highlights" | "rows" | "texts" | "note"> & { answered: boolean; pieces?: ReportSection["pieces"] };
 const NOTHING = "No answers yet.";
 
 function build(g: FocusGroup, info: SessionPayload, r: ResultsPayload, cells: ReturnType<typeof indexCells>, histograms: Map<string, number[]>): Built {
@@ -201,6 +205,12 @@ function build(g: FocusGroup, info: SessionPayload, r: ResultsPayload, cells: Re
       const hidden = mine.length - shown.length;
       const note = hidden ? `${count(hidden, "answer")} hidden by the presenter ${hidden === 1 ? "is" : "are"} left out.` : null;
       if (!shown.length) return { ...empty, people: respondents, note };
+      if (g.board) {
+        // a board keeps each answer's name (unless the presenter hid it), in the order they arrived
+        const pieces = arrivalOrder(shown).map((t) => ({ id: t.id, text: t.text, author: t.nameHidden ? null : (t.author ?? null) }));
+        const texts = pieces.map((p) => (p.author ? `${p.text} — ${p.author}` : p.text));
+        return { people: respondents, highlights: [`${countPieces(g.board, pieces.length)} from ${count(respondents, "person", "people")}.`], rows: [], texts, pieces, note, answered: true };
+      }
       return { people: respondents, highlights: [`${count(shown.length, "answer")}.`], rows: [], texts: shown.map((t) => t.text), note, answered: true };
     }
 
@@ -262,6 +272,8 @@ export function buildReport(info: SessionPayload, r: ResultsPayload, extra: { po
       highlights: b.highlights,
       rows: b.rows,
       texts: b.texts,
+      board: g.kind === "text" ? (g.board ?? null) : null,
+      pieces: b.pieces ?? [],
       note: b.note,
       insight: ai?.questions.find((q) => q.focusId === g.focus.id)?.insight ?? null,
     };

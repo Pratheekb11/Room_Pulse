@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Logo } from "../Logo";
 import { Picture } from "../Picture";
+import { BoardThumb } from "../BoardThumb";
 import { CenteredMessage, LoadingScreen } from "../StatusScreens";
 import { isOverdue, pointCounts, sortPoints, statusLabel } from "@/lib/points";
 import type { Report, ReportRow, ReportSection } from "@/lib/report";
@@ -243,6 +244,11 @@ function Section({ s, people }: { s: ReportSection; people: number }) {
             <Row key={`${r.name}-${i}`} r={r} />
           ))}
         </ol>
+      )}
+      {s.board && s.pieces.length > 0 && (
+        <div className="report-keep mt-3 max-w-md">
+          <BoardThumb board={s.board} pieces={s.pieces} notes={9} />
+        </div>
       )}
       {s.texts.length > 0 && (
         <ul className="mt-2 flex flex-col gap-1.5">

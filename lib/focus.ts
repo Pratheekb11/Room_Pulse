@@ -19,6 +19,8 @@ export interface FocusGroup {
   chart: string;
   /** Open answers shown as a board (lib/boards.ts); null = a plain list. */
   board?: BoardId | null;
+  /** Boards: how many leaves each person may add (null = the usual 5). */
+  maxLeaves?: number | null;
   /** `index` is the topic's position in the whole presentation (drives its colour). */
   topics: { item: TopicItem; index: number }[];
 }
@@ -38,6 +40,7 @@ export function groupByFocus(
           kind,
           chart: f.chart ?? defaultChart(kind),
           board: f.board ?? null,
+          maxLeaves: f.maxLeaves ?? null,
           maxPicks: f.maxPicks ?? null,
           min: f.min ?? null,
           max: f.max ?? null,

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defaultChart, isChartFor } from "./charts";
 import { DEFAULT_THEME, THEME_IDS } from "./themes";
-import { BOARD_IDS, MAX_AUTHOR, MAX_LEAVES } from "./boards";
+import { BOARD_IDS, MAX_AUTHOR, MAX_LEAVES_LIMIT } from "./boards";
 import { MAX_POINT_ASSIGNEE, MAX_POINT_NAME, MAX_POINT_NOTE, MAX_POINT_TEXT } from "./points";
 
 export const codeSchema = z
@@ -78,6 +78,8 @@ const settingsShape = {
   itemImages: z.record(z.string().max(480), z.uuid()).nullish(),
   /** Open answers: show them as a board (lib/boards.ts). null = a plain list. */
   board: z.enum(BOARD_IDS).nullish(),
+  /** Boards: how many leaves each person may add. null = the usual 5. */
+  maxLeaves: z.number().int().min(1, "Allow at least 1").max(MAX_LEAVES_LIMIT, `Allow at most ${MAX_LEAVES_LIMIT}`).nullish(),
 };
 
 /** "  Offline  Mode " → "offline mode": how an item description finds its item. */
@@ -92,7 +94,7 @@ function boardChart(kind: Kind, board: string | null, chart: string | null): str
   return chart ?? "board";
 }
 
-type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null; image?: string | null; itemImages?: Record<string, string> | null; board?: string | null };
+type Settings = { maxPicks?: number | null; min?: number | null; max?: number | null; unit?: string | null; correct?: string | null; seconds?: number | null; description?: string | null; itemDescriptions?: Record<string, string> | null; image?: string | null; itemImages?: Record<string, string> | null; board?: string | null; maxLeaves?: number | null };
 const topicName = (t: unknown) => cleanName(typeof t === "string" ? t : (t as { name: string }).name);
 
 function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] } & Settings>(f: T) {
@@ -116,6 +118,7 @@ function withSettings<T extends { kind: Kind; chart?: string; topics: unknown[] 
     ),
     image: f.image ?? null,
     board: f.kind === "text" ? (f.board ?? null) : null,
+    maxLeaves: f.kind === "text" && f.board ? (f.maxLeaves ?? null) : null,
     itemImages: hasOptions(f.kind) ? Object.fromEntries(Object.entries(f.itemImages ?? {}).map(([name, id]) => [itemKey(name), id])) : {},
     // the right option's index; -1 = missing or not one of the options
     correctIndex: isQuiz ? (correct ? f.topics.map(topicName).indexOf(cleanName(correct)) : -1) : null,
@@ -320,8 +323,8 @@ export const answerSchema = z.discriminatedUnion("kind", [
       .transform((t) => t.trim().replace(/\s+/g, " "))
       .pipe(z.string().min(1, "Empty answer").max(MAX_TEXT_ANSWER, `Keep it under ${MAX_TEXT_ANSWER} characters`))
       .optional(),
-    /** Board questions: which of the person's leaves this is (0…MAX_LEAVES-1). Plain open answers always use 0. */
-    slot: z.number().int().min(0).max(MAX_LEAVES - 1).default(0),
+    /** Board questions: which of the person's leaves this is (0 up to the board's limit − 1, checked when saving). Plain open answers always use 0. */
+    slot: z.number().int().min(0).max(MAX_LEAVES_LIMIT - 1).default(0),
     /** Board questions: take this leaf back. */
     remove: z.boolean().optional(),
     /** Board questions: a name to sign the answer with. Blank = unsigned. Ignored on plain open answers. */
@@ -375,8 +378,10 @@ export const qaModerateSchema = z
   .object({ id: z.uuid(), hidden: z.boolean().optional(), answered: z.boolean().optional() })
   .refine((m) => m.hidden !== undefined || m.answered !== undefined, "Nothing to change");
 
-/** Owner moderation of an open answer. */
-export const textModerateSchema = z.object({ id: z.uuid(), hidden: z.boolean() });
+/** Owner moderation of an open answer: hide it, or just the name it's signed with (at least one). */
+export const textModerateSchema = z
+  .object({ id: z.uuid(), hidden: z.boolean().optional(), nameHidden: z.boolean().optional() })
+  .refine((m) => m.hidden !== undefined || m.nameHidden !== undefined, "Nothing to change");
 
 /** AI insights on one question's answers. */
 export const aiActionSchema = z.union([

@@ -25,17 +25,28 @@ export const BOARDS: BoardInfo[] = [
 export const isBoard = (v: unknown): v is BoardId => typeof v === "string" && (BOARD_IDS as readonly string[]).includes(v);
 export const boardInfo = (id: BoardId) => BOARDS.find((b) => b.id === id)!;
 
+/** "1 leaf", "3 leaves", "2 notes", "0 stars". */
+export function countPieces(board: BoardId, n: number): string {
+  const one = boardInfo(board).piece;
+  return `${n} ${n === 1 ? one : one === "leaf" ? "leaves" : `${one}s`}`;
+}
+
 /** Longest name someone may sign their answer with. */
 export const MAX_AUTHOR = 30;
 
-/** Leaves (notes, stars) one person may add to one board. */
+/** Leaves (notes, stars) one person may add to one board, unless the board says otherwise. */
 export const MAX_LEAVES = 5;
+/** The most a board may allow (its leaf numbers, slots, run 0 to 9). */
+export const MAX_LEAVES_LIMIT = 10;
+
+/** How many leaves one person may add to this board. */
+export const leafLimit = (f: { maxLeaves?: number | null }) => f.maxLeaves ?? MAX_LEAVES;
 
 /** The voter page's save key for one leaf: "<question id>#<slot>". */
 export const leafKey = (focusId: string, slot: number) => `${focusId}#${slot}`;
 export function parseLeafKey(key: string): { focusId: string; slot: number } | null {
   const m = /^(.+)#([0-9])$/.exec(key);
-  return m && Number(m[2]) < MAX_LEAVES ? { focusId: m[1], slot: Number(m[2]) } : null;
+  return m ? { focusId: m[1], slot: Number(m[2]) } : null;
 }
 
 /** How big to set a leaf's words when it's shown on its own: a few words big, a paragraph smaller. */

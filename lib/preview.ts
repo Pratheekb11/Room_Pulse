@@ -43,11 +43,13 @@ export interface PreviewQuestion {
   itemImages?: Record<string, string>;
   /** Open answers shown as a board (lib/boards.ts). */
   board?: BoardId | null;
+  /** Boards: how many leaves each person may add. */
+  maxLeaves?: number | null;
 }
 
 /** Builder drafts as preview slides: blank names and option lists get placeholders. */
 export function previewQuestions(
-  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null; description?: string | null; itemDescriptions?: Record<string, string>; image?: string | null; itemImages?: Record<string, string>; board?: BoardId | null }[],
+  drafts: { kind: QuestionKind; name: string; options: string[]; min?: number; max?: number; unit?: string | null; maxPicks?: number | null; description?: string | null; itemDescriptions?: Record<string, string>; image?: string | null; itemImages?: Record<string, string>; board?: BoardId | null; maxLeaves?: number | null }[],
 ): PreviewQuestion[] {
   return drafts.map((d, i) => {
     const focusId = `preview-${i}`;

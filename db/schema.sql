@@ -459,3 +459,10 @@ begin
     alter table text_answers add constraint text_answers_pkey primary key (focus_id, voter_id, slot);
   end if;
 end $$;
+
+-- Finishing team activities (2026-11-15): how many leaves each person may add to a board (1 to 10,
+-- null = 5, lib/boards.ts leafLimit), so slots go up to 9; and hiding just the name on a board answer.
+alter table focus_topics add column if not exists max_leaves int check (max_leaves between 1 and 10);
+alter table text_answers add column if not exists author_hidden boolean not null default false;
+alter table text_answers drop constraint if exists text_answers_slot_check;
+alter table text_answers add constraint text_answers_slot_check check (slot between 0 and 9);

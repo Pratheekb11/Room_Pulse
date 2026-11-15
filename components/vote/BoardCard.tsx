@@ -15,6 +15,8 @@ interface Props {
   board: BoardId;
   /** This person's leaves by slot; "" = an empty slot (never written, or taken back). */
   leaves: string[];
+  /** How many leaves each person may add to this board (lib/boards.ts leafLimit). */
+  maxLeaves?: number;
   /** Save state of their leaves. */
   status?: SaveStatus;
   disabled: boolean;
@@ -40,11 +42,11 @@ const plural = (piece: string) => (piece === "leaf" ? "leaves" : `${piece}s`);
  * change one, or take one back. Each one carries the person's name (team building is about
  * knowing who said what), and bad words are kept off the board.
  */
-export function BoardCard({ question, color, board, leaves, status, disabled, author = "", seeHref, onSave, onRemove, finished = false, onFinish }: Props) {
+export function BoardCard({ question, color, board, leaves, maxLeaves = MAX_LEAVES, status, disabled, author = "", seeHref, onSave, onRemove, finished = false, onFinish }: Props) {
   const piece = boardInfo(board).piece;
   const pieces = plural(piece);
   const mine = leaves.map((text, slot) => ({ text, slot })).filter((l) => l.text);
-  const freeSlot = Array.from({ length: MAX_LEAVES }, (_, i) => i).find((i) => !leaves[i]);
+  const freeSlot = Array.from({ length: maxLeaves }, (_, i) => i).find((i) => !leaves[i]);
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [name, setName] = useState(author);
@@ -74,7 +76,7 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
         {mine.length > 0 && (
           <section aria-labelledby="mine-h">
             <h3 id="mine-h" className="text-sm font-bold text-ink-soft">
-              Your {pieces} ({mine.length} of {MAX_LEAVES})
+              Your {pieces} ({mine.length} of {maxLeaves})
             </h3>
             <ul className="mt-2 flex flex-col gap-2">
               {mine.map((l) => (
@@ -122,7 +124,7 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
 
         {full ? (
           <p className="rounded-lg bg-canvas px-3 py-2 text-sm">
-            That&rsquo;s {MAX_LEAVES} {pieces}, the most each person can add. Change or remove one to add something else.
+            That&rsquo;s {maxLeaves} {maxLeaves === 1 ? piece : pieces}, the most each person can add. Change or remove one to add something else.
           </p>
         ) : (
           <form onSubmit={save} className="flex flex-col gap-3">
@@ -189,7 +191,7 @@ export function BoardCard({ question, color, board, leaves, status, disabled, au
             </div>
             <p className="text-right text-xs font-semibold text-ink-soft">
               {`Your ${piece} goes ${ON[board]} with your name, for everyone to see.`}
-              {mine.length === 0 ? ` You can add up to ${MAX_LEAVES} ${pieces}.` : ""}
+              {mine.length === 0 ? maxLeaves === 1 ? ` You can add one ${piece}.` : ` You can add up to ${maxLeaves} ${pieces}.` : ""}
             </p>
           </form>
         )}

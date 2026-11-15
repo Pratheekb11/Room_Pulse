@@ -26,6 +26,8 @@ import { WordCloud, WordList } from "./WordCloud";
 import { chartsFor, isChartFor } from "@/lib/charts";
 import { ScoreLegend } from "./Donut";
 import { Heatmap } from "./Heatmap";
+import { activityFor } from "@/lib/activities";
+import { HowToRun } from "./results/HowToRun";
 import { MoreMenu, QuestionDescription, QuestionTabs, QuestionTitle, ResultCard, ScreenHeader, VotingPills, menuItem } from "./ScreenChrome";
 import { HeatScale } from "./HeatScale";
 import { LiveBadge } from "./LiveBadge";
@@ -285,6 +287,8 @@ function Stage({
       onAddPoint={pointsState.add}
     />
   );
+  /** Made from a team activity: the host's steps (matched by its title). */
+  const howTo = activityFor(session.title);
   /** People who answered one question. */
   const peopleIn = (focusId: string) => r.respondents.find((x) => x.focusId === focusId)?.n ?? 0;
 
@@ -446,6 +450,7 @@ function Stage({
         <main className="min-w-0 flex-1">
           {showPoints && <OpenPoints code={code} state={pointsState} groups={groups} onClose={closePoints} />}
           <div className={showPoints ? "hidden" : undefined}>
+          {isOwner && !audience && !fit && howTo && <HowToRun activity={howTo} />}
           {!single && (
             <QuestionTabs compact={fit} names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />
           )}

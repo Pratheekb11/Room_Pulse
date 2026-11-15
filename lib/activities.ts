@@ -39,7 +39,7 @@ export const ACTIVITIES: Activity[] = [
           kind: "text",
           board: "tree",
           name: "What motivates you at work?",
-          description: "Write it on your leaf. Add your name if you like.",
+          description: "Write it on your leaf. Your name goes on it.",
         },
       ],
     },
@@ -187,9 +187,121 @@ export const ACTIVITIES: Activity[] = [
       ],
     },
   },
+  {
+    id: "two-truths",
+    icon: "cards",
+    label: "Two truths and a lie",
+    blurb: "Three facts each, one made up: can the team spot it?",
+    minutes: 20,
+    steps: [
+      "Everyone writes three short notes about themselves: two true, one made up. Their name goes on them.",
+      "Pick a person. Read their three notes out in the order they appear on the wall: the first, the second, the third.",
+      "Everyone guesses the lie in the next question. Then the person tells the room which one it was.",
+      "Do as many people as you have rounds. To play more, edit the presentation and add another round.",
+    ],
+    plan: {
+      title: "Two truths and a lie",
+      questions: [
+        {
+          kind: "text",
+          board: "wall",
+          maxLeaves: 3,
+          name: "Two truths and a lie about you",
+          description: "Three notes: two true, one made up. Keep them short.",
+        },
+        { kind: "poll", name: "Round 1: which one is the lie?", options: ["The first", "The second", "The third"] },
+        { kind: "poll", name: "Round 2: which one is the lie?", options: ["The first", "The second", "The third"] },
+        { kind: "poll", name: "Round 3: which one is the lie?", options: ["The first", "The second", "The third"] },
+        { kind: "poll", name: "Round 4: which one is the lie?", options: ["The first", "The second", "The third"] },
+      ],
+    },
+  },
+  {
+    id: "gratitude-jar",
+    icon: "jar",
+    label: "Gratitude jar",
+    blurb: "Small things we're thankful for, one note each",
+    minutes: 10,
+    steps: [
+      "Ask everyone to add something they're thankful for this week: a person, a moment, a small win.",
+      "Read a few notes out. No need to discuss: just let them land.",
+      "End the meeting on it. It works well before a holiday or after a hard sprint.",
+    ],
+    plan: {
+      title: "Our gratitude jar",
+      questions: [
+        { kind: "text", board: "wall", name: "Something you're thankful for this week", description: "Big or small, at work or not." },
+      ],
+    },
+  },
+  {
+    id: "time-capsule",
+    icon: "capsule",
+    label: "Time capsule",
+    blurb: "Hopes and guesses for the year, to open together next year",
+    minutes: 15,
+    steps: [
+      "Everyone writes a message to the team a year from now: a hope, a guess, a worry.",
+      "Then one word for how this year felt.",
+      "Download the report (PDF) when you're done and keep it somewhere safe.",
+      "Put a date in the calendar for next year, and open the capsule together.",
+    ],
+    plan: {
+      title: "Our time capsule",
+      questions: [
+        { kind: "text", board: "wall", name: "A message to our team a year from now", description: "A hope, a guess or a worry. We'll read it next year." },
+        { kind: "words", name: "This year in one word" },
+      ],
+    },
+  },
+  {
+    id: "team-map",
+    icon: "pin",
+    label: "Team map",
+    blurb: "Where everyone joins from, in one cloud",
+    minutes: 5,
+    steps: [
+      "Ask everyone where they're joining from today: a city, a town, or just \"home\".",
+      "Look at the cloud: the big words are where most of us are.",
+      "Ask the people furthest away what the weather's like there.",
+    ],
+    plan: {
+      title: "Our team map",
+      questions: [
+        { kind: "words", name: "Where are you joining from today?", description: "Your city or town." },
+        { kind: "words", name: "One place you'd love to work from for a week" },
+      ],
+    },
+  },
+  {
+    id: "bucket-list",
+    icon: "sparkle",
+    label: "Bucket list",
+    blurb: "Things we'd love to do one day, as stars",
+    minutes: 15,
+    steps: [
+      "Everyone adds things they'd love to do one day. Each one becomes a star with their name.",
+      "Tap a few stars and ask the person to tell the story behind it.",
+      "Look for ones you could do together as a team.",
+    ],
+    plan: {
+      title: "Our bucket list",
+      questions: [
+        { kind: "text", board: "sky", maxLeaves: 3, name: "Something you'd love to do one day", description: "Up to three. Dream big." },
+      ],
+    },
+  },
 ];
 
 /** The create-presentation request for an activity: results are on phones from the start. */
 export function activityToBody(a: Activity) {
   return { ...planToBody(a.plan), showResults: true };
+}
+
+/**
+ * The activity a presentation was made from, matched by its title (the plan's title, exactly as made),
+ * so the results screen can show the host how to run it. Null if the title was changed or it's not one.
+ */
+export function activityFor(title: string): Activity | null {
+  return ACTIVITIES.find((a) => a.plan.title === title.trim()) ?? null;
 }

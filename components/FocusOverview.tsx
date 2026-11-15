@@ -5,6 +5,8 @@ import { avg, cellKey, fmt1, sumAggs, type Agg } from "@/lib/stats";
 import { formatNumber, numberStats, pollTally, qaOrder, rankTally, wordWeights } from "@/lib/answers";
 import { kindLabel } from "@/lib/kinds";
 import type { NamedItem, ResultsPayload } from "@/lib/types";
+import { arrivalOrder, countPieces } from "@/lib/boards";
+import { BoardThumb } from "./BoardThumb";
 
 interface Props {
   groups: FocusGroup[];
@@ -67,6 +69,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
           const count =
             g.kind === "poll" && tally ? plural(tally.total, "vote", "votes")
             : g.kind === "words" ? plural(cloud.reduce((s, w) => s + w.n, 0), "answer", "answers")
+            : g.kind === "text" && g.board ? countPieces(g.board, texts.length)
             : g.kind === "text" ? plural(texts.length, "answer", "answers")
             : g.kind === "qa" ? plural(asked.length, "question", "questions")
             : g.kind === "quiz" ? plural(quizAnswers, "answer", "answers")
@@ -92,7 +95,15 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
                   <span className="font-semibold text-ink-soft">{stats.mean === null ? "no answers yet" : `average${g.unit ? ` ${g.unit}` : ""}`}</span>
                 </p>
               )}
-              {g.kind === "text" && (
+              {g.kind === "text" && g.board && (
+                <BoardThumb
+                  board={g.board}
+                  pieces={arrivalOrder(texts).map((t) => ({ id: t.id, text: t.text, author: t.nameHidden ? null : t.author }))}
+                  notes={6}
+                  className="mt-4"
+                />
+              )}
+              {g.kind === "text" && !g.board && (
                 <ul className="mt-4 flex flex-col gap-1.5">
                   {texts.slice(0, 3).map((t) => (
                     <li key={`${t.at}:${t.text}`} className="truncate rounded-lg bg-canvas px-2.5 py-1.5 text-[clamp(0.95rem,1.2vw,1.4rem)] font-semibold" title={t.text}>

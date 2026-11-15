@@ -82,9 +82,9 @@ describe("the phone's card for a board question", () => {
     expect(leafCard({ leaves: ["Growth"], finished: true })).not.toContain("all from me");
   });
 
-  it("counts a board as done only at 5 leaves or when the person says so", () => {
+  it("counts a board as done only at its leaf limit (5 unless set) or when the person says so", () => {
     const src = readFileSync(new URL("../components/VoteApp.tsx", import.meta.url), "utf8");
-    expect(src).toContain("v.filter((t) => t).length >= MAX_LEAVES || (v.some((t) => t) && finished.includes(g.focus.id))");
+    expect(src).toContain("v.filter((t) => t).length >= leafLimit(g) || (v.some((t) => t) && finished.includes(g.focus.id))");
     expect(src).toMatch(/<BoardCard[\s\S]*?finished=\{finished\.includes\(group\.focus\.id\)\}[\s\S]*?onFinish=\{\(\) => onFinish\(here\.gi\)\}/);
   });
 
@@ -158,7 +158,7 @@ describe("the builder", () => {
     const { draftsFromPlan } = await import("@/components/admin/PresentationForm");
     const { ACTIVITIES } = await import("@/lib/activities");
     const [leaf] = draftsFromPlan(ACTIVITIES[0].plan, 0);
-    expect(leaf).toMatchObject({ kind: "text", board: "tree", chart: "board", description: "Write it on your leaf. Add your name if you like." });
+    expect(leaf).toMatchObject({ kind: "text", board: "tree", chart: "board", description: "Write it on your leaf. Your name goes on it." });
     const [poll] = draftsFromPlan({ title: "x", questions: [{ kind: "poll", name: "Coffee?", options: ["Yes", "No"] }] }, 0);
     expect(poll.board).toBeNull();
   });

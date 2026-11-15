@@ -199,6 +199,7 @@ function PhoneSlide({
               question={q.name}
               color={color}
               board={q.board}
+              maxLeaves={q.maxLeaves ?? undefined}
               leaves={Array.isArray(value) ? (value as string[]) : []}
               disabled={false}
               onSave={(slot, text) => set(Object.assign([...(Array.isArray(value) ? (value as string[]) : [])], { [slot]: text }))}

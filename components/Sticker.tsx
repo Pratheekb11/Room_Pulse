@@ -127,6 +127,20 @@ export const STICKERS = {
       <path d="M13 13l2.5 2.5L20.5 10" {...S} fill="none" />
     </>
   ),
+  jar: (
+    <>
+      <rect x="9" y="3" width="14" height="5" rx="1.5" fill={BARK} {...S} />
+      <path d="M10 8h12c0 2 3 3 3 7v10c0 2-1.5 4-4 4H11c-2.5 0-4-2-4-4V15c0-4 3-5 3-7z" fill={SKY} {...S} />
+      <path d="M16 24.5s-4.2-2.5-4.2-5.2c0-1.4 1-2.4 2.3-2.4.9 0 1.5.5 1.9 1.1.4-.6 1-1.1 1.9-1.1 1.3 0 2.3 1 2.3 2.4 0 2.7-4.2 5.2-4.2 5.2z" fill={PEACH} {...S} />
+    </>
+  ),
+  capsule: (
+    <>
+      <path d="M7 4h18M7 28h18" {...S} />
+      <path d="M9 4c0 6 7 8 7 12s-7 6-7 12h14c0-6-7-8-7-12s7-6 7-12z" fill={PAPER} {...S} />
+      <path d="M11.5 26.5c.8-3 4.5-4.5 4.5-6.5 0 2 3.7 3.5 4.5 6.5zM12.5 8.5h7c-1 1.8-3.5 3-3.5 4.5 0-1.5-2.5-2.7-3.5-4.5z" fill={SUN} {...S} strokeWidth={1.5} />
+    </>
+  ),
 } as const;
 
 export type StickerName = keyof typeof STICKERS;

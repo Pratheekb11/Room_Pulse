@@ -33,25 +33,37 @@ export function TextAnswers({
 }) {
   // Changes made here show at once, before the next results refresh confirms them.
   const [changes, setChanges] = useState<Record<string, boolean>>({});
+  // names hidden or shown again here (the server leaves a hidden name out of the results)
+  const [nameChanges, setNameChanges] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
-  const merged = answers.map((a) => (a.id in changes ? { ...a, hidden: changes[a.id] } : a));
+  const merged = answers.map((a) => {
+    const b = a.id in changes ? { ...a, hidden: changes[a.id] } : a;
+    if (!(a.id in nameChanges)) return b;
+    const nameHidden = nameChanges[a.id];
+    return { ...b, nameHidden, author: nameHidden ? null : b.author };
+  });
   const shown = visibleTexts(merged, focusId);
   const hidden = merged.filter((a) => a.focusId === focusId && a.hidden);
 
-  async function setHidden(id: string, value: boolean) {
-    setChanges((m) => ({ ...m, [id]: value }));
+  async function save(
+    id: string,
+    change: { hidden: boolean } | { nameHidden: boolean },
+    set: typeof setChanges,
+    value: boolean,
+  ) {
+    set((m) => ({ ...m, [id]: value }));
     setError(null);
     try {
       const res = await fetch(`/api/admin/sessions/${encodeURIComponent(code)}/text`, {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, hidden: value }),
+        body: JSON.stringify({ id, ...change }),
       });
       if (!res.ok) throw new Error(String(res.status));
     } catch {
-      setChanges((m) => {
+      set((m) => {
         const next = { ...m };
         delete next[id];
         return next;
@@ -59,8 +71,12 @@ export function TextAnswers({
       setError("That change didn't save. Try again.");
     }
   }
+  const setHidden = (id: string, value: boolean) => save(id, { hidden: value }, setChanges, value);
+  /** Hide only the name on an answer (a rude or wrong name), or show it again. */
+  const setNameHidden = (id: string, value: boolean) => save(id, { nameHidden: value }, setNameChanges, value);
 
   const onHide = owner ? (id: string) => void setHidden(id, true) : undefined;
+  const onNameHidden = owner ? (id: string, value: boolean) => void setNameHidden(id, value) : undefined;
   return (
     <div>
       {error && (
@@ -69,7 +85,7 @@ export function TextAnswers({
         </p>
       )}
       {view === "board" && board ? (
-        <BoardView board={board} answers={shown} onHide={onHide} />
+        <BoardView board={board} answers={shown} onHide={onHide} onNameHidden={onNameHidden} />
       ) : view === "spotlight" ? (
         <TextSpotlight answers={shown} onHide={onHide} />
       ) : (

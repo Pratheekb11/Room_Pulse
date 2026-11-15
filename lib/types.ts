@@ -43,6 +43,8 @@ export interface FocusItem extends NamedItem {
   correct?: number | null;
   /** Open answers: shown as a board (lib/boards.ts); null = a plain list. */
   board?: BoardId | null;
+  /** Boards: how many leaves each person may add; null = the usual 5 (lib/boards.ts leafLimit). */
+  maxLeaves?: number | null;
 }
 
 export interface TopicItem extends NamedItem {
@@ -207,8 +209,10 @@ export interface TextAnswer {
   /** Hidden by the owner: kept in results and exports, never on the big screen. */
   hidden: boolean;
   text: string;
-  /** Board questions: the name the answer is signed with; null = unsigned. */
+  /** Board questions: the name the answer is signed with; null = unsigned, or hidden by the owner. */
   author?: string | null;
+  /** The owner hid the name (the answer itself still shows). The name is never sent. */
+  nameHidden?: boolean;
   /** ISO time of the latest change. */
   at: string;
   /** ISO time it was first sent: a board keeps each answer in its spot by this. */

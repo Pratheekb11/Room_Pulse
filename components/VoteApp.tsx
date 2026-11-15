@@ -28,12 +28,12 @@ import { useDocumentTheme } from "./useDocumentTheme";
 import { Doodle } from "./Doodle";
 import { RaisePoint } from "./vote/RaisePoint";
 import { charactersFor, type Character } from "@/lib/decor";
-import { leafKey, MAX_AUTHOR, MAX_LEAVES, parseLeafKey } from "@/lib/boards";
+import { leafKey, leafLimit, MAX_AUTHOR, MAX_LEAVES_LIMIT, parseLeafKey } from "@/lib/boards";
 import { BoardCard } from "./vote/BoardCard";
 
 /** The save state to show for a board: the most worrying of its leaves'. */
 function leafStatus(statuses: Record<string, SaveStatus>, focusId: string): SaveStatus | undefined {
-  const all = Array.from({ length: MAX_LEAVES }, (_, i) => statuses[leafKey(focusId, i)]);
+  const all = Array.from({ length: MAX_LEAVES_LIMIT }, (_, i) => statuses[leafKey(focusId, i)]);
   return (["closed", "error", "retrying", "saving", "saved"] as const).find((s) => all.includes(s));
 }
 
@@ -104,7 +104,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           return typeof v === "number" && v >= (g.min ?? 0) && v <= (g.max ?? 100);
         case "text":
           // board questions keep each person's leaves by slot ("" = empty)
-          return g.board ? Array.isArray(v) && v.length <= MAX_LEAVES && v.every((t) => typeof t === "string") : typeof v === "string" && v.length > 0;
+          return g.board ? Array.isArray(v) && v.length <= MAX_LEAVES_LIMIT && v.every((t) => typeof t === "string") : typeof v === "string" && v.length > 0;
         case "qa":
           return false; // Q&A keeps its own state (QaCard)
         case "quiz":
@@ -283,7 +283,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         case "text":
           // a board takes several leaves: done at the most allowed, or when the person says they're done
           return g.board
-            ? Array.isArray(v) && (v.filter((t) => t).length >= MAX_LEAVES || (v.some((t) => t) && finished.includes(g.focus.id)))
+            ? Array.isArray(v) && (v.filter((t) => t).length >= leafLimit(g) || (v.some((t) => t) && finished.includes(g.focus.id)))
             : typeof v === "string";
         case "number":
           return typeof v === "number";
@@ -405,7 +405,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       const focusId = groups[gi].focus.id;
       const had = Array.isArray(answers[focusId]) ? (answers[focusId] as string[]) : [];
       if (text && !had.some((t) => t)) reward();
-      const leaves = Array.from({ length: MAX_LEAVES }, (_, i) => (i === slot ? text : (had[i] ?? "")));
+      const leaves = Array.from({ length: Math.max(leafLimit(groups[gi]), had.length) }, (_, i) => (i === slot ? text : (had[i] ?? "")));
       const next = { ...answers, [focusId]: leaves };
       const i = steps.findIndex((s) => s.kind !== "rating" && s.gi === gi);
       const wasDone = stepDone(steps[i], ratings, answers);
@@ -682,6 +682,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   question={group.focus.name}
                   color={topicColor(here.gi)}
                   board={group.board}
+                  maxLeaves={leafLimit(group)}
                   leaves={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : []}
                   status={leafStatus(statuses, group.focus.id)}
                   disabled={!isOpen}
