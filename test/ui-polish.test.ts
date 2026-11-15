@@ -140,3 +140,44 @@ describe("score colours follow the slide design", () => {
     expect(read("components/DashboardApp.tsx")).toMatch(/<HeatScale theme=\{session\.theme\}/);
   });
 });
+
+describe("the default design has a look of its own (whiteboard, teal marker, sticky notes)", () => {
+  const paper = getTheme("paper");
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const hue = (h: string) => {
+    const [r, g, b] = rgb(h).map((v) => v / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    if (!d) return 0;
+    const x = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return (x * 60 + 360) % 360;
+  };
+
+  it("isn't cream with an orange button", () => {
+    const [r, , b] = rgb(paper.colors.canvas);
+    expect(r - b, "canvas leans warm (cream)").toBeLessThanOrEqual(2);
+    const h = hue(paper.colors.primary);
+    expect(h < 0 || h > 60, `primary hue ${h}`).toBe(true);
+  });
+
+  it("uses a teal marker colour, unlike Harbour's blue and Forest's green", () => {
+    const h = hue(paper.colors.primary);
+    expect(h).toBeGreaterThanOrEqual(160);
+    expect(h).toBeLessThanOrEqual(185);
+    for (const other of ["harbour", "forest", "neon"]) expect(getTheme(other).colors.primary).not.toBe(paper.colors.primary);
+  });
+
+  it("highlights in sticky-note yellow", () => {
+    const h = hue(paper.colors.sun);
+    expect(h).toBeGreaterThanOrEqual(42);
+    expect(h).toBeLessThanOrEqual(56);
+  });
+
+  it("the browser bar and emails use the same colours", () => {
+    expect(read("app/layout.tsx")).toContain(`themeColor: "${paper.colors.canvas}"`);
+    expect(read("lib/email.ts")).toContain(`background:${paper.colors.primary}`);
+  });
+
+  it("says what it looks like", () => {
+    expect(paper.blurb).toMatch(/whiteboard/i);
+  });
+});
