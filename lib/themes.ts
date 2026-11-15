@@ -40,7 +40,7 @@ export interface Theme {
   style: string;
   dark: boolean;
   /** Headline typeface (body text stays the same everywhere). */
-  font: "sans" | "serif" | "chalk" | "poster" | "mono" | "anime";
+  font: "grotesk" | "sans" | "serif" | "chalk" | "poster" | "mono" | "anime";
   /** Plain design: option colours, score colours and illustrations turn grey (`--theme-chroma: 0%`). */
   plain?: boolean;
   /** Background pattern drawn behind everything (CSS image), e.g. halftone dots. */
@@ -57,7 +57,7 @@ export const THEMES: Theme[] = [
     label: "Paper",
     blurb: "Whiteboard white, a teal marker and sticky-note yellow. Fits almost anything.",
     dark: false,
-    font: "sans",
+    font: "grotesk",
     colors: {
       canvas: "#f4f6f6",
       canvasSoft: "#f9fafa",
@@ -372,6 +372,7 @@ export function getTheme(id: string | null | undefined): Theme {
 }
 
 const FONTS: Record<Theme["font"], string> = {
+  grotesk: "var(--font-gabarito), var(--font-inter), ui-sans-serif, system-ui, sans-serif",
   sans: "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
   serif: "var(--font-newsreader), ui-serif, Georgia, serif",
   chalk: "var(--font-kalam), var(--font-inter), ui-sans-serif, sans-serif",
@@ -405,6 +406,8 @@ export function themeStyle(id: string | null | undefined): Record<string, string
     "--color-success": c.success,
     "--color-warn": t.dark ? "#f5c56b" : "#9a5b00",
     "--font-display": FONTS[t.font],
+    // Gabarito reads best a little heavier; the other faces are drawn for 400
+    "--display-weight": t.font === "grotesk" || t.font === "sans" ? "600" : "400",
     "--theme-pattern": t.pattern?.image ?? "none",
     // Doodles (components/Doodle.tsx) have dark outlines: a white sticker edge keeps them visible on dark designs.
     "--doodle-halo": t.plain ? "grayscale(1)" : t.dark ? "drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff)" : "none",
@@ -416,6 +419,14 @@ export function themeStyle(id: string | null | undefined): Record<string, string
     ...(t.dark ? Object.fromEntries(TOPIC_COLORS.map((c, i) => [`--topic-ink-${i}`, c])) : {}),
     colorScheme: t.dark ? "dark" : "light",
   };
+}
+
+/**
+ * Game words (points, combos, "Level complete!") suit a quiz or a playful design, not a sprint retro.
+ * Playful designs: Pop, Anime and Arcade.
+ */
+export function isPlayful(theme: string | null | undefined, kinds: readonly string[]): boolean {
+  return kinds.includes("quiz") || ["Playful", "Anime", "Bold"].includes(getTheme(theme).style);
 }
 
 const has = (title: string, re: RegExp) => re.test(title.toLowerCase());

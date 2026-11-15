@@ -27,8 +27,8 @@ function Bars({ rows, labelWidth = "w-[4ch]" }: { rows: { id: string; name: stri
       {/* under 17rem of card (4 per row beside the QR code) the name takes a line of its own, so words stay whole */}
       {rows.map((r) => (
         <li key={r.id} className="mb-2 flex flex-wrap break-inside-avoid items-center gap-x-2 gap-y-0.5 last:mb-0">
-          <span className="w-full @[17rem]:w-[42%] shrink-0 text-[clamp(0.85rem,1vw,1.15rem)] leading-snug font-semibold break-words">{r.name}</span>
-          <span className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft">
+          <span className="w-full @[17rem]:w-[42%] shrink-0 text-[clamp(0.95rem,1.2vw,1.4rem)] leading-snug font-semibold break-words">{r.name}</span>
+          <span className="h-3.5 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft">
             <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${r.pct}%`, backgroundColor: topicColor(r.index) }} />
           </span>
           <span className={`font-display ${labelWidth} shrink-0 text-right font-semibold whitespace-nowrap tabular-nums`}>{r.label}</span>
@@ -95,7 +95,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
               {g.kind === "text" && (
                 <ul className="mt-4 flex flex-col gap-1.5">
                   {texts.slice(0, 3).map((t) => (
-                    <li key={`${t.at}:${t.text}`} className="truncate rounded-lg bg-canvas px-2.5 py-1.5 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold" title={t.text}>
+                    <li key={`${t.at}:${t.text}`} className="truncate rounded-lg bg-canvas px-2.5 py-1.5 text-[clamp(0.95rem,1.2vw,1.4rem)] font-semibold" title={t.text}>
                       {t.text}
                     </li>
                   ))}
@@ -118,7 +118,7 @@ export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOp
               {g.kind === "qa" && (
                 <ul className="mt-4 flex flex-col gap-1.5">
                   {asked.slice(0, 3).map((q) => (
-                    <li key={q.id} className="flex items-center gap-2 rounded-lg bg-canvas px-2.5 py-1.5 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold">
+                    <li key={q.id} className="flex items-center gap-2 rounded-lg bg-canvas px-2.5 py-1.5 text-[clamp(0.95rem,1.2vw,1.4rem)] font-semibold">
                       <span className="shrink-0 tabular-nums text-primary">▲ {q.votes}</span>
                       <span className="truncate" title={q.text}>
                         {q.text}

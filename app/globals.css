@@ -35,7 +35,7 @@
   --color-warn: #9a5b00; /* "Retrying…" and other gentle warnings */
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-gabarito), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -108,11 +108,12 @@ body,
   background-size: var(--theme-pattern-size, auto);
 }
 
-/* Display voice: weight 400, tight tracking (unlayered, so it wins over weight utilities). */
+/* Display voice: the design's headline face and weight (600 for Gabarito and Inter, 400 for the one-weight faces),
+   tight tracking. Unlayered, so it wins over weight utilities. */
 .font-display {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.025em;
+  font-weight: var(--display-weight, 600);
+  letter-spacing: -0.02em;
 }
 .font-mono {
   font-family: var(--font-mono);
@@ -159,8 +160,9 @@ body,
 }
 
 /* Fun illustrations (components/Doodle.tsx): a gentle bob */
+/* Bobs three times as the page arrives, then rests: it sits beside text people are reading. */
 .doodle {
-  animation: bob 3.2s ease-in-out infinite;
+  animation: bob 3.2s ease-in-out 3;
   filter: var(--doodle-halo, none);
   overflow: visible;
 }

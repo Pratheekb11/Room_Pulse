@@ -10,6 +10,7 @@ import { WarmUp } from "@/components/WarmUp";
 import { KIND_INFO } from "@/lib/kinds";
 import { ACTIVITIES } from "@/lib/activities";
 import { MiniTree } from "@/components/MiniTree";
+import { Sticker } from "@/components/Sticker";
 
 const CHIP_COLORS = ["bg-peach", "bg-sky", "bg-mint", "bg-lavender"];
 
@@ -41,7 +42,7 @@ export default function Home() {
           <div className="min-w-0">
             <h1 className="font-display text-[clamp(2.5rem,5.6vw,4rem)] leading-[1.04] text-ink">
               <span className="block">Know what the room thinks.</span>
-              <span className="block text-ink-soft">Right now.</span>
+              <span className="block">Right now.</span>
             </h1>
             <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink-soft">
               Ask your audience questions. They answer on their phones, and the results show up on your screen straight away.
@@ -94,7 +95,7 @@ export default function Home() {
               <ul className="mt-6 flex max-w-xl flex-wrap gap-2" aria-label="Team activities">
                 {ACTIVITIES.map((a) => (
                   <li key={a.id} title={a.blurb} className="flex items-center gap-1.5 rounded-full border border-line bg-white py-1.5 pr-3.5 pl-2.5 text-sm font-semibold text-ink">
-                    <span aria-hidden>{a.icon}</span>
+                    <Sticker name={a.icon} size={20} />
                     {a.label}
                   </li>
                 ))}

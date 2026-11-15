@@ -1,3 +1,4 @@
+import type { StickerName } from "@/components/Sticker";
 // Team activities: ready-made team-building games that work for people in the room and online
 // alike, built from the usual question types. Each one turns on results on phones, so everyone
 // watches the tree (or wall, or sky) fill up together.
@@ -7,7 +8,8 @@ export interface Activity {
   id: string;
   label: string;
   /** An emoji for the card. */
-  icon: string;
+  /** Its sticker (components/Sticker.tsx). */
+  icon: StickerName;
   /** One line under the label. */
   blurb: string;
   /** Roughly how long it takes, in minutes. */
@@ -20,7 +22,7 @@ export interface Activity {
 export const ACTIVITIES: Activity[] = [
   {
     id: "motivation-tree",
-    icon: "🌳",
+    icon: "tree",
     label: "Motivation tree",
     blurb: "Everyone adds a leaf: what keeps them going at work",
     minutes: 15,
@@ -44,7 +46,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "goals-sky",
-    icon: "✨",
+    icon: "star",
     label: "Goals for next year",
     blurb: "Each goal lights up a star; then what would help",
     minutes: 20,
@@ -63,7 +65,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "kudos-wall",
-    icon: "💌",
+    icon: "kudos",
     label: "Kudos wall",
     blurb: "Thank a teammate on a sticky note",
     minutes: 10,
@@ -80,7 +82,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "sailboat",
-    icon: "⛵",
+    icon: "boat",
     label: "Sailboat retro",
     blurb: "Wind, anchors, rocks and the island we sail to",
     minutes: 30,
@@ -101,7 +103,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "weather",
-    icon: "🌦️",
+    icon: "weather",
     label: "Weather check-in",
     blurb: "How's everyone's weather today? A gentle start",
     minutes: 5,
@@ -119,7 +121,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "superpowers",
-    icon: "🦸",
+    icon: "bolt",
     label: "Hidden superpowers",
     blurb: "Skills the team doesn't know about yet",
     minutes: 15,
@@ -137,7 +139,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "this-or-that",
-    icon: "⚖️",
+    icon: "scales",
     label: "This or that",
     blurb: "Quick fun picks to warm up a meeting",
     minutes: 5,
@@ -154,7 +156,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "team-word",
-    icon: "💬",
+    icon: "bubble",
     label: "Our team in one word",
     blurb: "A word cloud of who we are, and who we want to be",
     minutes: 10,
@@ -169,7 +171,7 @@ export const ACTIVITIES: Activity[] = [
   },
   {
     id: "team-agreements",
-    icon: "🤝",
+    icon: "pact",
     label: "Team agreements",
     blurb: "Agree how we work together best",
     minutes: 20,

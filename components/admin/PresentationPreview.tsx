@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
 import { kindLabel } from "@/lib/kinds";
-import { getTheme, themeStyle, type ThemeId } from "@/lib/themes";
+import { getTheme, isPlayful, themeStyle, type ThemeId } from "@/lib/themes";
 import { sampleBoardAnswers, sampleCounts, sampleWords, type PreviewQuestion } from "@/lib/preview";
 import type { PollTally } from "@/lib/answers";
 import type { NamedItem, SessionInfo } from "@/lib/types";
@@ -160,7 +160,7 @@ function PhoneSlide({
   const done = (i: number) => (questions[i].kind === "rating" ? Object.keys(ratings).some((k) => k.startsWith(`${questions[i].options[0]?.id}:`)) : answers[`q${i}`] !== undefined);
   return (
     <div className="pb-10">
-      <VoterHeader title={title || "Your presentation"} theme={session.theme} decor={session.decor} score={<ScorePill points={0} />} />
+      <VoterHeader title={title || "Your presentation"} theme={session.theme} decor={session.decor} score={isPlayful(session.theme, questions.map((x) => x.kind)) ? <ScorePill points={0} /> : null} />
       <VoterProgress
         done={questions.filter((_, i) => done(i)).length}
         total={questions.length}

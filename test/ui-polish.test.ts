@@ -181,3 +181,114 @@ describe("the default design has a look of its own (whiteboard, teal marker, sti
     expect(paper.blurb).toMatch(/whiteboard/i);
   });
 });
+
+// ── Batch 3: type, the big screen's order of importance, the home page's words and pictures, motion, game words ──
+
+describe("Paper has a headline voice of its own", () => {
+  it("sets headlines in Gabarito at a heavier weight; the other designs keep their own faces", async () => {
+    const { themeStyle } = await import("@/lib/themes");
+    expect(getTheme("paper").font).toBe("grotesk");
+    expect(themeStyle("paper")["--font-display"]).toContain("--font-gabarito");
+    expect(themeStyle("paper")["--display-weight"]).toBe("600");
+    expect(themeStyle("mono")["--font-display"]).not.toContain("gabarito");
+    // display faces with one weight (serif, chalk, poster, anime) stay at 400
+    for (const t of THEMES.filter((x) => x.font !== "grotesk" && x.font !== "sans")) expect(themeStyle(t.id)["--display-weight"], t.id).toBe("400");
+  });
+
+  it("sets Inter headlines (Harbour, Mono) semibold too, so a big-screen title isn't thin", async () => {
+    const { themeStyle } = await import("@/lib/themes");
+    const sans = THEMES.filter((x) => x.font === "sans");
+    expect(sans.length).toBeGreaterThan(0);
+    for (const t of sans) expect(themeStyle(t.id)["--display-weight"], t.id).toBe("600");
+  });
+
+  it("loads the face once, for every page, and the home page uses it straight away", () => {
+    const layout = read("app/layout.tsx");
+    expect(layout).toMatch(/Gabarito\(\{[^}]*variable: "--font-gabarito"/);
+    expect(layout).toContain("${grotesk.variable}");
+    const css = read("app/globals.css");
+    expect(css).toMatch(/--font-display: var\(--font-gabarito\)/);
+    expect(css).toMatch(/font-weight: var\(--display-weight, 600\)/);
+  });
+});
+
+describe("on the big screen the question and the numbers come first", () => {
+  const maxRem = (cls: string) => Number(/clamp\([^,]+,[^,]+,([\d.]+)rem\)/.exec(cls)![1]);
+  it("the question is bigger than the presentation's title", () => {
+    const chrome = read("components/ScreenChrome.tsx");
+    const title = /compact \? "text-\[clamp\([^\]]+\)\]" : "(text-\[clamp\([^\]]+\)\])"/.exec(chrome)![1];
+    const question = /export function QuestionTitle[\s\S]*?(text-\[clamp\([^\]]+\)\])/.exec(chrome)![1];
+    expect(maxRem(question)).toBeGreaterThan(maxRem(title));
+  });
+
+  it("All questions cards use names big enough to read across a room", () => {
+    const overview = read("components/FocusOverview.tsx");
+    const name = /function Bars[\s\S]*?(text-\[clamp\([^\]]+\)\])/.exec(overview)![1];
+    expect(maxRem(name)).toBeGreaterThanOrEqual(1.35);
+  });
+});
+
+describe("the home page's words and pictures", () => {
+  const page = read("app/page.tsx");
+  const demo = read("components/LiveDemo.tsx");
+  const emoji = /\p{Extended_Pictographic}/u;
+
+  it("the headline is one voice, not a grey second line", () => {
+    const h1 = page.slice(page.indexOf("<h1"), page.indexOf("</h1>"));
+    expect(h1).not.toContain("text-ink-soft");
+  });
+
+  it("the demo's labels are plain sentence case, not tracked capitals or code type", () => {
+    expect(demo).not.toMatch(/uppercase/);
+    expect(demo).not.toMatch(/tracking-\[/);
+    expect(demo).not.toMatch(/ · /);
+  });
+
+  it("features and activities are drawn in the same sticker style as the illustrations, not emoji", async () => {
+    const { FeatureList } = await import("@/components/FeatureList");
+    const out = html(createElement(FeatureList, { ai: true }));
+    expect(out).not.toMatch(emoji);
+    expect(out).toContain("<svg");
+    // the activity chips draw a sticker, not the icon as text
+    expect(page).not.toMatch(/>\s*\{a\.icon\}/);
+    expect(page).toMatch(/<Sticker name=\{a\.icon\}/);
+    expect(page).toContain("<Sticker");
+    const { ACTIVITIES } = await import("@/lib/activities");
+    const { STICKERS } = await import("@/components/Sticker");
+    for (const a of ACTIVITIES) expect(STICKERS, a.id).toHaveProperty(a.icon);
+  });
+});
+
+describe("motion is saved for what changed", () => {
+  it("the illustrations bob a few times on arrival, then rest", () => {
+    const css = read("app/globals.css");
+    const rule = /\.doodle \{[^}]*animation: ([^;]+);/.exec(css)![1];
+    expect(rule).not.toMatch(/infinite/);
+    expect(rule).toMatch(/ \d+$/);
+  });
+
+  it("the people-voted count pops when someone new answers", () => {
+    const chrome = read("components/ScreenChrome.tsx");
+    expect(chrome).toMatch(/key=\{`voters-\$\{voters\}`\}[^>]*animate-pop/);
+  });
+});
+
+describe("game words only where a game fits", () => {
+  it("quizzes and playful designs are games; a sprint retro is not", async () => {
+    const { isPlayful } = await import("@/lib/themes");
+    expect(isPlayful("harbour", ["poll", "text"])).toBe(false);
+    expect(isPlayful("paper", ["rating"])).toBe(false);
+    expect(isPlayful("paper", ["poll", "quiz"])).toBe(true);
+    for (const id of ["pop", "anime", "arcade"]) expect(isPlayful(id, ["poll"]), id).toBe(true);
+  });
+
+  it("points, combos and 'Level complete!' only show in a game", () => {
+    const vote = read("components/VoteApp.tsx");
+    expect(vote).toMatch(/const game = isPlayful\(/);
+    expect(vote).toMatch(/game && combo >= 3/);
+    expect(vote).toMatch(/game \? <ScorePill/);
+    expect(vote).toMatch(/game && levelUp/);
+    const preview = read("components/admin/PresentationPreview.tsx");
+    expect(preview).toMatch(/isPlayful\(/);
+  });
+});

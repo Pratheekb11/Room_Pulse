@@ -35,8 +35,8 @@ export function ScreenHeader({
       <div className="min-w-0 flex-[1_1_min(100%,34rem)]">
         <Logo />
         <div className={`flex items-end gap-3 ${compact ? "mt-1" : "mt-2"}`}>
-          <h1 className={`font-display min-w-0 font-semibold leading-[0.98] tracking-tight break-words ${compact ? "text-[clamp(1.3rem,1.9vw,2.2rem)]" : "text-[clamp(2rem,3.6vw,4.2rem)]"}`}>{title}</h1>
-          {decor && !compact && <Doodle character={charactersFor(theme).screen} className="h-[clamp(4rem,8vw,8.5rem)] w-auto shrink-0" />}
+          <h1 className={`font-display min-w-0 font-semibold leading-[0.98] tracking-tight break-words ${compact ? "text-[clamp(1.3rem,1.9vw,2.2rem)]" : "text-[clamp(1.6rem,2.6vw,2.9rem)]"}`}>{title}</h1>
+          {decor && !compact && <Doodle character={charactersFor(theme).screen} className="h-[clamp(3rem,5.5vw,6rem)] w-auto shrink-0" />}
         </div>
       </div>
       <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
@@ -51,7 +51,8 @@ export function ScreenHeader({
 export function VotingPills({ voters, isOpen }: { voters: number; isOpen: boolean }) {
   return (
     <>
-      <span className="rounded-full border border-line-strong bg-white px-2.5 py-0.5 text-sm font-bold tabular-nums sm:px-3.5 sm:py-1 sm:text-lg">
+      {/* a new key each time someone new answers: the count pops, the one moment of motion the room should notice */}
+      <span key={`voters-${voters}`} className="animate-pop rounded-full border border-line-strong bg-white px-2.5 py-0.5 text-sm font-bold tabular-nums sm:px-3.5 sm:py-1 sm:text-lg">
         <CountUp value={voters} /> {voters === 1 ? "person" : "people"} voted
       </span>
       <span className={`rounded-full border border-line-strong px-2.5 py-0.5 text-sm font-bold sm:px-3.5 sm:py-1 sm:text-lg ${isOpen ? "bg-mint text-ink" : "bg-ink text-white"}`}>
@@ -142,7 +143,7 @@ export function QuestionDescription({ text, image, question = "" }: { text?: str
 
 /** The question, as the biggest words on the big screen after the presentation's title. */
 export function QuestionTitle({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <h2 className={`font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight break-words ${className}`}>{children}</h2>;
+  return <h2 className={`font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.75rem,3.1vw,3.6rem)] font-semibold leading-tight break-words ${className}`}>{children}</h2>;
 }
 
 /** A question's results card with its title. */

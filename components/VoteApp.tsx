@@ -7,6 +7,7 @@ import { cellKey } from "@/lib/stats";
 import { groupByFocus } from "@/lib/focus";
 import { getVoterId, readJSON, writeJSON } from "@/lib/storage";
 import type { LiveQuiz, QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
+import { isPlayful } from "@/lib/themes";
 import { ScorePill, StepIntro, StepNav, VoterHeader, VoterProgress } from "./VoterChrome";
 import { VoteQueue, type SaveStatus } from "@/lib/vote-queue";
 import { Confetti } from "./Confetti";
@@ -213,6 +214,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
 
   // Quiz: the question running now, and server minus phone time.
   const hasQuiz = groups.some((g) => g.kind === "quiz");
+  // Points, combos and "Level complete!" only in a quiz or a playful design; a retro stays calm.
+  const game = isPlayful(session.theme, groups.map((g) => g.kind));
   const [liveQuiz, setLiveQuiz] = useState<LiveQuiz | null>(null);
   const [quizOffset, setQuizOffset] = useState(0);
 
@@ -532,8 +535,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
 
   return (
     <div className="min-h-dvh overflow-x-clip pb-16">
-      {(celebrate || levelUp) && <Confetti />}
-      {levelUp && (
+      {(celebrate || (game && levelUp)) && <Confetti />}
+      {game && levelUp && (
         <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
           <div className="slab animate-pop rounded-xl bg-sun px-5 py-3 text-center">
             <p className="font-display text-xl font-semibold">Level complete!</p>
@@ -549,13 +552,13 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         decor={session.decor}
         score={
           <>
-            {combo >= 3 && (
+            {game && combo >= 3 && (
               <span key={`combo-${combo}`} className="animate-pop rounded-full bg-lavender px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase">
                 Combo ×{combo}
               </span>
             )}
-            <ScorePill points={points} />
-            {plus > 0 && (
+            {game ? <ScorePill points={points} /> : null}
+            {game && plus > 0 && (
               <span key={`plus-${plus}`} aria-hidden className="float-up font-mono absolute -top-1 right-1 text-sm font-medium text-primary">
                 +10
               </span>

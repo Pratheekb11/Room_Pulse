@@ -55,13 +55,15 @@ export function LiveDemo() {
         <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
         <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
         <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-        <span className="font-mono ml-3 text-xs text-muted">liverate · k7m2qp</span>
+        <span className="ml-3 text-xs text-muted">
+          Join code <span className="font-mono text-ink">k7m2qp</span>
+        </span>
       </div>
       <div className="grid grid-cols-1 gap-3 bg-canvas-soft p-3 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.6fr)]">
         {/* phone */}
         <div className="rounded-lg border border-line bg-white p-4">
-          <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Your vote</p>
-          <p key={`q-${tap.tick}`} className="animate-rise mt-1 text-[15px] font-medium text-ink">
+          <p className="text-xs font-semibold text-muted">Your phone</p>
+          <p key={`q-${tap.tick}`} className="animate-fade mt-1 min-h-[2.6em] text-[15px] leading-tight font-medium text-ink">
             {OPTIONS[tap.option].name}
           </p>
           <p className="mt-0.5 text-xs text-muted">Impact</p>
@@ -85,7 +87,7 @@ export function LiveDemo() {
             {STAGES.map((s, i) => (
               <span
                 key={s.label}
-                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] uppercase transition-all duration-300 ${
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-all duration-300 ${
                   stage >= i ? `${s.color} text-ink` : "bg-line-soft text-muted-soft"
                 }`}
               >
@@ -97,8 +99,8 @@ export function LiveDemo() {
         {/* dashboard */}
         <div className="rounded-lg border border-line bg-white p-4">
           <div className="flex items-baseline justify-between">
-            <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">What to build next</p>
-            <p className="font-mono text-xs text-muted">
+            <p className="text-sm font-semibold text-ink">What should we build next?</p>
+            <p className="text-xs whitespace-nowrap text-muted tabular-nums">
               <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-success align-middle" />
               {total} votes
             </p>
@@ -108,7 +110,7 @@ export function LiveDemo() {
               <li key={o.name}>
                 <div className="flex justify-between text-[13px]">
                   <span className="text-ink">{o.name}</span>
-                  <span className="font-mono text-muted tabular-nums">{Math.round((votes[i] / total) * 100)}%</span>
+                  <span className="text-muted tabular-nums">{Math.round((votes[i] / total) * 100)}%</span>
                 </div>
                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-line-soft">
                   <div
