@@ -295,7 +295,7 @@ export const ACTIVITIES: Activity[] = [
 
 /** The create-presentation request for an activity: results are on phones from the start. */
 export function activityToBody(a: Activity) {
-  return { ...planToBody(a.plan), showResults: true };
+  return { ...planToBody(a.plan), showResults: true, named: true };
 }
 
 /**

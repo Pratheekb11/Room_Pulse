@@ -12,11 +12,13 @@ interface Props {
   value: string | undefined;
   status: SaveStatus | undefined;
   disabled: boolean;
+  /** Names on (team activities): the answer shows the person's name. */
+  named?: boolean;
   onSend: (text: string) => void;
 }
 
 /** Open answer: one short answer in the voter's own words. They can change it later. */
-export function TextCard({ question, color, value, status, disabled, onSend }: Props) {
+export function TextCard({ question, color, value, status, disabled, named = false, onSend }: Props) {
   const [draft, setDraft] = useState(value ?? "");
   const clean = draft.trim().replace(/\s+/g, " ");
   const unchanged = value !== undefined && clean === value;
@@ -52,7 +54,7 @@ export function TextCard({ question, color, value, status, disabled, onSend }: P
           </button>
         </div>
         <p aria-live="polite" className="min-h-4 text-right text-xs font-semibold text-ink-soft">
-          {saveText(status) || (value !== undefined ? "Sent. You can change it until voting closes." : "Your answer is anonymous.")}
+          {saveText(status) || (value !== undefined ? "Sent. You can change it until voting closes." : named ? "Your name goes with it." : "Your answer is anonymous.")}
         </p>
       </form>
     </CardShell>

@@ -466,3 +466,18 @@ alter table focus_topics add column if not exists max_leaves int check (max_leav
 alter table text_answers add column if not exists author_hidden boolean not null default false;
 alter table text_answers drop constraint if exists text_answers_slot_check;
 alter table text_answers add constraint text_answers_slot_check check (slot between 0 and 9);
+
+-- Names on team activities (2026-11-15): sessions.named = every answer shows the name its writer gave
+-- (team activities turn it on); voter_names = the name each person gave, one per person per presentation,
+-- shown beside their answers. Cleared with the answers.
+alter table sessions add column if not exists named boolean not null default false;
+-- Recreate the view so it includes the column above.
+create or replace view live_sessions as
+  select * from sessions where expires_at is null or expires_at > now();
+create table if not exists voter_names (
+  session_id  uuid not null references sessions(id) on delete cascade,
+  voter_id    uuid not null,
+  name        text not null check (length(name) between 1 and 30),
+  updated_at  timestamptz not null default now(),
+  primary key (session_id, voter_id)
+);

@@ -188,6 +188,8 @@ interface Draft {
   start?: StartChoice;
   /** Voters see the results on their phones from the start (team activities turn it on). */
   showResults?: boolean;
+  /** Names on: phones ask for a name once and results show who answered (team activities turn it on). */
+  named?: boolean;
 }
 
 /** For an activity, `steps` is how to run it, shown to the host under "Started from". */
@@ -261,6 +263,7 @@ function fromSession(s: SessionPayload): Draft {
     criteria: rowsFrom(s.criteria),
     theme: isThemeId(s.session.theme) ? s.session.theme : "paper",
     decor: s.session.decor !== false,
+    named: s.session.named === true,
   };
 }
 
@@ -308,6 +311,7 @@ export function PresentationForm({
   const [themeChoice, setThemeChoice] = useState<ThemeId | null>(initial?.theme ?? null);
   const [decor, setDecor] = useState(initial?.decor ?? true);
   const [showResults, setShowResults] = useState(initial?.showResults === true);
+  const [named, setNamed] = useState(initial?.named === true);
   /**
    * How this presentation was started: null while choosing, "blank", or the template / AI draft used
    * (with a snapshot, so going back can tell whether anything was changed since).
@@ -334,12 +338,13 @@ export function PresentationForm({
           decor,
           start,
           showResults,
+          named,
         }),
       );
     } catch {
       /* storage unavailable */
     }
-  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows, themeChoice, decor, start, showResults]);
+  }, [editing, title, scaleMax, lowLabel, highLabel, focus, criteriaRows, themeChoice, decor, start, showResults, named]);
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
   // The problem list and save errors sit at the bottom of a long form, under the sticky Create
@@ -528,8 +533,10 @@ export function PresentationForm({
     setFocus(drafts);
     nextKey.current += plan.questions.length;
     setStart({ label, snapshot: snapshotOf(plan.title, drafts), ...(steps?.length ? { steps } : {}) });
-    // activities are watched together: everyone sees the tree fill up on their phone
+    // activities are watched together: everyone sees the tree fill up on their phone,
+    // and team building needs names: who is on which side
     setShowResults(shareResults);
+    setNamed(shareResults);
   }
   /** Back to the start choices with an empty form. */
   function restart() {
@@ -539,6 +546,7 @@ export function PresentationForm({
     setThemeChoice(null);
     setStart(null);
     setShowResults(false);
+    setNamed(false);
     setConfirmRestart(false);
   }
   const changedSinceStart = start !== null && start !== "blank" && snapshotOf(title, focus) !== start.snapshot;
@@ -618,6 +626,7 @@ export function PresentationForm({
             highLabel,
             theme,
             decor,
+            named,
             focusTopics: focus.map((f) => ({
               id: f.id,
               name: f.name,
@@ -642,6 +651,7 @@ export function PresentationForm({
           theme,
           decor,
           showResults,
+          named,
           focusTopics: parsed.map((f) => ({
             name: f.name,
             kind: f.kind,
@@ -659,6 +669,7 @@ export function PresentationForm({
       setThemeChoice(null);
       setStart(null);
       setShowResults(false);
+      setNamed(false);
       setTouched(false);
       await onDone(body.code);
     } catch (err) {
@@ -1306,6 +1317,15 @@ export function PresentationForm({
               </span>
             </label>
           )}
+          <label className="mt-3 flex items-start gap-2.5 text-sm">
+            <input type="checkbox" checked={named} onChange={(e) => setNamed(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-ink" />
+            <span>
+              <span className="font-semibold">Show who answered (names)</span>
+              <span className="block text-ink-soft">
+                Phones ask for a name once, and the results show who picked each option. Good for team activities; leave it off to keep answers anonymous.
+              </span>
+            </span>
+          </label>
         </section>
 
         <p

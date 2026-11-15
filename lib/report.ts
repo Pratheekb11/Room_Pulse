@@ -1,5 +1,6 @@
 // The report: every question's results with a short analysis in plain words, what needs attention,
 // the AI summary and the open point list. Built from what the presenter's screen shows (no hidden answers).
+import { reportPrivacy } from "./names";
 import { formatNumber, numberStats, pollTally, qaOrder, rankTally, visibleTexts, wordWeights } from "./answers";
 import { groupByFocus, type FocusGroup } from "./focus";
 import { takeaways } from "./insights";
@@ -67,6 +68,8 @@ export interface Report {
   points: OpenPoint[];
   /** ISO time the report was made (set by the server). */
   generatedAt?: string;
+  /** The footer's line on names (lib/names.ts reportPrivacy). */
+  privacy: string;
 }
 
 const andList = (names: string[]) => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
@@ -303,5 +306,6 @@ export function buildReport(info: SessionPayload, r: ResultsPayload, extra: { po
     leaderboard: r.leaderboard,
     ai: ai ? { headline: ai.headline, summary: ai.summary, actions: ai.actions, people: ai.people, at: ai.at } : null,
     points: extra.points ?? [],
+    privacy: reportPrivacy({ named: Boolean(info.session.named), boards: groups.some((g) => g.board) }),
   };
 }

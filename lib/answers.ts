@@ -186,6 +186,7 @@ export function visibleTexts<T extends { focusId: string; hidden?: boolean }>(te
 export function audienceResults(r: ResultsPayload, quizFocusIds: Set<string>): ResultsPayload {
   return {
     ...r,
+    ...(r.who ? { who: r.who.filter((w) => !quizFocusIds.has(w.focusId)) } : {}),
     texts: r.texts.filter((t) => !t.hidden).map((t) => (t.nameHidden ? { ...t, author: null } : t)),
     questions: r.questions.filter((q) => !q.hidden),
     respondents: r.respondents.filter((x) => !quizFocusIds.has(x.focusId)),

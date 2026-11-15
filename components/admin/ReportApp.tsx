@@ -194,7 +194,7 @@ export function ReportApp({ code, autoPrint }: { code: string; autoPrint: boolea
         </section>
 
         <footer className="mt-8 border-t border-line pt-3 text-xs text-ink-soft">
-          Made with LiveRate. Answers are anonymous. Hidden answers and hidden questions are left out of this report.
+          Made with LiveRate. {report.privacy} Hidden answers and hidden questions are left out of this report.
         </footer>
       </article>
     </div>

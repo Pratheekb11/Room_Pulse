@@ -28,6 +28,8 @@ import { ScoreLegend } from "./Donut";
 import { Heatmap } from "./Heatmap";
 import { activityFor } from "@/lib/activities";
 import { HowToRun } from "./results/HowToRun";
+import { WhoAnswered } from "./results/WhoAnswered";
+import { hasNames, namesFor } from "@/lib/names";
 import { MoreMenu, QuestionDescription, QuestionTabs, QuestionTitle, ResultCard, ScreenHeader, VotingPills, menuItem } from "./ScreenChrome";
 import { HeatScale } from "./HeatScale";
 import { LiveBadge } from "./LiveBadge";
@@ -192,6 +194,18 @@ function Stage({
     : overviewMode === "heatmap"
       ? "heatmap"
       : "";
+  // Names on (team activities): who picked each option (first place for Put in order) or said each word
+  const who =
+    group && hasNames(r, group.focus.id) && !fit ? (
+      <WhoAnswered
+        heading={group.kind === "words" ? "Who said what" : group.kind === "rank" ? "Who put it first" : "Who picked what"}
+        rows={
+          group.kind === "words"
+            ? wordWeights(r.words ?? [], group.focus.id).map((w) => ({ key: w.word, label: w.word, names: namesFor(r, group.focus.id, w.word) }))
+            : group.topics.map(({ item }) => ({ key: item.id, label: item.name, names: namesFor(r, group.focus.id, item.id) }))
+        }
+      />
+    ) : null;
   // Keep the place in the URL so a refresh comes back to the same focus topic and chart.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -488,6 +502,7 @@ function Stage({
                 if (view === "donut") return <PollPie tally={tally} />;
                 return <PollBars tally={tally} />;
               })()}
+              {who}
             </section>
           ) : group.kind === "multi" ? (
             <ResultCard title={group.focus.name}>
@@ -505,6 +520,7 @@ function Stage({
                   </>
                 );
               })()}
+              {who}
             </ResultCard>
           ) : group.kind === "rank" ? (
             <ResultCard title={group.focus.name}>
@@ -519,6 +535,7 @@ function Stage({
                   </>
                 );
               })()}
+              {who}
             </ResultCard>
           ) : group.kind === "number" ? (
             <ResultCard title={group.focus.name}>
@@ -589,6 +606,7 @@ function Stage({
               ) : (
                 <WordCloud words={wordWeights(r.words ?? [], group.focus.id)} />
               )}
+              {who}
             </section>
           ) : view === "heatmap" ? (
             <div className="flex flex-col gap-[clamp(0.75rem,2vh,1.75rem)]">

@@ -14,6 +14,8 @@ export interface SessionInfo {
   theme: string;
   /** Fun illustrations are on. */
   decor: boolean;
+  /** Every answer shows its writer's name (team activities); off = anonymous. */
+  named?: boolean;
 }
 
 export interface NamedItem {
@@ -252,6 +254,18 @@ export interface ResultsPayload {
   revision: number;
   /** Open points not closed yet (0 on voters' phones). */
   openPoints?: number;
+  /** Presentations with names on: who picked each option or said each word (lib/names.ts). */
+  who?: WhoRow[];
+}
+
+/**
+ * Who gave one answer: `key` is the option's id (Pick one, Pick several, Put in order: who put it first)
+ * or the word (Word cloud). Names in the order people answered.
+ */
+export interface WhoRow {
+  focusId: string;
+  key: string;
+  names: string[];
 }
 
 /** The AI's summary of a whole presentation (saved; the latest one is kept). */

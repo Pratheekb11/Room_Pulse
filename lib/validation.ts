@@ -164,6 +164,8 @@ export const createSessionSchema = z.object({
   decor: z.boolean().default(true),
   /** Voters may see the results on their phones from the start (team activities). */
   showResults: z.boolean().default(false),
+  /** Every answer shows its writer's name (team activities); off = anonymous. */
+  named: z.boolean().default(false),
   focusTopics: z
     .array(focusTopicSchema)
     .min(1, "Add at least 1 focus topic")
@@ -217,6 +219,8 @@ export const editSessionSchema = z
     /** Left out = keep the current design. */
     theme: z.enum(THEME_IDS).optional(),
     decor: z.boolean().optional(),
+    /** Left out = keep it as it is. */
+    named: z.boolean().optional(),
     focusTopics: z.array(editFocusSchema).min(1, "Add at least 1 question").max(MAX_FOCUS_TOPICS),
     criteria: z.array(itemSchema(60)).max(MAX_CRITERIA).default([]),
   })
@@ -266,12 +270,25 @@ const word = z
   .transform((w) => w.trim().replace(/\s+/g, " ").toLowerCase())
   .pipe(z.string().min(1, "Empty answer").max(40, "Keep each answer under 40 characters"));
 
+/**
+ * The name to sign an answer with: board leaves (always) and every answer of a presentation with names on
+ * (`sessions.named`). Blank = unsigned. Ignored where names aren't shown.
+ */
+const authorField = z
+  .string()
+  .max(MAX_AUTHOR * 4)
+  .transform((t) => t.trim().replace(/\s+/g, " "))
+  .pipe(z.string().max(MAX_AUTHOR, `Keep your name under ${MAX_AUTHOR} characters`))
+  .transform((t) => t || null)
+  .nullish();
+
 export const answerSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("poll"),
     code: codeSchema,
     focusId: z.uuid(),
     voterId: z.uuid(),
+    author: authorField,
     topicId: z.uuid(),
   }),
   z.object({
@@ -279,6 +296,7 @@ export const answerSchema = z.discriminatedUnion("kind", [
     code: codeSchema,
     focusId: z.uuid(),
     voterId: z.uuid(),
+    author: authorField,
     words: z
       .array(word)
       .max(3, "Up to 3 answers")
@@ -289,6 +307,7 @@ export const answerSchema = z.discriminatedUnion("kind", [
     code: codeSchema,
     focusId: z.uuid(),
     voterId: z.uuid(),
+    author: authorField,
     // empty = clear the answer
     topicIds: z.array(z.uuid()).max(MAX_TOPICS_PER_FOCUS).refine((ids) => new Set(ids).size === ids.length, "Pick each option once"),
   }),
@@ -297,6 +316,7 @@ export const answerSchema = z.discriminatedUnion("kind", [
     code: codeSchema,
     focusId: z.uuid(),
     voterId: z.uuid(),
+    author: authorField,
     /** Every option, first place first. */
     topicIds: z
       .array(z.uuid())
@@ -309,6 +329,7 @@ export const answerSchema = z.discriminatedUnion("kind", [
     code: codeSchema,
     focusId: z.uuid(),
     voterId: z.uuid(),
+    author: authorField,
     value: boundedNumber,
   }),
   z.object({
@@ -316,6 +337,7 @@ export const answerSchema = z.discriminatedUnion("kind", [
     code: codeSchema,
     focusId: z.uuid(),
     voterId: z.uuid(),
+    author: authorField,
     /** Missing only when taking a leaf back (`remove`). */
     text: z
       .string()
@@ -327,14 +349,6 @@ export const answerSchema = z.discriminatedUnion("kind", [
     slot: z.number().int().min(0).max(MAX_LEAVES_LIMIT - 1).default(0),
     /** Board questions: take this leaf back. */
     remove: z.boolean().optional(),
-    /** Board questions: a name to sign the answer with. Blank = unsigned. Ignored on plain open answers. */
-    author: z
-      .string()
-      .max(MAX_AUTHOR * 4)
-      .transform((t) => t.trim().replace(/\s+/g, " "))
-      .pipe(z.string().max(MAX_AUTHOR, `Keep your name under ${MAX_AUTHOR} characters`))
-      .transform((t) => t || null)
-      .nullish(),
   }),
 ]);
 export type AnswerInput = z.infer<typeof answerSchema>;

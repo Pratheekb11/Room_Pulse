@@ -62,6 +62,8 @@ export function toMarkdown(title: string, ratings: SummaryRow[], choices: Choice
 
   for (const c of choices) {
     const label = escapeMd(c.label);
+    // names on (team activities): who picked it, on the line under it
+    const who = c.names ? `\n  - ${escapeMd(c.names)}` : "";
     switch (c.kind) {
       case "Hidden answer":
       case "Hidden question":
@@ -71,12 +73,12 @@ export function toMarkdown(title: string, ratings: SummaryRow[], choices: Choice
       case "Right answer": {
         const total = pollTotals.get(c.focus) ?? 0;
         const pct = total ? Math.round((c.n / total) * 100) : 0;
-        add(c.focus, `- ${label}: ${c.n} (${pct}%)${c.kind === "Right answer" ? " ✓ right answer" : ""}`);
+        add(c.focus, `- ${label}: ${c.n} (${pct}%)${c.kind === "Right answer" ? " ✓ right answer" : ""}${who}`);
         break;
       }
       case "Picked":
       case "Word":
-        add(c.focus, `- ${label}: ${c.n}`);
+        add(c.focus, `- ${label}: ${c.n}${who}`);
         break;
       case "Average place":
         add(c.focus, `- ${label}: average place ${c.average === null ? "–" : c.average.toFixed(1)}`);

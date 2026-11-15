@@ -30,6 +30,8 @@ import { RaisePoint } from "./vote/RaisePoint";
 import { charactersFor, type Character } from "@/lib/decor";
 import { leafKey, leafLimit, MAX_AUTHOR, MAX_LEAVES_LIMIT, parseLeafKey } from "@/lib/boards";
 import { BoardCard } from "./vote/BoardCard";
+import { NameGate } from "./vote/NameGate";
+import { privacyLine } from "@/lib/names";
 
 /** The save state to show for a board: the most worrying of its leaves'. */
 function leafStatus(statuses: Record<string, SaveStatus>, focusId: string): SaveStatus | undefined {
@@ -137,6 +139,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const [finished, setFinished] = useState<string[]>(() => readJSON<string[]>(finishedKey, []));
   // Still on the ballot although everything is done: following the live Q&A.
   const [reviewing, setReviewing] = useState(false);
+  // names on: "Change" opens the name screen again
+  const [askName, setAskName] = useState(false);
   const [isOpen, setIsOpen] = useState(session.isOpen);
   // The presenter lets people see live results on their phones.
   const [showResults, setShowResults] = useState(false);
@@ -178,11 +182,13 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
               : { kind: "text", focusId: leaf.focusId, slot: leaf.slot, remove: true };
           const focusId = key;
           const kind = byFocus.get(focusId)?.kind;
-          if (kind === "poll") return { kind, focusId, topicId: v };
-          if (kind === "multi" || kind === "rank") return { kind, focusId, topicIds: v };
-          if (kind === "number") return { kind, focusId, value: v };
-          if (kind === "text") return { kind, focusId, text: v };
-          return { kind: "words", focusId, words: v };
+          // names on (team activities): every answer carries the person's name
+          const named = session.named ? { author: signedName(readJSON<unknown>(authorKey, "")) } : {};
+          if (kind === "poll") return { kind, focusId, topicId: v, ...named };
+          if (kind === "multi" || kind === "rank") return { kind, focusId, topicIds: v, ...named };
+          if (kind === "number") return { kind, focusId, value: v, ...named };
+          if (kind === "text") return { kind, focusId, text: v, ...named };
+          return { kind: "words", focusId, words: v, ...named };
         },
         initialPending: Object.fromEntries(
           Object.entries(readJSON<Record<string, unknown>>(answersPendingKey, {})).filter(([k, v]) => {
@@ -533,6 +539,19 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       />
     );
 
+  if (session.named && (!author || askName))
+    return (
+      <NameGate
+        title={session.title}
+        initial={author}
+        onDone={(name) => {
+          setAuthor(name);
+          writeJSON(authorKey, name);
+          setAskName(false);
+        }}
+      />
+    );
+
   return (
     <div className="min-h-dvh overflow-x-clip pb-16">
       {(celebrate || (game && levelUp)) && <Confetti />}
@@ -547,6 +566,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
 
       <VoterHeader
         signable={groups.some((g) => g.board)}
+        privacy={privacyLine({ named: Boolean(session.named), boards: groups.some((g) => g.board) })}
         title={session.title}
         theme={session.theme}
         decor={session.decor}
@@ -566,6 +586,14 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           </>
         }
       >
+        {session.named && author && (
+          <p className="mt-1 text-sm">
+            Answering as <span className="font-bold">{author}</span>{" "}
+            <button type="button" onClick={() => setAskName(true)} className="font-bold text-primary underline underline-offset-4">
+              Change
+            </button>
+          </p>
+        )}
         {resultsHref && (
           <a href={resultsHref} className="mt-2 inline-block text-[0.95rem] font-bold underline decoration-primary decoration-2 underline-offset-4">
             See live results
@@ -704,6 +732,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   value={typeof answers[group.focus.id] === "string" ? (answers[group.focus.id] as string) : undefined}
                   status={statuses[group.focus.id]}
                   disabled={!isOpen}
+                  named={Boolean(session.named)}
                   onSend={(text) => onAnswer(here.gi, text)}
                 />
               ) : here.kind === "quiz" ? (

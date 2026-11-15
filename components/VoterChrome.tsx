@@ -18,6 +18,7 @@ export function VoterHeader({
   decor,
   score,
   signable = false,
+  privacy,
   children,
 }: {
   title: string;
@@ -28,6 +29,8 @@ export function VoterHeader({
   score: React.ReactNode;
   /** Some answers carry the person's name (boards in team activities), so they aren't all anonymous. */
   signable?: boolean;
+  /** The privacy line, when the page works it out itself (lib/names.ts privacyLine). */
+  privacy?: string;
   /** Extra lines under the title, e.g. "See live results". */
   children?: React.ReactNode;
 }) {
@@ -42,7 +45,7 @@ export function VoterHeader({
         {decor && <Doodle character={charactersFor(theme).phone} className="h-14 w-14 shrink-0 sm:h-20 sm:w-20" />}
       </div>
       <p className="mt-1 text-sm text-ink-soft">
-        {signable ? "Saved as you tap. Answers on a board show your name. The rest are anonymous." : "Saved as you tap. Your answers are anonymous."}
+        {privacy ?? (signable ? "Saved as you tap. Answers on a board show your name. The rest are anonymous." : "Saved as you tap. Your answers are anonymous.")}
       </p>
       {children}
     </header>

@@ -5,6 +5,7 @@ import type {
   NamedItem,
   ResultCell,
   ResultsPayload,
+  WhoRow,
   ScoreBucket,
   FocusItem,
   PollCount,
@@ -41,7 +42,7 @@ import { MAX_LEAVES } from "./boards";
 export async function getSession(code: string, opts: { withAnswers?: boolean } = {}): Promise<SessionPayload | null> {
   const withAnswers = opts.withAnswers === true;
   const rows = (await sql`
-    select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open, s.revision, s.theme, s.decor,
+    select s.code, s.title, s.scale_max, s.low_label, s.high_label, s.is_open, s.revision, s.theme, s.decor, s.named,
       coalesce((select json_agg(jsonb_build_object('id', f.id, 'name', f.name, 'kind', f.kind,
                   'chart', coalesce(f.chart, case f.kind when 'poll' then 'bars' when 'words' then 'cloud' else 'heatmap' end),
                   'maxPicks', f.max_picks, 'min', f.num_min, 'max', f.num_max, 'unit', f.num_unit,
@@ -65,6 +66,7 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
     revision: number;
     theme: string;
     decor: boolean;
+    named: boolean;
     focus_topics: FocusItem[];
     topics: TopicItem[];
     criteria: NamedItem[];
@@ -82,6 +84,7 @@ export async function getSession(code: string, opts: { withAnswers?: boolean } =
       revision: r.revision,
       theme: r.theme,
       decor: r.decor,
+      named: r.named === true,
     },
     focusTopics: r.focus_topics,
     topics: r.topics,
@@ -267,6 +270,18 @@ export async function getResults(
                           and now() <= s.quiz_started_at + make_interval(secs => f.quiz_seconds + ${QUIZ_REVEAL_AFTER}::float8))),
                '[]'::json) as quiz_revealed,
       (select count(*)::int from open_points p where p.session_id = s.id and p.status <> 'closed') as open_points,
+      -- names on (team activities): who picked each option, who put it first, who said each word
+      case when s.named then
+        coalesce((select json_agg(json_build_object('focusId', w.focus_id, 'key', w.key, 'names', w.names))
+                  from (select a.focus_id, a.key, json_agg(n.name order by a.at, n.name) as names
+                          from (select focus_id, topic_id::text as key, voter_id, updated_at as at from poll_answers where session_id = s.id
+                                union all select focus_id, topic_id::text, voter_id, created_at from choice_answers where session_id = s.id
+                                union all select focus_id, topic_id::text, voter_id, created_at from rank_answers where session_id = s.id and place = 1
+                                union all select focus_id, word, voter_id, min(created_at) from word_answers where session_id = s.id
+                                  group by focus_id, word, voter_id) a
+                          join voter_names n on n.session_id = s.id and n.voter_id = a.voter_id
+                         group by a.focus_id, a.key) w), '[]'::json)
+      else '[]'::json end as who,
       ${liveQuizJson()} as quiz
     from live_sessions s
     where s.code = ${code}
@@ -288,6 +303,7 @@ export async function getResults(
     quiz_revealed: { focusId: string; topicId: string }[];
     leaderboard: LeaderRow[];
     open_points: number;
+    who: WhoRow[];
     quiz: LiveQuiz | null;
   }[];
   const r = rows[0];
@@ -310,6 +326,7 @@ export async function getResults(
     leaderboard: r.leaderboard,
     quiz: isoQuiz(r.quiz),
     revision: r.revision,
+    ...(r.who.length ? { who: r.who } : {}),
   };
 }
 
@@ -395,8 +412,8 @@ export async function createSession(
     try {
       await sql`
         with s as (
-          insert into sessions (code, dashboard_key, title, scale_max, low_label, high_label, theme, decor, show_results, owner_id, expires_at)
-          values (${code}, ${dashboardKey}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${input.theme}, ${input.decor}, ${input.showResults}, ${ownerId},
+          insert into sessions (code, dashboard_key, title, scale_max, low_label, high_label, theme, decor, show_results, named, owner_id, expires_at)
+          values (${code}, ${dashboardKey}, ${input.title}, ${input.scaleMax}, ${input.lowLabel}, ${input.highLabel}, ${input.theme}, ${input.decor}, ${input.showResults}, ${input.named}, ${ownerId},
                   case when ${expiresInDays}::int is null then null else now() + make_interval(days => ${expiresInDays}::int) end)
           returning id
         ), input as (
@@ -474,6 +491,7 @@ export async function resetSession(code: string): Promise<void> {
     sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
     // the AI summary was written from those answers
     sql`delete from ai_reports where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from voter_names where session_id = (select id from live_sessions where code = ${code})`,
   ]);
 }
 
@@ -719,6 +737,22 @@ export type AnswerOutcome = VoteOutcome | "blocked" | "name_required";
 
 /** Saves a poll choice, word-cloud answers, picks, open answer, ranking or number (replacing earlier ones). */
 export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
+  // Names on (team activities): keep the name this person answers under, the latest one given.
+  // Only asked when a name came with the answer, so anonymous presentations pay nothing.
+  if (a.author && !(a.kind === "text" && a.remove)) {
+    const badName = hasBadWords(a.author);
+    const rows = (await sql`
+      with s as (select id, named from live_sessions where code = ${a.code} and is_open),
+      up as (
+        insert into voter_names (session_id, voter_id, name)
+        select id, ${a.voterId}::uuid, ${a.author} from s where named and not ${badName}::boolean
+        on conflict (session_id, voter_id) do update set name = excluded.name, updated_at = now()
+        returning 1
+      )
+      select named from s
+    `) as { named: boolean }[];
+    if (rows[0]?.named && badName) return "blocked";
+  }
   let saved: boolean;
   if (a.kind === "multi" || a.kind === "rank") {
     saved = await saveOptionList(a.kind, a.code, a.focusId, a.voterId, a.topicIds);
@@ -748,8 +782,8 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
              -- several leaves per person on a board; one answer per person otherwise
              case when f.board is not null then ${a.slot}::int else 0 end,
              ${a.text},
-             -- only board questions are signed; plain open answers stay anonymous
-             case when f.board is not null then ${a.author ?? null}::text end
+             -- board questions are signed, and every answer when names are on; plain open answers stay anonymous otherwise
+             case when f.board is not null or s.named then ${a.author ?? null}::text end
       from live_sessions s
       join focus_topics f on f.session_id = s.id and f.id = ${a.focusId}::uuid and f.kind = 'text'
       where s.code = ${a.code} and s.is_open
@@ -1055,6 +1089,8 @@ export interface ChoiceSummaryRow {
     | "Quiz choice";
   average: number | null;
   n: number;
+  /** Names on (team activities): who picked it or said it, comma-separated. */
+  names?: string;
 }
 
 /** Counts for every question that isn't a rating, in display order (options nobody picked included). */
@@ -1064,20 +1100,32 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
       select f.position as fp, t.position::float8 as tp, f.name as focus, t.name as label,
              case f.kind when 'poll' then 'Poll choice' else 'Picked' end as kind, null::float8 as average,
              (select count(*)::int from poll_answers p where p.topic_id = t.id)
-               + (select count(*)::int from choice_answers c where c.topic_id = t.id) as n
+               + (select count(*)::int from choice_answers c where c.topic_id = t.id) as n,
+             -- names on (team activities): who picked it
+             case when s.named then
+               (select string_agg(n.name, ', ' order by x.at, n.name)
+                  from (select voter_id, updated_at as at from poll_answers p where p.topic_id = t.id
+                        union all select voter_id, created_at from choice_answers c where c.topic_id = t.id) x
+                  join voter_names n on n.session_id = s.id and n.voter_id = x.voter_id)
+             end as names
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind in ('poll', 'multi')
         join topics t on t.focus_id = f.id
        where s.code = ${code}
       union all
-      select f.position, -count(*)::float8, f.name, w.word, 'Word', null, count(*)::int
+      select f.position, -count(*)::float8, f.name, w.word, 'Word', null, count(*)::int,
+             case when s.named then
+               (select string_agg(n.name, ', ' order by n.name)
+                  from (select distinct voter_id from word_answers x where x.focus_id = f.id and x.word = w.word) x
+                  join voter_names n on n.session_id = s.id and n.voter_id = x.voter_id)
+             end
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'words'
         join word_answers w on w.focus_id = f.id
        where s.code = ${code}
-       group by f.position, f.name, w.word
+       group by s.id, s.named, f.id, f.position, f.name, w.word
       union all
-      select f.position, t.position, f.name, t.name, 'Average place', avg(r.place)::float8, count(r.place)::int
+      select f.position, t.position, f.name, t.name, 'Average place', avg(r.place)::float8, count(r.place)::int, null::text
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'rank'
         join topics t on t.focus_id = f.id
@@ -1085,7 +1133,7 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
        where s.code = ${code}
        group by f.position, t.position, f.name, t.name
       union all
-      select f.position, m.ord, f.name, '', m.kind, m.value, x.n
+      select f.position, m.ord, f.name, '', m.kind, m.value, x.n, null::text
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'number'
         cross join lateral (select count(*)::int as n, avg(value)::float8 as mean,
@@ -1095,7 +1143,7 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
        where s.code = ${code}
       union all
       select f.position, extract(epoch from a.updated_at)::float8 + case when a.hidden then 1e12 else 0 end, f.name, a.body || coalesce(' — ' || case when a.author_hidden then '(name hidden)' else a.author end, ''),
-             case when a.hidden then 'Hidden answer' else 'Answer' end, null, 1
+             case when a.hidden then 'Hidden answer' else 'Answer' end, null, 1, null::text
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'text'
         join text_answers a on a.focus_id = f.id
@@ -1103,7 +1151,7 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
       union all
       select f.position, -x.votes::float8 + case when q.hidden then 1e9 when q.answered then 1e6 else 0 end, f.name, q.body,
              case when q.hidden then 'Hidden question' when q.answered then 'Answered question' else 'Audience question' end,
-             null, x.votes
+             null, x.votes, null::text
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'qa'
         join qa_questions q on q.focus_id = f.id
@@ -1112,15 +1160,22 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
       union all
       select f.position, t.position, f.name, t.name,
              case when t.position - f.position * 100 = f.quiz_correct then 'Right answer' else 'Quiz choice' end, null,
-             (select count(*)::int from quiz_answers a where a.topic_id = t.id)
+             (select count(*)::int from quiz_answers a where a.topic_id = t.id), null::text
         from live_sessions s
         join focus_topics f on f.session_id = s.id and f.kind = 'quiz'
         join topics t on t.focus_id = f.id
        where s.code = ${code}
     ) x
     order by fp, tp, label
-  `) as { focus: string; label: string; kind: ChoiceSummaryRow["kind"]; average: number | string | null; n: number }[];
-  return rows.map((r) => ({ focus: r.focus, label: r.label, kind: r.kind, average: r.average === null ? null : Number(r.average), n: r.n }));
+  `) as { focus: string; label: string; kind: ChoiceSummaryRow["kind"]; average: number | string | null; n: number; names: string | null }[];
+  return rows.map((r) => ({
+    focus: r.focus,
+    label: r.label,
+    kind: r.kind,
+    average: r.average === null ? null : Number(r.average),
+    n: r.n,
+    ...(r.names ? { names: r.names } : {}),
+  }));
 }
 
 // ---------------------------------------------------------------- email links
@@ -1358,6 +1413,7 @@ export async function updateSession(code: string, ownerId: string, input: EditSe
     // The scale guard repeats the check, in case a rating arrived since the read above.
     sql`update sessions set title = ${input.title}, low_label = ${input.lowLabel}, high_label = ${input.highLabel},
           theme = coalesce(${input.theme ?? null}::text, theme), decor = coalesce(${input.decor ?? null}::boolean, decor),
+          named = coalesce(${input.named ?? null}::boolean, named),
           scale_max = case when exists (select 1 from votes where session_id = ${sid}::uuid) then scale_max else ${input.scaleMax}::int end,
           revision = revision + 1
         where id = ${sid}::uuid`,
