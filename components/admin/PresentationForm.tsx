@@ -1333,7 +1333,11 @@ export function PresentationForm({
             {busy
               ? "Saving…"
               : editing
-                ? "Save changes"
+                ? (
+                    <>
+                      Save<span className="max-sm:hidden"> changes</span>
+                    </>
+                  )
                 : (
                     <>
                       Create<span className="max-sm:hidden"> presentation</span>

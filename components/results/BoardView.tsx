@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { arrivalOrder, boardInfo, boardSpot, clampPan, leafTilt, pieceShade, pieceTextSize, sceneSize, ZOOMS, type BoardId } from "@/lib/boards";
+import { arrivalOrder, boardInfo, boardSpot, clampPan, fitSceneSize, leafTilt, pieceShade, pieceTextSize, SCENE_FIT_MIN, sceneRatio, sceneSize, screenInFrame, ZOOMS, type BoardId } from "@/lib/boards";
 import { tinted } from "@/lib/colors";
 import { tree, treeShape } from "@/lib/tree";
 import type { TextAnswer } from "@/lib/types";
+import { useFit } from "../FitToScreen";
 import { ToBody } from "../Portal";
 import { FONT_SHARE, LEAF_INK, LEAVES, LeafShape, leafStyle, TREE_SKY, TreeArt } from "../TreeArt";
 
@@ -14,18 +15,20 @@ const NOTE_INK = "#2b2620";
 
 const plural = (n: number, w: string) => `${n} ${n === 1 ? w : w === "leaf" ? "leaves" : `${w}s`}`;
 
-function useWidth<T extends HTMLElement>() {
+/** An element's own width and height (layout pixels: a scaled parent doesn't change them). */
+function useSize<T extends HTMLElement>() {
   const ref = useRef<T>(null);
-  const [w, setW] = useState(0);
+  const [size, setSize] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    setW(el.clientWidth);
-    const ro = new ResizeObserver(() => setW(el.clientWidth));
+    const read = () => setSize((cur) => (cur.w === el.clientWidth && cur.h === el.clientHeight ? cur : { w: el.clientWidth, h: el.clientHeight }));
+    read();
+    const ro = new ResizeObserver(read);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  return [ref, w] as const;
+  return [ref, size] as const;
 }
 
 const NARROW = "(max-width: 559px)";
@@ -122,16 +125,25 @@ export function BoardView({ board, answers, onHide }: { board: BoardId; answers:
  * so the whole picture is always in view. Zoom in (buttons, or pinch) to read small leaves; drag to look around.
  */
 function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: TextAnswer[]; onOpen: (id: string) => void }) {
-  const [ref, width] = useWidth<HTMLDivElement>();
+  // With Fit to screen on, it gives this picture its box (the room left on the screen) and the picture
+  // only draws inside it. If both sized the picture, each would change the other's answer for ever.
+  const fit = useFit();
+  const [ref, box] = useSize<HTMLDivElement>();
+  const width = box.w;
   const [screen, setScreen] = useState({ vh: 0, top: 0 });
   // Where the picture starts moves as things above it load (description, picture, live pills), so measure
   // after every render and on resize; only a real change re-renders.
   const measure = useCallback(() => {
+    if (fit.on) return;
     const el = ref.current;
     if (!el) return;
-    const next = { vh: window.innerHeight, top: Math.round(el.getBoundingClientRect().top + window.scrollY) };
+    // the builder's preview draws a pretend screen, scaled down: the picture fits that, not the window
+    const frame = el.closest<HTMLElement>("[data-screen]");
+    const shown = frame?.getBoundingClientRect();
+    const top = el.getBoundingClientRect().top;
+    const next = frame && shown ? screenInFrame(top, shown.top, shown.height, frame.offsetHeight) : { vh: window.innerHeight, top: Math.round(top + window.scrollY) };
     setScreen((cur) => (Math.abs(cur.vh - next.vh) > 2 || Math.abs(cur.top - next.top) > 2 ? next : cur));
-  }, [ref]);
+  }, [ref, fit.on]);
   useLayoutEffect(measure);
   useEffect(() => {
     window.addEventListener("resize", measure);
@@ -142,8 +154,13 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
       ro.disconnect();
     };
   }, [measure]);
-  const { w, h } = sceneSize(width, screen.vh || 800, screen.top);
+  const { w, h } = fit.on ? fitSceneSize(width, box.h) : sceneSize(width, screen.vh || 800, screen.top);
   const wide = width >= 560;
+  // the picture's shape changes with its width (wide or tall): Fit to screen has to work its box out again
+  const ratio = sceneRatio(width);
+  useLayoutEffect(() => {
+    if (fit.on) fit.refit();
+  }, [fit, ratio]);
 
   // the tree, drawn for this picture's shape (wide on big screens, tall on phones)
   const art = board === "tree" ? tree(treeShape(w, h)) : null;
@@ -214,16 +231,24 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
   // where the stars go: most of the sky
   const area = { l: 0.05, t: 0.07, w: 0.9, h: 0.8 };
   const label = board === "tree" ? `A tree with ${plural(n, "leaf")}` : `A night sky with ${plural(n, "star")}`;
+  // one line beside the zoom buttons: the long wording wrapped on a phone-sized picture
+  const one = board === "tree" ? "leaf" : "star";
+  const hint = w < 360 ? `Tap a ${one} to read it` : `Zoom in or tap a ${one} to read it`;
   const zoomBtn =
     "flex h-9 min-w-9 items-center justify-center rounded-full border border-line-strong bg-white px-2 text-lg font-bold text-ink shadow-sm disabled:opacity-40";
 
   return (
-    <div ref={ref} className="w-full">
-      {width > 0 && (
+    <div
+      ref={ref}
+      className={fit.on ? "flex w-full justify-center overflow-hidden" : "w-full"}
+      data-fit-flex={fit.on ? ratio : undefined}
+      data-fit-min={fit.on ? SCENE_FIT_MIN : undefined}
+    >
+      {width > 0 && h > 0 && (
         <div
           role="group"
           aria-label={label}
-          className="relative mx-auto overflow-hidden rounded-2xl border border-line-strong select-none"
+          className="relative mx-auto shrink-0 overflow-hidden rounded-2xl border border-line-strong select-none"
           style={{
             width: w,
             height: h,
@@ -302,7 +327,7 @@ function Scene({ board, answers, onOpen }: { board: "tree" | "sky"; answers: Tex
           )}
           {n > 0 && !showText && zoom === 1 && (
             <p className="pointer-events-none absolute bottom-3.5 left-2 right-24">
-              <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold text-ink">Zoom in or tap a {board === "tree" ? "leaf" : "star"} to read it</span>
+              <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold whitespace-nowrap text-ink">{hint}</span>
             </p>
           )}
           {n > 0 && (
@@ -407,16 +432,26 @@ function PieceDialog({
   onHide?: (id: string) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  // the latest handlers: they change on every refresh of the results, and the box must not start over then
+  const handlers = useRef({ onClose, onStep });
+  useEffect(() => {
+    handlers.current = { onClose, onStep };
+  });
   useEffect(() => {
     closeRef.current?.focus();
+    // The results screen has keys of its own (Esc = all questions, arrows = the next question, F, Q, 1–5).
+    // While this box is open the keys belong to it: handle them first and stop them here, or Esc would
+    // also leave the question and an arrow would also change the board behind the box.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") onStep(1);
-      else if (e.key === "ArrowLeft") onStep(-1);
+      if (e.key === "Tab" || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") handlers.current.onClose();
+      else if (e.key === "ArrowRight") handlers.current.onStep(1);
+      else if (e.key === "ArrowLeft") handlers.current.onStep(-1);
+      e.stopImmediatePropagation();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, onStep]);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
 
   const info = boardInfo(board);
   // a paragraph gets smaller words and a plainer shape, so it all fits inside the box

@@ -65,3 +65,48 @@ describe("Summary counts the people who scored that question", () => {
     expect(src("components/DashboardApp.tsx")).toMatch(/voterCount=\{peopleIn\(group\.focus\.id\)\}/);
   });
 });
+
+// Found in the 2026-11-14 sweep: with a leaf, note or star shown big, Esc also went back to
+// "All questions" and the arrow keys also changed the question behind it.
+describe("keys pressed while a leaf, note or star is shown big stay with it", () => {
+  const board = src("components/results/BoardView.tsx");
+  const dialog = board.slice(board.indexOf("function PieceDialog"));
+
+  it("handles Esc and the arrows before the results screen does, and stops them there", () => {
+    expect(dialog).toMatch(/window\.addEventListener\("keydown", onKey, true\)/);
+    expect(dialog).toMatch(/window\.removeEventListener\("keydown", onKey, true\)/);
+    expect(dialog).toContain("e.stopImmediatePropagation()");
+  });
+
+  it("takes the focus once, when it opens, not again every time new results arrive", () => {
+    // its close and step handlers are new functions on every refresh: they're kept in a ref
+    expect(dialog).toMatch(/closeRef\.current\?\.focus\(\);[\s\S]{0,900}\}, \[\]\);/);
+  });
+
+  it("keeps the presenter's other shortcuts (F, Q, 1–5) from firing behind it", () => {
+    // every key is stopped while the box is open, except Tab (moving between its buttons)
+    expect(dialog).toMatch(/e\.key === "Tab"/);
+  });
+});
+
+// Found in the 2026-11-14 sweep, on the builder at 390px.
+describe("the builder's item rows and save bar fit a phone", () => {
+  it("puts '+ description' on a line of its own, so the item's name box keeps the row's width", () => {
+    // sharing the row, it left the name box about 10 letters wide on a phone ("Daily standu")
+    const list = src("components/admin/ListEditor.tsx");
+    expect(list).toMatch(/<div className="w-full[^"]*">\s*<button[\s\S]{0,400}\+ description/);
+  });
+
+  it("says 'Save' on a phone, where 'Save changes' doesn't fit beside Cancel and Preview", () => {
+    const form = src("components/admin/PresentationForm.tsx");
+    expect(form).toMatch(/Save<span className="max-sm:hidden"> changes<\/span>/);
+  });
+});
+
+describe("the tree's 'tap to read' hint stays on one line on a phone", () => {
+  it("uses the short wording when the picture is narrow (the long one wrapped under the zoom buttons' side)", () => {
+    const board = src("components/results/BoardView.tsx");
+    expect(board).toMatch(/w < 360 \? `Tap a \$\{[a-z]+\} to read it` : `Zoom in or tap a \$\{[a-z]+\} to read it`/);
+    expect(board).toMatch(/whitespace-nowrap[^"]*">\{hint\}/);
+  });
+});

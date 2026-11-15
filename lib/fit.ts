@@ -43,3 +43,42 @@ export function fitScale(availWidth: number, availHeight: number, measure: (widt
   }
   return best;
 }
+
+export interface FlexFit extends Fit {
+  /** The height the flexible piece gets, at the layout width. */
+  flex: number;
+}
+
+/**
+ * Like `fitScale`, for a page with one piece that can be any height (a board: the tree, the night sky).
+ * The piece takes the room that's left: the page stays at full size as long as the piece can be at
+ * least `min` tall, and only shrinks when it can't. `measure(width)` gives the height of everything
+ * else (`rest`) and the tallest the piece may be (`cap`) at a layout width.
+ *
+ * The piece's own height is never read back, so the answer doesn't depend on what was drawn before.
+ * (When the piece sized itself from the screen and the page was then fitted around it, each changed
+ * the other's answer and the picture flickered between two sizes.)
+ */
+export function fitWithFlex(
+  availWidth: number,
+  availHeight: number,
+  measure: (width: number) => { rest: number; cap: number },
+  min: number,
+  steps = 7,
+): FlexFit {
+  const smallest = (m: { cap: number }) => Math.max(0, Math.min(min, m.cap));
+  const fit = fitScale(
+    availWidth,
+    availHeight,
+    (width) => {
+      const m = measure(width);
+      return m.rest + smallest(m);
+    },
+    steps,
+  );
+  const m = measure(fit.width);
+  const room = availHeight > 0 ? Math.floor(availHeight / fit.scale - m.rest) : 0;
+  const flex = Math.max(smallest(m), Math.min(m.cap, room));
+  const height = m.rest + flex;
+  return { ...fit, height, flex, fits: !(availHeight > 0) || height * fit.scale <= availHeight + 0.5 };
+}

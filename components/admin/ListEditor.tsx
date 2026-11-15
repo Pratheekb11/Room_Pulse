@@ -168,14 +168,17 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
               </span>
               {describe &&
                 (row.description === undefined ? (
-                  <button
-                    type="button"
-                    onClick={() => change(items.map((r, j) => (j === i ? { ...r, description: "" } : r)))}
-                    className="mt-0.5 rounded px-1 text-xs font-semibold text-ink-soft underline underline-offset-4 hover:text-ink sm:ml-[5.75rem]"
-                    aria-label={`Add a description to ${noun} ${i + 1}`}
-                  >
-                    + description
-                  </button>
+                  // a line of its own, under the name box: beside it, it squeezed the box to a few letters on a phone
+                  <div className="w-full sm:pl-[5.75rem]">
+                    <button
+                      type="button"
+                      onClick={() => change(items.map((r, j) => (j === i ? { ...r, description: "" } : r)))}
+                      className="mt-0.5 rounded px-1 text-xs font-semibold text-ink-soft underline underline-offset-4 hover:text-ink"
+                      aria-label={`Add a description to ${noun} ${i + 1}`}
+                    >
+                      + description
+                    </button>
+                  </div>
                 ) : (
                   <div className="mt-1 flex w-full items-center gap-1 sm:pl-[6rem]">
                     <label htmlFor={`${id}-${i}-desc`} className="sr-only">

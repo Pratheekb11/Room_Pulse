@@ -19,3 +19,15 @@ describe("the builder preview is drawn with the same pieces as the real screens"
     expect(uses(preview, [...parts, "QrPanel", "LiveBadge"])).toEqual([]);
   });
 });
+
+// Found in the 2026-11-14 sweep: the preview's big screen cut the tree and the night sky off at the
+// bottom, because the picture sized itself to the real window instead of the 1280×800 preview screen.
+describe("a board in the preview fits the preview's screen", () => {
+  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  it("the preview marks its pretend screen, and the board measures that", () => {
+    expect(read("components/admin/PresentationPreview.tsx")).toMatch(/data-screen[^>]*style=\{\{ width: SCREEN_W, height: SCREEN_H/);
+    const board = read("components/results/BoardView.tsx");
+    expect(board).toContain('closest<HTMLElement>("[data-screen]")');
+    expect(board).toContain("screenInFrame(");
+  });
+});

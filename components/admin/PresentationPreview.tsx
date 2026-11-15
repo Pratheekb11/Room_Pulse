@@ -94,7 +94,8 @@ function ScreenSlide({ title, questions, index, onPick, session }: { title: stri
   const voters = sampleCounts(q.options.length || 4).reduce((a, b) => a + b, 0);
   return (
     <div ref={box} className="slab mx-auto w-full max-w-[calc((100dvh-17rem)*1.6)] min-w-0 overflow-hidden rounded-xl" style={{ height: SCREEN_H * scale }}>
-      <div className="theme-pattern origin-top-left bg-canvas" style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}>
+      {/* data-screen: a board (tree, night sky) fits this pretend screen, not the real window */}
+      <div className="theme-pattern origin-top-left bg-canvas" data-screen style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}>
         <div className="flex h-full flex-col gap-5 px-8 py-6">
           <ScreenHeader
             title={title || "Your presentation"}

@@ -12,7 +12,7 @@ import * as resultsRoute from "@/app/api/results/[code]/route";
 import * as publicResults from "@/app/api/results/[code]/public/route";
 import * as answerRoute from "@/app/api/answer/route";
 import { ACTIVITIES, activityToBody } from "@/lib/activities";
-import { arrivalOrder, BOARDS, boardSpot, clampPan, leafTilt, MAX_AUTHOR, MAX_LEAVES, sceneSize, ZOOMS } from "@/lib/boards";
+import { arrivalOrder, BOARDS, boardSpot, clampPan, leafTilt, MAX_AUTHOR, MAX_LEAVES, sceneSize, screenInFrame, ZOOMS } from "@/lib/boards";
 import { tree as drawnTree } from "@/lib/tree";
 import { createSessionSchema } from "@/lib/validation";
 import { chartsFor } from "@/lib/charts";
@@ -375,6 +375,16 @@ describe("fitting the tree on any screen", () => {
       const s = sceneSize(c.width, c.viewportH, c.top);
       expect(c.top + s.h, JSON.stringify(c)).toBeLessThanOrEqual(c.viewportH);
     }
+  });
+
+  it("on a pretend screen drawn smaller (the builder's preview), measures that screen and not the window", () => {
+    // a 1280×800 screen shown at half size, starting 100px down the window; the picture shows 160px into it
+    expect(screenInFrame(260, 100, 400, 800)).toEqual({ vh: 800, top: 320 });
+    // so the whole picture fits the pretend screen
+    const at = screenInFrame(260, 100, 400, 800);
+    expect(at.top + sceneSize(880, at.vh, at.top).h).toBeLessThanOrEqual(800);
+    // a frame with no size yet doesn't break the sums
+    expect(screenInFrame(0, 0, 0, 0)).toEqual({ vh: 0, top: 0 });
   });
 
   it("is tall on phones and wide on big screens", () => {

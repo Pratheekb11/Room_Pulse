@@ -46,17 +46,44 @@ export function pieceTextSize(text: string): "big" | "medium" | "small" {
 /** Zoom steps on the tree and the sky. */
 export const ZOOMS = [1, 1.5, 2, 3] as const;
 
+/** The picture's shape (width ÷ height): wide on big screens, tall on phones. */
+export const sceneRatio = (width: number) => (width >= 560 ? 1.6 : 0.85);
+
+/** With Fit to screen on, the shortest the tree or sky is drawn before the page is shrunk instead. */
+export const SCENE_FIT_MIN = 200;
+
+/**
+ * The tree or sky inside the box Fit to screen gives it (`width` × `height`): as tall as the box,
+ * never wider than it, in its usual shape. It only reads the box, so it can't change the page around it.
+ */
+export function fitSceneSize(width: number, height: number): { w: number; h: number; ratio: number } {
+  const ratio = sceneRatio(width);
+  const h = Math.max(0, Math.floor(Math.min(height, width / ratio)));
+  return { w: Math.floor(h * ratio), h, ratio };
+}
+
 /**
  * How big to draw the tree or sky: as wide as there's room for, never taller than the screen,
  * and if it starts in the top 60% of the screen, short enough to be seen whole without scrolling.
  * Tall on phones (narrow space), wide on big screens.
  */
 export function sceneSize(width: number, viewportH: number, top: number): { w: number; h: number; ratio: number } {
-  const ratio = width >= 560 ? 1.6 : 0.85;
+  const ratio = sceneRatio(width);
   const startsHigh = top >= 0 && top <= viewportH * 0.6;
   const room = Math.max(160, startsHigh ? Math.max(viewportH - top, viewportH * 0.4) - 16 : viewportH - 16);
   const h = Math.floor(Math.min(width / ratio, room));
   return { w: Math.floor(h * ratio), h, ratio };
+}
+
+/**
+ * The "screen" for `sceneSize` when the picture is on a pretend screen drawn smaller with a transform
+ * (the builder's preview, 1280×800 scaled to fit): that screen's own height, and how far down it the
+ * picture starts, both in the pretend screen's pixels. `elTop`, `frameTop` and `shownHeight` are what
+ * the window shows; `height` is the pretend screen's real height.
+ */
+export function screenInFrame(elTop: number, frameTop: number, shownHeight: number, height: number): { vh: number; top: number } {
+  const scale = height > 0 && shownHeight > 0 ? shownHeight / height : 1;
+  return { vh: height, top: Math.round((elTop - frameTop) / scale) };
 }
 
 /** Keeps a zoomed picture covering its frame: it can't be dragged past its edges. */
