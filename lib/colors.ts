@@ -19,17 +19,67 @@ export const TOPIC_INKS = ["#9a4a26", "#2f5f99", "#2f7340", "#6a4799", "#7d5a12"
  * A colour at the design's colour strength (`--theme-chroma`, set by lib/themes.ts): full colour normally,
  * a grey of the same brightness in plain designs (Mono). Same brightness = text contrast is unchanged.
  */
-export function tinted(full: string): string {
+export function tinted(full: string, css: string = full): string {
   // grey with the same relative luminance (WCAG), so contrast with any text colour is unchanged
   const l = luminance(parseHex(full));
   const s = l <= 0.0031308 ? 12.92 * l : 1.055 * l ** (1 / 2.4) - 0.055;
   const y = Math.round(s * 255);
-  return `color-mix(in srgb, ${full} var(--theme-chroma, 100%), ${hex([y, y, y])})`;
+  return `color-mix(in srgb, ${css} var(--theme-chroma, 100%), ${hex([y, y, y])})`;
 }
 
-export const topicInk = (index: number) => tinted(TOPIC_INKS[index % TOPIC_INKS.length]);
+/**
+ * Option colour N: the slide design's own (`--topic-N`, set by lib/themes.ts) with the default set behind it.
+ * The grey for plain designs is worked out from the default colour; plain designs don't set their own.
+ */
+export const topicColor = (index: number) => {
+  const i = index % TOPIC_COLORS.length;
+  return tinted(TOPIC_COLORS[i], `var(--topic-${i}, ${TOPIC_COLORS[i]})`);
+};
 
-export const topicColor = (index: number) => tinted(TOPIC_COLORS[index % TOPIC_COLORS.length]);
+/** Text drawn in option colour N (word lists): the design's readable shade, or the default dark ink. */
+export const topicInk = (index: number) => {
+  const i = index % TOPIC_INKS.length;
+  return tinted(TOPIC_INKS[i], `var(--topic-ink-${i}, ${TOPIC_INKS[i]})`);
+};
+
+/** A shade of `color`, darkened just enough to read as text (4.5:1) on every one of `backgrounds`, keeping its hue. */
+export function readableShade(color: string, backgrounds: string[]): string {
+  const [h, sat, light] = toHsl(parseHex(color));
+  const bgs = backgrounds.map(parseHex);
+  // darker shades of a pastel look grey unless they're also more saturated
+  const s2 = Math.min(1, Math.max(sat, 0.45));
+  for (let l = light; l >= 0; l -= 0.01) {
+    const c = fromHsl(h, s2, l);
+    if (bgs.every((b) => contrast(c, b) >= 4.6)) return hex(c);
+  }
+  return hex(BLACK);
+}
+
+function toHsl([r, g, b]: RGB): [number, number, number] {
+  const [x, y, z] = [r / 255, g / 255, b / 255];
+  const max = Math.max(x, y, z);
+  const min = Math.min(x, y, z);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === x ? (y - z) / d + (y < z ? 6 : 0) : max === y ? (z - x) / d + 2 : (x - y) / d + 4;
+  return [h / 6, s, l];
+}
+
+function fromHsl(h: number, s: number, l: number): RGB {
+  if (s === 0) return [l * 255, l * 255, l * 255];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const f = (t: number) => {
+    const u = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  return [f(h + 1 / 3) * 255, f(h) * 255, f(h - 1 / 3) * 255];
+}
 
 const INK: RGB = [38, 37, 30]; // #26251e
 const WHITE: RGB = [255, 255, 255];

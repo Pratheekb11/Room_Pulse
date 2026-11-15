@@ -1,4 +1,4 @@
-import { TOPIC_COLORS } from "./colors";
+import { TOPIC_COLORS, TOPIC_INKS, readableShade } from "./colors";
 import type { QuestionKind } from "./types";
 
 // Slide designs: how a presentation looks on the big screen and on voters' phones.
@@ -47,6 +47,8 @@ export interface Theme {
   pattern?: { image: string; size: string };
   /** The colour score scales are built from (colour grid, heatmap), when the main colour shades badly (yellow turns olive). */
   heat?: string;
+  /** The design's eight option colours (card headers, bars, slices, chips), all light enough for dark text. Plain designs keep the default set. */
+  topics?: string[];
   colors: ThemeColors;
 }
 
@@ -55,27 +57,28 @@ export const THEMES: Theme[] = [
     id: "paper",
     style: "Minimal",
     label: "Paper",
-    blurb: "Whiteboard white, a teal marker and sticky-note yellow. Fits almost anything.",
+    blurb: "Clean white, a vivid cobalt and sticky-note yellow. Fits almost anything.",
     dark: false,
     font: "grotesk",
+    topics: ["#aebdfb", "#ffe08a", "#f6a9a0", "#9fdcb8", "#d4b8f6", "#c6e48f", "#a6e3f0", "#efb3d8"],
     colors: {
-      canvas: "#f4f6f6",
-      canvasSoft: "#f9fafa",
+      canvas: "#f7f7f8",
+      canvasSoft: "#fbfbfc",
       surface: "#ffffff",
-      surfaceStrong: "#dfe5e5",
-      ink: "#172426",
-      inkSoft: "#465557",
-      muted: "#5b696b",
-      mutedSoft: "#7f8c8e",
-      line: "#dde4e4",
-      lineSoft: "#e9eeee",
-      lineStrong: "#c2cdcd",
-      primary: "#0b7a6e",
-      primaryActive: "#08635a",
-      sun: "#fbeeb0",
-      mint: "#a8dcc9",
-      lavender: "#cbc3ee",
-      error: "#c62a4b",
+      surfaceStrong: "#e4e5ea",
+      ink: "#0f1115",
+      inkSoft: "#3f434b",
+      muted: "#5d616a",
+      mutedSoft: "#858a94",
+      line: "#e2e3e8",
+      lineSoft: "#eeeff2",
+      lineStrong: "#c8cad2",
+      primary: "#2747f5",
+      primaryActive: "#1a34cf",
+      sun: "#ffe58a",
+      mint: "#b3e5cc",
+      lavender: "#cfd6fc",
+      error: "#cf2747",
       success: "#1b7f5e",
     },
   },
@@ -115,6 +118,7 @@ export const THEMES: Theme[] = [
     blurb: "Cool blues. Calm for retros and standups.",
     dark: false,
     font: "sans",
+    topics: ["#9cc0ea", "#8fd3cf", "#f2c38b", "#c3aee8", "#f0a3a0", "#a9d6a5", "#d6c7a8", "#e8b2cc"],
     colors: {
       canvas: "#eef3f7",
       canvasSoft: "#f4f7fa",
@@ -143,6 +147,7 @@ export const THEMES: Theme[] = [
     blurb: "Sage and moss with a serif. Earthy and calm.",
     dark: false,
     font: "serif",
+    topics: ["#a8d08d", "#e8c77a", "#9fc7b4", "#d9a98a", "#d4e08f", "#b7c4e0", "#e3b3a8", "#c2b8a0"],
     colors: {
       canvas: "#f1f4ec",
       canvasSoft: "#f6f8f2",
@@ -171,6 +176,7 @@ export const THEMES: Theme[] = [
     blurb: "Soft rose with a serif. Friendly for parties and socials.",
     dark: false,
     font: "serif",
+    topics: ["#f2aebf", "#f6c9a4", "#c9b6e8", "#b7d6c4", "#ebb5e8", "#d9d48f", "#a9c4e2", "#d3b49a"],
     colors: {
       canvas: "#fbf1ee",
       canvasSoft: "#fdf6f4",
@@ -199,6 +205,7 @@ export const THEMES: Theme[] = [
     blurb: "Butter yellow and violet. Loud in a good way.",
     dark: false,
     font: "poster",
+    topics: ["#c4a5ff", "#7fe0c4", "#ffb37a", "#7cc8ff", "#ff9fc8", "#ffe066", "#a6e36f", "#ff8fa3"],
     colors: {
       canvas: "#fff6db",
       canvasSoft: "#fffaeb",
@@ -227,6 +234,7 @@ export const THEMES: Theme[] = [
     blurb: "Sakura pink, manga halftone dots and bubbly type. For anime clubs and fun crowds.",
     dark: false,
     font: "anime",
+    topics: ["#ffb3cf", "#a9d8ff", "#ffd98a", "#c5b3ff", "#9fe3c8", "#ffbfa0", "#e6a8f0", "#b8e08f"],
     pattern: { image: "radial-gradient(rgb(232 36 111 / 0.1) 1.4px, transparent 1.6px)", size: "14px 14px" },
     colors: {
       canvas: "#fff0f5",
@@ -256,6 +264,7 @@ export const THEMES: Theme[] = [
     blurb: "Green board, chalk lettering. For workshops and classes.",
     dark: true,
     font: "chalk",
+    topics: ["#f2d65c", "#f4a6a6", "#9fd4f0", "#b5e3a1", "#f7b98a", "#d2b8f2", "#ece9dc", "#8fe0d0"],
     heat: "#f08a3c",
     colors: {
       canvas: "#1f2b25",
@@ -285,6 +294,7 @@ export const THEMES: Theme[] = [
     blurb: "Dark and easy on the eyes in a dim room. For talks.",
     dark: true,
     font: "serif",
+    topics: ["#ff9f80", "#8fb8ff", "#f7d488", "#b9a3ff", "#7fd9b9", "#ff9cc3", "#9fdcf2", "#d8c3a0"],
     colors: {
       canvas: "#11151c",
       canvasSoft: "#141922",
@@ -313,6 +323,7 @@ export const THEMES: Theme[] = [
     blurb: "Dark with a cyan glow and code type. For dev crowds.",
     dark: true,
     font: "mono",
+    topics: ["#3ee0d0", "#ff7ddc", "#b4ff5c", "#9aa5ff", "#ffd15c", "#5cc8ff", "#ff9f80", "#d0a8ff"],
     colors: {
       canvas: "#0b1016",
       canvasSoft: "#0e141b",
@@ -341,6 +352,7 @@ export const THEMES: Theme[] = [
     blurb: "Black and yellow, big poster type. Made for quizzes.",
     dark: true,
     font: "poster",
+    topics: ["#ffd400", "#ff7a9c", "#3ad6ff", "#7cff6b", "#c49bff", "#ff9a3c", "#4dffc3", "#ff8ae8"],
     heat: "#ff4d7a",
     colors: {
       canvas: "#121212",
@@ -415,8 +427,17 @@ export function themeStyle(id: string | null | undefined): Record<string, string
     // Accent colours some badges use directly (bg-peach…): greys in plain designs.
     ...(t.plain ? { "--color-peach": "#d9d9d9", "--color-sky": "#cccccc", "--color-gold": "#8c8c8c", "--color-coral": "#d9d9d9" } : {}),
     "--theme-pattern-size": t.pattern?.size ?? "auto",
-    // Coloured words (e.g. word lists): the dark inks vanish on dark designs, the pastels read well.
-    ...(t.dark ? Object.fromEntries(TOPIC_COLORS.map((c, i) => [`--topic-ink-${i}`, c])) : {}),
+    // Option colours of the design (lib/colors.ts topicColor reads them). Every design sets all of them,
+    // plain ones the default set, so none picks up Paper's from the page (app/globals.css).
+    ...Object.fromEntries((t.topics ?? TOPIC_COLORS).map((c, i) => [`--topic-${i}`, c])),
+    // Coloured words (e.g. word lists): on dark designs the option colours themselves read well;
+    // on light ones a dark shade of each, readable on cards and the page.
+    ...Object.fromEntries(
+      (t.topics ?? TOPIC_COLORS).map((c, i) => [
+        `--topic-ink-${i}`,
+        t.dark ? c : t.topics ? readableShade(c, [t.colors.surface, t.colors.canvas]) : TOPIC_INKS[i],
+      ]),
+    ),
     colorScheme: t.dark ? "dark" : "light",
   };
 }

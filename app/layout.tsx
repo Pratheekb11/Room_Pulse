@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f4f6f6",
+  themeColor: "#f7f7f8",
 };
 
 // Pages that need a CSP nonce opt into per-request rendering themselves (`dynamic = "force-dynamic"`);

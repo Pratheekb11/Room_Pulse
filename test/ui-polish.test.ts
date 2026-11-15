@@ -141,44 +141,67 @@ describe("score colours follow the slide design", () => {
   });
 });
 
-describe("the default design has a look of its own (whiteboard, teal marker, sticky notes)", () => {
+describe("the default design has a look of its own (clean white, cobalt, sticky notes)", () => {
   const paper = getTheme("paper");
   const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  const hue = (h: string) => {
+  const hsl = (h: string) => {
     const [r, g, b] = rgb(h).map((v) => v / 255);
-    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-    if (!d) return 0;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, l = (max + min) / 2;
+    if (!d) return { h: 0, s: 0, l };
     const x = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    return (x * 60 + 360) % 360;
+    return { h: (x * 60 + 360) % 360, s: d / (1 - Math.abs(2 * l - 1)), l };
   };
 
-  it("isn't cream with an orange button", () => {
-    const [r, , b] = rgb(paper.colors.canvas);
-    expect(r - b, "canvas leans warm (cream)").toBeLessThanOrEqual(2);
-    const h = hue(paper.colors.primary);
-    expect(h < 0 || h > 60, `primary hue ${h}`).toBe(true);
+  // 2026-11-15: the grey-green whiteboard and teal looked dull; the canvas is a plain neutral grey now
+  it("has a neutral canvas: not cream, not green", () => {
+    const [r, g, b] = rgb(paper.colors.canvas);
+    expect(Math.abs(r - g), "canvas tint").toBeLessThanOrEqual(1);
+    expect(b - r, "canvas tint").toBeGreaterThanOrEqual(0);
+    expect(b - r, "canvas tint").toBeLessThanOrEqual(2);
+    expect(paper.colors.surface).toBe("#ffffff");
   });
 
-  it("uses a teal marker colour, unlike Harbour's blue and Forest's green", () => {
-    const h = hue(paper.colors.primary);
-    expect(h).toBeGreaterThanOrEqual(160);
-    expect(h).toBeLessThanOrEqual(185);
-    for (const other of ["harbour", "forest", "neon"]) expect(getTheme(other).colors.primary).not.toBe(paper.colors.primary);
+  it("writes in near-black, not a tinted ink", () => {
+    const [r, g, b] = rgb(paper.colors.ink);
+    expect(Math.max(r, g, b)).toBeLessThanOrEqual(24);
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(8);
+  });
+
+  it("uses a vivid cobalt, brighter than Harbour's navy and unlike the other blues", () => {
+    const c = hsl(paper.colors.primary);
+    expect(c.h).toBeGreaterThanOrEqual(220);
+    expect(c.h).toBeLessThanOrEqual(235);
+    expect(c.s).toBeGreaterThan(0.8);
+    const harbour = hsl(getTheme("harbour").colors.primary);
+    expect(c.s).toBeGreaterThan(harbour.s);
+    expect(c.l).toBeGreaterThan(harbour.l);
+    for (const other of ["harbour", "forest", "neon", "pop"]) expect(getTheme(other).colors.primary).not.toBe(paper.colors.primary);
   });
 
   it("highlights in sticky-note yellow", () => {
-    const h = hue(paper.colors.sun);
+    const h = hsl(paper.colors.sun).h;
     expect(h).toBeGreaterThanOrEqual(42);
     expect(h).toBeLessThanOrEqual(56);
   });
 
+  it("its option colours have no teal or grey-green", () => {
+    for (const c of paper.topics!) {
+      const { h } = hsl(c);
+      expect(h < 160 || h > 190, `${c} hue ${h}`).toBe(true);
+    }
+  });
+
   it("the browser bar and emails use the same colours", () => {
     expect(read("app/layout.tsx")).toContain(`themeColor: "${paper.colors.canvas}"`);
-    expect(read("lib/email.ts")).toContain(`background:${paper.colors.primary}`);
+    const email = read("lib/email.ts");
+    expect(email).toContain(`background:${paper.colors.primary}`);
+    expect(email).toContain(`background:${paper.colors.canvas}`);
+    expect(email).toContain(`color:${paper.colors.ink}`);
   });
 
   it("says what it looks like", () => {
-    expect(paper.blurb).toMatch(/whiteboard/i);
+    expect(paper.blurb).toMatch(/cobalt/i);
+    expect(paper.blurb).not.toMatch(/teal/i);
   });
 });
 

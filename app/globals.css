@@ -1,37 +1,37 @@
 @import "tailwindcss";
 
 /*
- * Design language: a team's whiteboard.
- * Whiteboard-grey canvas, teal-black marker ink, one teal for primary actions only,
+ * Design language: clean and confident.
+ * Neutral light-grey canvas, white cards, near-black ink, one vivid cobalt for primary actions and score scales,
  * sticky-note yellow for highlights, hairlines not shadows, mono for codes.
  * These are the Paper design's colours (lib/themes.ts); a test keeps them the same.
  */
 @theme {
-  --color-ink: #172426;
-  --color-ink-soft: #465557; /* body text */
-  --color-muted: #5b696b;
-  --color-muted-soft: #7f8c8e;
-  --color-canvas: #f4f6f6;
-  --color-canvas-soft: #f9fafa;
-  --color-line: #dde4e4;
-  --color-line-soft: #e9eeee;
-  --color-line-strong: #c2cdcd;
-  --color-surface-strong: #dfe5e5;
+  --color-ink: #0f1115;
+  --color-ink-soft: #3f434b; /* body text */
+  --color-muted: #5d616a;
+  --color-muted-soft: #858a94;
+  --color-canvas: #f7f7f8;
+  --color-canvas-soft: #fbfbfc;
+  --color-line: #e2e3e8;
+  --color-line-soft: #eeeff2;
+  --color-line-strong: #c8cad2;
+  --color-surface-strong: #e4e5ea;
 
-  --color-primary: #0b7a6e;
-  --color-primary-active: #08635a;
+  --color-primary: #2747f5;
+  --color-primary-active: #1a34cf;
 
   /* Pastel set: used only inside results and progress visualisations */
-  --color-peach: #dfa88f;
-  --color-mint: #a8dcc9;
-  --color-sky: #9fbbe0;
-  --color-lavender: #cbc3ee;
+  --color-peach: #f6a9a0;
+  --color-mint: #b3e5cc;
+  --color-sky: #aebdfb;
+  --color-lavender: #cfd6fc;
   --color-gold: #c08532;
-  --color-sun: #fbeeb0; /* soft gold tint for notices */
-  --color-coral: #dfa88f;
+  --color-sun: #ffe58a; /* soft gold tint for notices */
+  --color-coral: #f6a9a0;
 
   --color-success: #1b7f5e;
-  --color-error: #c62a4b;
+  --color-error: #cf2747;
   --color-warn: #9a5b00; /* "Retrying…" and other gentle warnings */
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -74,6 +74,27 @@
     from { opacity: 0; scale: 0.2; }
     to { opacity: 1; scale: 1; }
   }
+}
+
+/* Paper's option colours (card headers, bars, slices, chips) and the readable shade of each for coloured words.
+   Other designs set their own on <html> (lib/themes.ts themeStyle); a test keeps these the same as Paper's. */
+:root {
+  --topic-0: #aebdfb;
+  --topic-1: #ffe08a;
+  --topic-2: #f6a9a0;
+  --topic-3: #9fdcb8;
+  --topic-4: #d4b8f6;
+  --topic-5: #c6e48f;
+  --topic-6: #a6e3f0;
+  --topic-7: #efb3d8;
+  --topic-ink-0: #395ef5;
+  --topic-ink-1: #8f6900;
+  --topic-ink-2: #d42814;
+  --topic-ink-3: #2d7d4e;
+  --topic-ink-4: #8f47e8;
+  --topic-ink-5: #597a1d;
+  --topic-ink-6: #187a8e;
+  --topic-ink-7: #ca2b8d;
 }
 
 html {
