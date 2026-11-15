@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { scaleColor, topicColor } from "@/lib/colors";
+import { topicColor } from "@/lib/colors";
+import { useScaleColor } from "./HeatScale";
 import { agreement } from "@/lib/insights";
 import { avg, cellKey, criterionHistograms, fmt1, sumAggs, type Agg } from "@/lib/stats";
 import type { NamedItem, ScoreBucket } from "@/lib/types";
@@ -23,6 +24,7 @@ interface Props {
 
 /** One column per score: how many people gave 1, 2, 3… */
 function Columns({ counts, scaleMax, tall }: { counts: number[]; scaleMax: number; tall?: boolean }) {
+  const scaleColor = useScaleColor();
   const total = counts.reduce((a, b) => a + b, 0);
   const max = Math.max(1, ...counts);
   return (

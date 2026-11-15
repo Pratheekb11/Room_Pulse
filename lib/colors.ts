@@ -33,7 +33,8 @@ export const topicColor = (index: number) => tinted(TOPIC_COLORS[index % TOPIC_C
 
 const INK: RGB = [38, 37, 30]; // #26251e
 const WHITE: RGB = [255, 255, 255];
-type RGB = [number, number, number];
+const BLACK: RGB = [0, 0, 0];
+export type RGB = [number, number, number];
 
 // Single-hue sequential scale (warm cream → deep burnt orange), in sRGB stops.
 const SCALE: RGB[] = [
@@ -62,13 +63,22 @@ function contrast(a: RGB, b: RGB): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/**
+ * The score scale of a slide design: from a pale tint of its colour to a deep shade of it, light to dark
+ * (darker = stronger, as the legends say). `heat` picks another colour where the main one is a poor fit.
+ */
+export function heatStops(theme: { colors: { primary: string }; heat?: string }): RGB[] {
+  const base = parseHex(theme.heat ?? theme.colors.primary);
+  return [mix(WHITE, base, 0.08), mix(WHITE, base, 0.25), mix(WHITE, base, 0.5), mix(WHITE, base, 0.8), mix(base, BLACK, 0.25), mix(base, BLACK, 0.55)];
+}
+
 /** t in [0, 1] → colour on the sequential scale. */
-function sample(t: number): RGB {
-  const x = Math.min(1, Math.max(0, t)) * (SCALE.length - 1);
-  const i = Math.min(SCALE.length - 2, Math.floor(x));
+function sample(t: number, stops: RGB[]): RGB {
+  const x = Math.min(1, Math.max(0, t)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(x));
   const f = x - i;
-  const a = SCALE[i];
-  const b = SCALE[i + 1];
+  const a = stops[i];
+  const b = stops[i + 1];
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
 }
 
@@ -78,11 +88,11 @@ const mix = (a: RGB, b: RGB, f: number): RGB => [a[0] + (b[0] - a[0]) * f, a[1] 
  * Some mid-tones reach 4.5:1 with neither ink nor white text. Nudge those
  * slightly lighter or darker (whichever is closer) so text always passes AA.
  */
-function avoidDeadZone(rgb: RGB): RGB {
+function avoidDeadZone(rgb: RGB, stops: RGB[]): RGB {
   const ok = (c: RGB) => Math.max(contrast(c, WHITE), contrast(c, INK)) >= 4.6;
   if (ok(rgb)) return rgb;
   const towardLight = luminance(rgb) > 0.2;
-  const target: RGB = towardLight ? WHITE : SCALE[SCALE.length - 1];
+  const target: RGB = towardLight ? WHITE : stops[stops.length - 1];
   for (let f = 0.02; f <= 1; f += 0.02) {
     const c = mix(rgb, target, f);
     if (ok(c)) return c;
@@ -91,10 +101,10 @@ function avoidDeadZone(rgb: RGB): RGB {
 }
 
 /** Background + readable text colour for a value on 1…scaleMax. */
-export function scaleColor(value: number, scaleMax: number): { bg: string; fg: string } {
+export function scaleColor(value: number, scaleMax: number, stops: RGB[] = SCALE): { bg: string; fg: string } {
   // Start slightly above the lightest stop so low scores stay visible on white.
   const t = (value - 1) / Math.max(1, scaleMax - 1);
-  const rgb = avoidDeadZone(sample(0.12 + 0.88 * t));
+  const rgb = avoidDeadZone(sample(0.12 + 0.88 * t, stops), stops);
   const fg = contrast(rgb, WHITE) >= contrast(rgb, INK) ? WHITE : INK;
   return { bg: tinted(hex(rgb)), fg: hex(fg) };
 }

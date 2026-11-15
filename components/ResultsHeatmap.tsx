@@ -1,4 +1,4 @@
-import { scaleColor } from "@/lib/colors";
+import { useScaleColor } from "./HeatScale";
 import type { HeatRow } from "@/lib/heat";
 import { kindLabel } from "@/lib/kinds";
 
@@ -11,10 +11,11 @@ interface Props {
 }
 
 /** Heat 0…1 on the same colour scale as the scores, so one legend reads every question. */
-const heatColor = (heat: number) => scaleColor(1 + heat * 4, 5);
 
 /** Every question's results at a glance: one row of tiles per question, darker = stronger. */
 export function ResultsHeatmap({ rows, skipped, scaleMax, onOpen }: Props) {
+  const scaleColor = useScaleColor();
+  const heatColor = (heat: number) => scaleColor(1 + heat * 4, 5);
   return (
     <div className="flex flex-col gap-[clamp(0.75rem,1.4vw,1.5rem)]">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[clamp(0.85rem,1vw,1.1rem)] font-semibold text-ink-soft">

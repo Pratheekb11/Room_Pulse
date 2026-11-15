@@ -1,4 +1,5 @@
-import { scaleColor, topicColor, topicInk } from "@/lib/colors";
+import { topicColor, topicInk } from "@/lib/colors";
+import { useScaleColor } from "./HeatScale";
 import { summarizeFocus, type FocusGroup } from "@/lib/focus";
 import { avg, cellKey, fmt1, sumAggs, type Agg } from "@/lib/stats";
 import { formatNumber, numberStats, pollTally, qaOrder, rankTally, wordWeights } from "@/lib/answers";
@@ -39,6 +40,7 @@ function Bars({ rows, labelWidth = "w-[4ch]" }: { rows: { id: string; name: stri
 
 /** One card per question; click to see its details. */
 export function FocusOverview({ groups, criteria, cells, scaleMax, results, onOpen }: Props) {
+  const scaleColor = useScaleColor();
   const { polls, words } = results;
   const cols = groups.length <= 2 ? groups.length : groups.length <= 4 ? 2 : groups.length <= 6 ? 3 : 4;
   return (

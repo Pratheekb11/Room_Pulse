@@ -157,7 +157,8 @@ describe("Fit to screen on the results screen", () => {
   it("is a presenter control with a keyboard shortcut, off on voters' phones", () => {
     expect(dashboard).toContain("Fit to screen");
     expect(dashboard).toMatch(/<FitToScreen\b/);
-    expect(dashboard).toMatch(/!audience && \(\s*<button[^>]*\n?[^>]*aria-pressed=\{fit\}/);
+    // in the presenter's More menu (voters' phones get no More menu), ticked while it's on
+    expect(dashboard).toMatch(/audience \? \([\s\S]*?\) : \(\s*<MoreMenu>\s*<button[\s\S]{0,80}role="menuitemcheckbox"\s*aria-checked=\{fit\}/);
     expect(dashboard).toMatch(/key\.toLowerCase\(\) === "f"/);
   });
 

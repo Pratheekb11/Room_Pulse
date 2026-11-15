@@ -66,7 +66,7 @@ function layout(heading: string, body: string, cta: string, link: string, footer
 <p style="margin:0 0 4px;font-weight:800;font-size:18px">LiveRate</p>
 <h1 style="margin:16px 0 8px;font-size:24px">${escape(heading)}</h1>
 <p style="margin:0 0 24px;font-size:16px;line-height:1.5">${escape(body)}</p>
-<a href="${escape(link)}" style="display:inline-block;background:#f54e00;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:12px;border:1px solid #e6e5e0">${escape(cta)}</a>
+<a href="${escape(link)}" style="display:inline-block;background:#d54400;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:12px;border:1px solid #e6e5e0">${escape(cta)}</a>
 <p style="margin:24px 0 0;font-size:13px;color:#5a5852;line-height:1.5">${escape(footer)}</p>
 </td></tr></table></td></tr></table></body></html>`;
 }

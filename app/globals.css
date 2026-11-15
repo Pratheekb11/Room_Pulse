@@ -8,8 +8,8 @@
 @theme {
   --color-ink: #26251e;
   --color-ink-soft: #5a5852; /* body text */
-  --color-muted: #807d72;
-  --color-muted-soft: #a09c92;
+  --color-muted: #737067;
+  --color-muted-soft: #928e85;
   --color-canvas: #f7f7f4;
   --color-canvas-soft: #fafaf7;
   --color-line: #e6e5e0;
@@ -17,8 +17,8 @@
   --color-line-strong: #cfcdc4;
   --color-surface-strong: #e6e5e0;
 
-  --color-primary: #f54e00;
-  --color-primary-active: #d04200;
+  --color-primary: #d54400;
+  --color-primary-active: #c43e00;
 
   /* Pastel set: used only inside results and progress visualisations */
   --color-peach: #dfa88f;
@@ -124,7 +124,7 @@ body,
 }
 
 ::selection {
-  background: rgb(245 78 0 / 0.18);
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
 /* Buttons: 8px radius, hairline, no shadow; a small press response. */

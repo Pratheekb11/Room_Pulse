@@ -1,4 +1,4 @@
-import { scaleColor } from "@/lib/colors";
+import { useScaleColor } from "./HeatScale";
 import { avg, cellKey, sumAggs, type Agg } from "@/lib/stats";
 import { CountUp } from "./CountUp";
 import type { NamedItem } from "@/lib/types";
@@ -12,6 +12,7 @@ interface Props {
 }
 
 function Cell({ agg, scaleMax, flashKey, strong }: { agg: Agg; scaleMax: number; flashKey?: number; strong?: boolean }) {
+  const scaleColor = useScaleColor();
   const value = avg(agg);
   const colors = value === null ? null : scaleColor(value, scaleMax);
   return (
@@ -34,6 +35,7 @@ function Cell({ agg, scaleMax, flashKey, strong }: { agg: Agg; scaleMax: number;
 
 /** One measure's score as a small tile (the narrow-screen cards). */
 function Tile({ label, agg, scaleMax, strong }: { label: string; agg: Agg; scaleMax: number; strong?: boolean }) {
+  const scaleColor = useScaleColor();
   const value = avg(agg);
   const colors = value === null ? null : scaleColor(value, scaleMax);
   return (

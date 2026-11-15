@@ -26,7 +26,8 @@ import { WordCloud, WordList } from "./WordCloud";
 import { chartsFor, isChartFor } from "@/lib/charts";
 import { ScoreLegend } from "./Donut";
 import { Heatmap } from "./Heatmap";
-import { QuestionDescription, QuestionTabs, ResultCard, ScreenHeader, VotingPills } from "./ScreenChrome";
+import { MoreMenu, QuestionDescription, QuestionTabs, QuestionTitle, ResultCard, ScreenHeader, VotingPills, menuItem } from "./ScreenChrome";
+import { HeatScale } from "./HeatScale";
 import { LiveBadge } from "./LiveBadge";
 import { OverallBars, type BarDatum } from "./OverallBars";
 import { QrPanel } from "./QrPanel";
@@ -288,6 +289,7 @@ function Stage({
   const peopleIn = (focusId: string) => r.respondents.find((x) => x.focusId === focusId)?.n ?? 0;
 
   return (
+    <HeatScale theme={session.theme}>
     <div className="flex min-h-dvh flex-col gap-[clamp(0.75rem,1.6vh,1.5rem)] px-[clamp(1rem,2.2vw,2.75rem)] py-[clamp(0.75rem,2vh,1.75rem)]">
       <ScreenHeader
         title={session.title}
@@ -386,35 +388,55 @@ function Stage({
                 )}
               </button>
             )}
-            {!audience && (
+            {fit && (
               <button
                 type="button"
-                aria-pressed={fit}
-                title="Shrink the results so they all show at once, without scrolling. Shortcut: F"
+                aria-pressed
+                title="Fit to screen is on. Tap to turn it off. Shortcut: F"
                 onClick={toggleFit}
-                className={`rounded-full border border-line-strong px-3 py-1 ${fit ? "bg-sun" : "bg-white hover:bg-canvas"}`}
+                className="rounded-full border border-line-strong bg-sun px-3 py-1"
               >
-                Fit to screen
+                Fit to screen ✓
               </button>
             )}
-            <button type="button" onClick={toggleFullscreen} className="hidden rounded-full border border-line-strong bg-white px-3 py-1 sm:inline-block">
-              {isFullscreen ? "Exit full screen" : "Full screen"}
-            </button>
-            {isOwner && (
-              <a
-                href={`/admin/report/${code}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Every result with a short analysis, ready to save as a PDF"
-                className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas"
-              >
-                Report (PDF)
-              </a>
-            )}
-            {isOwner && (
-              <a href={`/admin/edit/${code}?back=results`} className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas">
-                Edit questions
-              </a>
+            {audience ? (
+              <button type="button" onClick={toggleFullscreen} className="hidden rounded-full border border-line-strong bg-white px-3 py-1 sm:inline-block">
+                {isFullscreen ? "Exit full screen" : "Full screen"}
+              </button>
+            ) : (
+              <MoreMenu>
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={fit}
+                  title="Shrink the results so they all show at once, without scrolling"
+                  onClick={toggleFit}
+                  className={menuItem}
+                >
+                  Fit to screen
+                  <span className="text-xs font-normal text-ink-soft">{fit ? "On · F" : "F"}</span>
+                </button>
+                <button type="button" role="menuitem" onClick={toggleFullscreen} className={`${menuItem} hidden sm:flex`}>
+                  {isFullscreen ? "Exit full screen" : "Full screen"}
+                </button>
+                {isOwner && (
+                  <a
+                    role="menuitem"
+                    href={`/admin/report/${code}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Every result with a short analysis, ready to save as a PDF"
+                    className={menuItem}
+                  >
+                    Report (PDF)
+                  </a>
+                )}
+                {isOwner && (
+                  <a role="menuitem" href={`/admin/edit/${code}?back=results`} className={menuItem}>
+                    Edit questions
+                  </a>
+                )}
+              </MoreMenu>
             )}
           </>
         }
@@ -565,6 +587,7 @@ function Stage({
             </section>
           ) : view === "heatmap" ? (
             <div className="flex flex-col gap-[clamp(0.75rem,2vh,1.75rem)]">
+              <QuestionTitle className="!mb-0">{group.focus.name}</QuestionTitle>
               <section className="slab rounded-xl bg-white p-[clamp(0.75rem,1.3vw,1.5rem)]">
                 <Heatmap
                   topics={sortedTopics}
@@ -581,13 +604,14 @@ function Stage({
             </div>
           ) : view === "ranking" ? (
             <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
-              <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.4rem,2.2vw,2.5rem)] font-semibold">
+              <QuestionTitle>
                 {sort === "bottom" ? "Bottom rated in" : sort === "top" ? "Top rated in" : "Ranking for"} {group.focus.name}
-              </h2>
+              </QuestionTitle>
               <OverallBars data={sortedBars} scaleMax={session.scaleMax} size="large" ranked />
             </section>
           ) : view === "breakdown" ? (
             <div className="flex flex-col gap-3">
+              <QuestionTitle className="!mb-0">{group.focus.name}</QuestionTitle>
               <Breakdown
                 topics={sortedFocusTopics}
                 criteria={criteria}
@@ -599,6 +623,8 @@ function Stage({
               <ScoreLegend scaleMax={session.scaleMax} lowLabel={session.lowLabel} highLabel={session.highLabel} />
             </div>
           ) : (
+            <div>
+            <QuestionTitle>{group.focus.name}</QuestionTitle>
             <ExecSummary
               rows={rated}
               sort={sort}
@@ -607,6 +633,7 @@ function Stage({
               scaleMax={session.scaleMax}
               voterCount={peopleIn(group.focus.id)}
             />
+            </div>
           )}
           </div>
           </FitToScreen>
@@ -641,6 +668,7 @@ function Stage({
         />
       )}
     </div>
+    </HeatScale>
   );
 }
 

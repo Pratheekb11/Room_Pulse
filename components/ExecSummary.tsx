@@ -1,4 +1,4 @@
-import { scaleColor } from "@/lib/colors";
+import { useScaleColor } from "./HeatScale";
 import { takeaways } from "@/lib/insights";
 import { bestAndWorst, sortItems, type ItemSort, type RatedItem } from "@/lib/rank-items";
 import { cellKey, avg, fmt1, type Agg } from "@/lib/stats";
@@ -47,6 +47,7 @@ function Standout({ label, rows, scaleMax, dark }: { label: string; rows: RatedI
 
 /** Board-room summary: the best and the lowest rated first, then the findings, then every item by rank. */
 export function ExecSummary({ rows, sort, criteria, cells, scaleMax, voterCount }: Props) {
+  const scaleColor = useScaleColor();
   const { best, bestTies, worstTies } = bestAndWorst(rows);
   const findings = takeaways(
     rows.map((r) => ({

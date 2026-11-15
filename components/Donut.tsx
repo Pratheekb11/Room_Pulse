@@ -1,4 +1,4 @@
-import { scaleColor } from "@/lib/colors";
+import { useScaleColor } from "./HeatScale";
 
 interface Props {
   counts: number[]; // counts[score - 1]
@@ -9,6 +9,7 @@ interface Props {
 
 /** Score distribution as a donut (SVG stroke segments, animates between polls). */
 export function Donut({ counts, scaleMax, center, label }: Props) {
+  const scaleColor = useScaleColor();
   const total = counts.reduce((a, b) => a + b, 0);
   const R = 40;
   const GAP = total > 0 && counts.filter((c) => c > 0).length > 1 ? 0.8 : 0;
@@ -57,6 +58,7 @@ export function Donut({ counts, scaleMax, center, label }: Props) {
 }
 
 export function ScoreLegend({ scaleMax, lowLabel, highLabel }: { scaleMax: number; lowLabel: string; highLabel: string }) {
+  const scaleColor = useScaleColor();
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[clamp(0.85rem,1vw,1.15rem)] font-semibold">
       <span>{lowLabel}</span>

@@ -37,12 +37,12 @@ export function VoterHeader({
         <Logo />
         <span className="relative flex items-center gap-2">{score}</span>
       </div>
-      <div className="mt-4 flex items-end justify-between gap-3">
+      <div className="mt-3 flex items-end justify-between gap-3">
         <h1 className="font-display min-w-0 text-[clamp(1.7rem,7cqw,2.4rem)] font-semibold leading-[1.02] tracking-tight break-words">{title}</h1>
-        {decor && <Doodle character={charactersFor(theme).phone} className="h-20 w-20 shrink-0" />}
+        {decor && <Doodle character={charactersFor(theme).phone} className="h-14 w-14 shrink-0 sm:h-20 sm:w-20" />}
       </div>
-      <p className="mt-1.5 text-[0.95rem] text-ink-soft">
-        Tap an answer. It saves straight away. {signable ? "Answers on a board show your name. The rest are anonymous." : "Your answers are anonymous."}
+      <p className="mt-1 text-sm text-ink-soft">
+        {signable ? "Saved as you tap. Answers on a board show your name. The rest are anonymous." : "Saved as you tap. Your answers are anonymous."}
       </p>
       {children}
     </header>
@@ -103,7 +103,7 @@ export function ChipList({ chips, onChip, onClose }: { chips: QuestionChip[]; on
 export function VoterProgress({ done, total, chips, onChip }: { done: number; total: number; chips: QuestionChip[]; onChip: (index: number) => void }) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   return (
-    <div className="sticky top-0 z-20 mt-4 border-b border-line-strong bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
+    <div className="sticky top-0 z-20 mt-3 border-b border-line-strong bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
       <div className="mx-auto max-w-xl px-4 py-3">
         <div className="flex items-center gap-3">
           <div
@@ -166,17 +166,17 @@ export function StepNav({ current, steps, onGo }: { current: number; steps: { la
   );
 }
 
-/** "Level 2 of 5" (and the item's question for Score items), then the question's description. */
+/**
+ * The Score items question (its card shows the item, so the question goes above it), then the question's
+ * description and picture. Other questions carry their own wording in the card, and the picker above
+ * already says "Question 2 of 5", so there's no extra line for them.
+ */
 export function StepIntro({
-  level,
-  levels,
   name,
   description,
   image,
   question = "",
 }: {
-  level: number;
-  levels: number;
   name?: string;
   description?: string | null;
   /** The question's picture, shown under the description. */
@@ -185,12 +185,7 @@ export function StepIntro({
 }) {
   return (
     <>
-      {levels > 1 && (
-        <p className="text-sm font-bold text-ink-soft">
-          Level {level} of {levels}
-          {name ? `: ${name}` : ""}
-        </p>
-      )}
+      {name && <h2 className="font-display text-xl leading-snug font-semibold break-words">{name}</h2>}
       {description && <p className="mt-1 mb-2 rounded-lg bg-white px-3 py-2 text-[15px] leading-snug text-ink break-words">{description}</p>}
       <QuestionPicture id={image} question={question} where="phone" />
     </>

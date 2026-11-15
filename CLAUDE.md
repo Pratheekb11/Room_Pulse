@@ -102,6 +102,16 @@ Considered and parked. The market is big, but it isn't empty: Kahoot, Blooket, Q
 
 If it comes back, build a narrow **Classroom mode** (a per-presentation setting), not a kids product: the teacher is the only account and kids stay anonymous with no sign-up; nicknames come from a safe generated list (adjective + animal) instead of typing; answers are big emoji or picture tiles; no free text on the big screen (or the teacher approves each one first); bigger tap targets and the Pop / Arcade / Anime designs; no AI. Talk to 3–5 teachers before building, and get a legal check on consent.
 
+### Front-end polish (branch `feat/ui-polish`, 2026-11-15)
+
+Built test-first (`test/ui-polish.test.ts`), checked in a browser at 390px, 768px and desktop.
+
+- **The question always shows.** Phones put a Score items question above its item card (`StepIntro`, an `<h2>`), even when it's the only question; the big screen titles the colour grid, score spread and summary with the question (`QuestionTitle` in `components/ScreenChrome.tsx`, also used by `ResultCard`).
+- **Phones reach the question sooner**: no "Level 2 of 4" line (the question picker already says it), a one-line "Saved as you tap. Your answers are anonymous.", a smaller illustration (h-14 on phones). The first card starts ~270px down a 390×844 phone instead of ~390px.
+- **Readable text (WCAG AA)**: every design's button label (`surface` on `primary`) and `primaryActive` reach 4.5:1, `muted` reaches 4.5:1 on canvas and cards, `mutedSoft` (placeholders) 3:1. Paper's orange is `#d54400` now; `app/globals.css` keeps Paper's colours (tested).
+- **Calmer presenter controls**: the view switcher, Sort, QR, Open points and a **More** menu (`MoreMenu`: Fit to screen with its F shortcut, Full screen, Report (PDF), Edit questions). The menu opens inside the screen, Esc or a tap outside closes it (and Esc doesn't also go back to All questions). While Fit to screen is on, a "Fit to screen ✓" pill shows to turn it off. Status pills are smaller on phones.
+- **Score colours follow the design** (`heatStops` in `lib/colors.ts`, `components/HeatScale.tsx`, `useScaleColor`): the colour grid, heatmap, summary, score spread, item close-up and overview badges go from a pale tint to a deep shade of the design's colour (`Theme.heat` overrides it where the main colour shades badly: Chalkboard, Arcade). Outside a `HeatScale` the old orange scale is used.
+
 ### Speed (first visit must feel instant)
 
 - The home page is static and served from the CDN (`○` in the build). It gets its CSP from `next.config.ts` (no nonce, `'unsafe-inline'` scripts; it shows no user content). Every other page needs this request's nonce from `proxy.ts`, so it exports `dynamic = "force-dynamic"` (guarded by `test/speed.test.ts`). A new page must do the same.

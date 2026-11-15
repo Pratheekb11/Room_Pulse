@@ -607,8 +607,6 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         ) : (
           <>
             <StepIntro
-              level={here.gi + 1}
-              levels={groups.length}
               name={here.kind === "rating" ? group.focus.name : undefined}
               description={group.focus.description}
               image={group.focus.imageId}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { ListSheet, SheetButton } from "./ListSheet";
 import { Doodle } from "./Doodle";
@@ -51,10 +51,10 @@ export function ScreenHeader({
 export function VotingPills({ voters, isOpen }: { voters: number; isOpen: boolean }) {
   return (
     <>
-      <span className="rounded-full border border-line-strong bg-white px-3 py-1 text-base font-bold tabular-nums sm:px-3.5 sm:text-lg">
+      <span className="rounded-full border border-line-strong bg-white px-2.5 py-0.5 text-sm font-bold tabular-nums sm:px-3.5 sm:py-1 sm:text-lg">
         <CountUp value={voters} /> {voters === 1 ? "person" : "people"} voted
       </span>
-      <span className={`rounded-full border border-line-strong px-3 py-1 text-base font-bold sm:px-3.5 sm:text-lg ${isOpen ? "bg-mint text-ink" : "bg-ink text-white"}`}>
+      <span className={`rounded-full border border-line-strong px-2.5 py-0.5 text-sm font-bold sm:px-3.5 sm:py-1 sm:text-lg ${isOpen ? "bg-mint text-ink" : "bg-ink text-white"}`}>
         {isOpen ? "Voting open" : "Voting closed"}
       </span>
     </>
@@ -140,12 +140,82 @@ export function QuestionDescription({ text, image, question = "" }: { text?: str
   );
 }
 
+/** The question, as the biggest words on the big screen after the presentation's title. */
+export function QuestionTitle({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <h2 className={`font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight break-words ${className}`}>{children}</h2>;
+}
+
 /** A question's results card with its title. */
 export function ResultCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
-      <h2 className="font-display mb-[clamp(0.75rem,2vh,1.5rem)] text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight break-words">{title}</h2>
+      <QuestionTitle>{title}</QuestionTitle>
       {children}
     </section>
+  );
+}
+
+const MENU_W = 224; // w-56
+
+/** A row in the More menu. */
+export const menuItem = "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left whitespace-nowrap hover:bg-canvas";
+
+/**
+ * The controls a presenter needs now and then (Fit to screen, Full screen, the report, editing), out of the
+ * way behind one button. Opens below it, inside the screen; Esc or a tap outside closes it.
+ */
+export function MoreMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  // undefined: under the button's right edge; a number: shifted from the button's left edge to stay on screen
+  const [shift, setShift] = useState<number | undefined>(undefined);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+  return (
+    <div
+      ref={box}
+      className="relative"
+      onKeyDown={(e) => {
+        // the menu owns Esc while it's open: it doesn't also take the results back to All questions
+        if (!open || e.key !== "Escape") return;
+        e.stopPropagation();
+        setOpen(false);
+        box.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      }}
+    >
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => {
+          // near the left edge (a phone, where the row wraps), open to the right, never past the screen's edge
+          const rect = box.current?.getBoundingClientRect();
+          const room = document.documentElement.clientWidth - 8;
+          setShift(!rect || rect.right - MENU_W >= 8 ? undefined : Math.min(0, room - MENU_W - rect.left));
+          setOpen((o) => !o);
+        }}
+        className={`rounded-full border border-line-strong px-3 py-1 ${open ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
+      >
+        More <span aria-hidden>▾</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('[role^="menuitem"]')) setOpen(false);
+          }}
+          style={shift === undefined ? { right: 0 } : { left: shift }}
+          className="animate-[fade_120ms_ease-out] absolute top-full z-30 mt-1.5 flex w-56 flex-col rounded-xl border border-line-strong bg-white p-1.5 shadow-[0_10px_30px_rgb(0_0_0/0.12)]"
+        >
+          {children}
+        </div>
+      )}
+    </div>
   );
 }

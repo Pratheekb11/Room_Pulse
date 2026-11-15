@@ -110,8 +110,8 @@ function ScreenSlide({ title, questions, index, onPick, session }: { title: stri
             controls={
               <>
                 <Pill on>Hide QR</Pill>
-                <Pill>Full screen</Pill>
-                <Pill>Edit questions</Pill>
+                <Pill>Open points</Pill>
+                <Pill>More ▾</Pill>
               </>
             }
           />
@@ -169,7 +169,7 @@ function PhoneSlide({
       />
       <main className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-5">
         <div>
-          <StepIntro level={index + 1} levels={questions.length} name={q.kind === "rating" ? q.name : undefined} description={q.description} image={q.image} question={q.name} />
+          <StepIntro name={q.kind === "rating" ? q.name : undefined} description={q.description} image={q.image} question={q.name} />
         {q.kind === "rating" ? (
           <TopicCard
             topic={q.options[0]}
