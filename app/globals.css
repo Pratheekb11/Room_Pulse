@@ -305,20 +305,111 @@ body:has(.home-quiet) {
   background: rgb(205 208 213 / 0.22);
 }
 
-/* The headline's lines fade up from behind a mask, one after the other */
-.line-mask {
-  display: block;
+/* Words rise one after another from behind their own mask (components/home/Words.tsx: `--i` is the word's place).
+   Inside a Reveal they wait until it's scrolled to. */
+.w {
+  display: inline-block;
   overflow: clip;
   overflow-clip-margin: 0.15em;
   padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+  vertical-align: top;
 }
-.line-rise {
-  display: block;
-  animation: line-rise 1300ms cubic-bezier(0.16, 1, 0.3, 1) 150ms both;
+.w > span {
+  display: inline-block;
+  animation: word-up 1100ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 65ms + 120ms) both;
 }
-@keyframes line-rise {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: none; opacity: 1; }
+@keyframes word-up {
+  from { transform: translateY(108%); }
+  to { transform: none; }
+}
+[data-shown="false"] .w > span {
+  animation: none;
+  transform: translateY(108%);
+}
+
+/* The logo's pulse draws itself as the page opens */
+.home-quiet header svg path {
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+  animation: draw-line 1300ms cubic-bezier(0.65, 0, 0.35, 1) 250ms forwards;
+}
+@keyframes draw-line {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Hairlines that draw in from the left, one after another (`--i`), then their words fade in */
+.rule {
+  position: relative;
+}
+.rule::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--color-line);
+  transform-origin: left;
+  animation: rule 1400ms cubic-bezier(0.65, 0, 0.35, 1) calc(var(--i, 0) * 80ms + 100ms) both;
+}
+@keyframes rule {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.rule > * {
+  animation: fade 900ms ease-out calc(var(--i, 0) * 80ms + 450ms) both;
+}
+[data-shown="false"] .rule::before,
+.rule[data-shown="false"]::before {
+  animation: none;
+  transform: scaleX(0);
+}
+[data-shown="false"] .rule > *,
+.rule[data-shown="false"] > * {
+  animation: none;
+  opacity: 0;
+}
+
+/* Underlines that sweep across on hover: a faint line always, an ink one that grows over it */
+.sweep {
+  background:
+    linear-gradient(currentColor, currentColor) no-repeat 0 100% / 0% 1px,
+    linear-gradient(var(--color-line-strong), var(--color-line-strong)) no-repeat 0 100% / 100% 1px;
+  padding-bottom: 4px;
+  transition: background-size 600ms cubic-bezier(0.65, 0, 0.35, 1), color 300ms ease;
+}
+.sweep:hover,
+.sweep:focus-visible {
+  background-size: 100% 1px, 100% 1px;
+}
+.sweep-lg {
+  background-size: 0% 2px, 100% 2px;
+  padding-bottom: 0.1em;
+}
+.sweep-lg:hover,
+.sweep-lg:focus-visible {
+  background-size: 100% 2px, 100% 2px;
+}
+
+/* The pulse mark at the end: it draws itself, then a heartbeat runs along it every few seconds */
+.pulse-base {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-line 1600ms cubic-bezier(0.65, 0, 0.35, 1) 300ms forwards;
+}
+.heartbeat {
+  stroke-dasharray: 0.16 1.2;
+  stroke-dashoffset: 0.16;
+  animation: heartbeat 2800ms cubic-bezier(0.45, 0, 0.2, 1) 1900ms infinite;
+}
+@keyframes heartbeat {
+  from { stroke-dashoffset: 0.16; }
+  70%, to { stroke-dashoffset: -1.04; }
+}
+[data-shown="false"] .pulse-base,
+[data-shown="false"] .heartbeat {
+  animation: none;
 }
 
 /* A hairline that grows down, like a thread to the next part of the page */
@@ -355,6 +446,39 @@ body:has(.home-quiet) {
   transform: translate(3px, -3px);
 }
 
+/* Scrolling moves things (where the browser can tie animation to scrolling): the headline drifts up and fades
+   as you leave it, the demo settles into place as it arrives, the tree floats a little slower than the page. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .drift {
+      animation: drift linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 70vh;
+    }
+    .settle {
+      animation: settle linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 35%;
+    }
+    .float-scroll {
+      animation: float-scroll linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+@keyframes drift {
+  to { transform: translateY(-9vh); opacity: 0.2; }
+}
+@keyframes settle {
+  from { transform: perspective(1200px) rotateX(14deg) scale(0.92) translateY(30px); opacity: 0.35; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes float-scroll {
+  from { transform: translateY(48px); }
+  to { transform: translateY(-48px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal[data-shown] {
     opacity: 1;
@@ -362,6 +486,17 @@ body:has(.home-quiet) {
   }
   .thread {
     transform: none !important;
+  }
+  .w > span,
+  .rule::before,
+  .rule > * {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .heartbeat {
+    animation: none !important;
+    opacity: 0;
   }
 }
 

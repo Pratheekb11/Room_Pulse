@@ -42,7 +42,7 @@ describe("two tones", () => {
     expect(css).not.toMatch(/--color-volt/);
     expect(page).not.toMatch(/volt|shadow-\[|Sticker|Spotlight|Tilt|SpinBadge|Marquee|halftone|rotate-/);
     expect(page).not.toMatch(/\p{Extended_Pictographic}/u);
-    for (const gone of ["Marquee", "SpinBadge", "Spotlight", "Tilt", "Words"]) expect(existsSync(new URL(`../components/home/${gone}.tsx`, import.meta.url)), gone).toBe(false);
+    for (const gone of ["Marquee", "SpinBadge", "Spotlight", "Tilt"]) expect(existsSync(new URL(`../components/home/${gone}.tsx`, import.meta.url)), gone).toBe(false);
     expect(css).not.toMatch(/\.pop-btn|\.lift|\.wiggle|\.marquee|\.spin-slow|\.spotlight/);
   });
 });
@@ -77,20 +77,69 @@ describe("hairlines, not boxes", () => {
 
   it("the features are a list of rows, not tiles", () => {
     const list = read("components/FeatureList.tsx");
-    expect(list).toMatch(/border-t/);
+    expect(list).toMatch(/\brule\b/);
     expect(list).not.toMatch(/rounded-/);
   });
 });
 
-describe("slow, small motion", () => {
-  it("the headline's lines fade up behind a mask, one after the other", () => {
-    expect(page).toContain('className="line-mask"');
-    expect(css).toMatch(/\.line-rise\s*\{[^}]*animation:[^;]*1[0-9]{3}ms/);
+describe("motion that feels designed", () => {
+  it("headlines rise word by word from behind a mask, keeping the spaces", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { Words } = await import("@/components/home/Words");
+    const html = renderToStaticMarkup(createElement(Words, { text: "Know what the room" }));
+    expect(html.replace(/<[^>]+>/g, "")).toBe("Know what the room");
+    expect(html.match(/class="w"/g)).toHaveLength(4);
+    expect(html).toContain("--i:3");
+    expect(css).toMatch(/\.w > span\s*\{[^}]*animation:[^;]*1[0-9]{3}ms/);
+    expect(css).toMatch(/calc\(var\(--i/);
+    // the headline and every section title
+    const h1 = page.slice(page.indexOf("<h1"), page.indexOf("</h1>"));
+    expect(h1).toContain("<Words");
+    expect(page.match(/<h2[^>]*>\s*<Words/g)!.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("section titles wait until they're scrolled to", () => {
+    expect(css).toMatch(/\[data-shown="false"\] \.w > span\s*\{[^}]*animation: none/);
+  });
+
+  it("hairlines draw in from the left, one after another, when scrolled to", () => {
+    expect(css).toMatch(/\.rule::before\s*\{[^}]*transform-origin: left/);
+    expect(css).toMatch(/@keyframes rule/);
+    expect(css).toMatch(/\[data-shown="false"\] \.rule::before[^{]*\{[^}]*animation: none/);
+    expect(page.match(/\brule\b/g)!.length).toBeGreaterThanOrEqual(3);
   });
 
   it("a hairline grows down the middle, like a thread to the next part", () => {
     expect(page).toContain('className="thread');
     expect(css).toMatch(/@keyframes thread/);
+  });
+
+  it("the logo's pulse draws itself as the page opens", () => {
+    expect(css).toMatch(/\.home-quiet header svg path\s*\{[^}]*stroke-dasharray/);
+  });
+
+  it("scrolling moves things: the headline drifts away, the demo settles in, the tree floats", () => {
+    const scroll = css.slice(css.indexOf("@supports (animation-timeline: view())"));
+    expect(scroll).toMatch(/animation-timeline: scroll\(root\)/);
+    expect(scroll).toMatch(/animation-timeline: view\(\)/);
+    for (const cls of ["drift", "settle", "float-scroll"]) {
+      expect(scroll, cls).toContain(`.${cls}`);
+      expect(page, cls).toContain(cls);
+    }
+    // only for people who haven't asked for less motion
+    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\)\s*\{\s*@supports \(animation-timeline: view\(\)\)/);
+  });
+
+  it("links underline with a sweep on hover", () => {
+    expect(css).toMatch(/\.sweep\s*\{[^}]*background-size/);
+    expect(css).toMatch(/\.sweep:hover[^{]*\{[^}]*background-size: 100% 1px/);
+    expect(page.match(/sweep/g)!.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("a heartbeat runs along the pulse mark at the end", () => {
+    expect(page).toContain("heartbeat");
+    expect(css).toMatch(/\.heartbeat\s*\{[^}]*animation:[^;]*infinite/);
   });
 
   it("sections fade in when scrolled to, hidden only once the browser has checked", () => {
@@ -102,9 +151,11 @@ describe("slow, small motion", () => {
   });
 
   it("nothing moves for people who ask for reduced motion", () => {
-    const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduced).toMatch(/\.reveal\[data-shown\]/);
-    expect(reduced).toMatch(/\.thread/);
+    const reduced = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)") - 1);
+    const home = css.slice(css.indexOf(".home-quiet {"));
+    const quietReduced = home.slice(home.indexOf("@media (prefers-reduced-motion: reduce)"));
+    for (const sel of [".reveal[data-shown]", ".thread", ".w > span", ".rule::before", ".heartbeat"]) expect(quietReduced, sel).toContain(sel);
+    expect(reduced).toBeTruthy();
   });
 });
 
