@@ -50,11 +50,11 @@ export function LiveDemo() {
   const max = Math.max(...votes);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-white" aria-hidden>
-      <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-        <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
-        <span className="h-2.5 w-2.5 rounded-full bg-line-strong" />
+    <div className="overflow-hidden rounded-2xl border-2 border-ink bg-white text-ink shadow-[10px_10px_0_var(--color-ink)]" aria-hidden>
+      <div className="flex items-center gap-1.5 border-b-2 border-ink px-4 py-2.5">
+        <span className="h-3 w-3 rounded-full border-2 border-ink bg-coral" />
+        <span className="h-3 w-3 rounded-full border-2 border-ink bg-volt" />
+        <span className="h-3 w-3 rounded-full border-2 border-ink bg-sky" />
         <span className="ml-3 text-xs text-muted">
           Join code <span className="font-mono text-ink">k7m2qp</span>
         </span>
