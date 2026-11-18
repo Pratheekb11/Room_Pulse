@@ -20,8 +20,6 @@
 
   --color-primary: #2747f5;
   --color-primary-active: #1a34cf;
-  /* The home page's duotone partner for the cobalt: acid volt, with ink on it */
-  --color-volt: #d8ff3e;
 
   /* Pastel set: used only inside results and progress visualisations */
   --color-peach: #f6a9a0;
@@ -277,159 +275,93 @@ body,
   from { scale: 0 1; }
 }
 
-/* ---- The home page's duotone motion (app/page.tsx, components/home/) ---- */
-
-/* Headline words rise from behind a mask, one after another (components/home/Words.tsx) */
-.word-mask {
-  display: inline-block;
-  overflow: clip;
-  overflow-clip-margin: 0.12em;
-  padding-bottom: 0.06em;
-  vertical-align: top;
-}
-.word-rise {
-  display: inline-block;
-  animation: word-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes word-rise {
-  from { transform: translateY(105%) rotate(4deg); }
-  to { transform: none; }
-}
-
-/* A volt highlighter that sweeps across a word after the headline lands */
-.marker {
+/* ---- The home page: quiet two tones (app/page.tsx, components/home/) ----
+   Near-black and soft grey, one weight of type, hairlines, one small accent. The colour variables are swapped
+   for the page only, so shared pieces (logo, join box, credit) follow; dialogs render outside it and stay light. */
+.home-quiet {
+  --color-canvas: #131314;
+  --color-canvas-soft: #161617;
+  --color-white: #1a1a1c;
+  --color-surface-strong: #242427;
+  --color-ink: #cdd0d5;
+  --color-ink-soft: #a4a8ae;
+  --color-muted: #8c9097;
+  --color-muted-soft: #6c7077;
+  --color-line: #2a2b2f;
+  --color-line-soft: #202124;
+  --color-line-strong: #3b3d42;
+  --color-primary: #7383ff;
+  --color-primary-active: #8f9cff;
+  --color-error: #ff7a8c;
+  --display-weight: 400;
+  background-color: var(--color-canvas);
   color: var(--color-ink);
-  background: linear-gradient(var(--color-volt), var(--color-volt)) no-repeat 0 60% / 0% 88%;
-  border-radius: 0.12em;
-  padding: 0 0.08em;
-  margin: 0 -0.04em;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-  animation: marker 700ms cubic-bezier(0.65, 0, 0.35, 1) 850ms forwards;
 }
-@keyframes marker {
-  to { background-size: 100% 88%; }
+html:has(.home-quiet),
+body:has(.home-quiet) {
+  background-color: #131314;
+}
+.home-quiet ::selection {
+  background: rgb(205 208 213 / 0.22);
 }
 
-/* Words that scroll past for ever (components/home/Marquee.tsx) */
-.marquee-track {
-  animation: marquee 38s linear infinite;
+/* The headline's lines fade up from behind a mask, one after the other */
+.line-mask {
+  display: block;
+  overflow: clip;
+  overflow-clip-margin: 0.15em;
+  padding-bottom: 0.08em;
 }
-.marquee:hover .marquee-track {
-  animation-play-state: paused;
+.line-rise {
+  display: block;
+  animation: line-rise 1300ms cubic-bezier(0.16, 1, 0.3, 1) 150ms both;
 }
-@keyframes marquee {
-  to { transform: translateX(-50%); }
+@keyframes line-rise {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: none; opacity: 1; }
 }
 
-/* Sections lift in when scrolled to (components/home/Reveal.tsx); hidden only once the browser has checked */
+/* A hairline that grows down, like a thread to the next part of the page */
+.thread {
+  width: 1px;
+  background: var(--color-line-strong);
+  transform-origin: top;
+  animation: thread 1400ms cubic-bezier(0.65, 0, 0.35, 1) 500ms both;
+}
+@keyframes thread {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+[data-shown="false"] .thread {
+  animation: none;
+  transform: scaleY(0);
+}
+
+/* Sections fade in when scrolled to (components/home/Reveal.tsx); hidden only once the browser has checked */
 .reveal {
-  transition: opacity 800ms var(--ease-out-soft), transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 1100ms var(--ease-out-soft), transform 1200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .reveal[data-shown="false"] {
   opacity: 0;
-  transform: translateY(48px) scale(0.98);
+  transform: translateY(24px);
 }
 
-/* A glow that follows the pointer across the cobalt hero (components/home/Spotlight.tsx) */
-.spotlight {
-  --spot-x: 75%;
-  --spot-y: 30%;
+/* Link rows on a hairline (components/home/LinkRow.tsx): the arrow steps up and right on hover */
+.link-arrow {
+  transition: transform 300ms var(--ease-out-soft);
 }
-.spotlight::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(520px circle at var(--spot-x) var(--spot-y), rgb(216 255 62 / 0.28), transparent 60%),
-    radial-gradient(900px circle at 0% 100%, rgb(9 20 120 / 0.55), transparent 60%);
-}
-/* halftone dots that fade out towards the middle: the print-shop half of the duotone look */
-.halftone {
-  background-image: radial-gradient(rgb(255 255 255 / 0.16) 1.2px, transparent 1.6px);
-  background-size: 18px 18px;
-  mask-image: radial-gradient(ellipse at 85% 10%, #000 0%, transparent 55%), radial-gradient(ellipse at 5% 95%, #000 0%, transparent 45%);
-}
-
-/* The demo tips towards the pointer and floats (components/home/Tilt.tsx) */
-.tilt {
-  transform: perspective(1100px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
-  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform;
-}
-.float {
-  animation: float 6s ease-in-out infinite;
-}
-.float-late {
-  animation: float 7s ease-in-out 1.2s infinite;
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
-  50% { transform: translateY(-12px) rotate(calc(var(--r, 0deg) + 4deg)); }
-}
-
-/* The round badge's words circle slowly (components/home/SpinBadge.tsx) */
-.spin-slow {
-  animation: spin-slow 16s linear infinite;
-}
-@keyframes spin-slow {
-  to { rotate: 360deg; }
-}
-
-/* Chunky buttons: a hard ink shadow that lifts on hover and presses flat */
-.pop-btn {
-  border: 2px solid var(--color-ink);
-  box-shadow: 4px 4px 0 var(--color-ink);
-  transition: transform 160ms var(--ease-out-soft), box-shadow 160ms var(--ease-out-soft), background-color 160ms ease;
-}
-.pop-btn:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--color-ink);
-}
-.pop-btn:active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0 var(--color-ink);
-}
-
-/* Cards that lift and flip to cobalt on hover (How it works, What you can do) */
-.lift {
-  transition: transform 260ms var(--ease-out-soft), box-shadow 260ms var(--ease-out-soft), background-color 220ms ease, color 220ms ease;
-}
-.lift:hover {
-  transform: translate(-3px, -4px) rotate(-0.6deg);
-  box-shadow: 7px 8px 0 var(--color-ink);
-}
-.wiggle-on-hover:hover .wiggle,
-.wiggle-on-hover:focus-within .wiggle {
-  animation: wiggle 600ms var(--ease-spring);
-}
-@keyframes wiggle {
-  0% { rotate: 0deg; scale: 1; }
-  30% { rotate: -14deg; scale: 1.15; }
-  60% { rotate: 10deg; scale: 1.1; }
-  100% { rotate: 0deg; scale: 1; }
+.link-row:hover .link-arrow,
+.link-row:focus-visible .link-arrow {
+  transform: translate(3px, -3px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .marquee-track,
-  .spin-slow,
-  .float,
-  .float-late {
-    animation: none !important;
-  }
   .reveal[data-shown] {
     opacity: 1;
     transform: none;
   }
-  .marker {
-    background-size: 100% 88%;
-  }
-  .tilt,
-  .lift:hover,
-  .pop-btn:hover {
-    transform: none;
+  .thread {
+    transform: none !important;
   }
 }
 

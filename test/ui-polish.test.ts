@@ -267,15 +267,15 @@ describe("the home page's words and pictures", () => {
     expect(demo).not.toMatch(/ · /);
   });
 
-  it("features and activities are drawn in the same sticker style as the illustrations, not emoji", async () => {
+  it("features and activities are quiet text: no emoji, no sticker icons, no icon names shown as words", async () => {
     const { FeatureList } = await import("@/components/FeatureList");
     const out = html(createElement(FeatureList, { ai: true }));
     expect(out).not.toMatch(emoji);
-    expect(out).toContain("<svg");
-    // the activity chips draw a sticker, not the icon as text
+    expect(out).not.toContain("<svg");
+    expect(page).not.toMatch(emoji);
     expect(page).not.toMatch(/>\s*\{a\.icon\}/);
-    expect(page).toMatch(/<Sticker name=\{a\.icon\}/);
-    expect(page).toContain("<Sticker");
+    expect(page).not.toContain("<Sticker");
+    // the stickers still exist for the activities in the builder
     const { ACTIVITIES } = await import("@/lib/activities");
     const { STICKERS } = await import("@/components/Sticker");
     for (const a of ACTIVITIES) expect(STICKERS, a.id).toHaveProperty(a.icon);
