@@ -141,7 +141,7 @@ export function HowToDemo({ initial = "rating", compact = false }: { initial?: Q
       <div
         ref={stage}
         aria-hidden
-        className={`relative mt-3 overflow-hidden rounded-xl border border-line bg-canvas-soft p-3 sm:p-4 ${compact ? "h-[360px]" : "h-[380px] sm:h-[400px]"}`}
+        className={`relative mt-3 overflow-hidden rounded-xl border border-line bg-canvas-soft p-3 sm:p-4 ${compact ? "h-[410px]" : "h-[420px] sm:h-[430px]"}`}
       >
         {state.screen === "builder" && <Builder state={state} goal={step.state} kindPicked={!(i === 0 && phase === "move")} typing={phase === "done" && !still ? step.target : null} />}
         {state.screen === "phone" && <Phone state={state} goal={step.state} />}

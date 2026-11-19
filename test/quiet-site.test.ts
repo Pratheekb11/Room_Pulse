@@ -166,3 +166,16 @@ describe("the site's own screens move like the home page", () => {
     expect(reduced).toContain(".enter");
   });
 });
+
+describe("See how it works fits its box", () => {
+  // Measured in a browser (2026-11-19): Score items with three items and "Scores go from" needs about 385px
+  // on a phone (the four type chips wrap onto two lines) and 375px on a laptop; the box was 360px, so the
+  // Create button was cut off. The box is fixed (steps mustn't make it jump), so it must fit the tallest step.
+  it("gives the demo room for its tallest step", () => {
+    const demo = read("components/HowToDemo.tsx");
+    const sizes = [...demo.matchAll(/h-\[(\d+)px\]/g)].map((m) => Number(m[1]));
+    const compact = Number(/compact \? "h-\[(\d+)px\]"/.exec(demo)![1]);
+    expect(compact).toBeGreaterThanOrEqual(400);
+    expect(Math.min(...sizes.filter((n) => n >= 300))).toBeGreaterThanOrEqual(400);
+  });
+});
