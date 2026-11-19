@@ -1,4 +1,5 @@
 import { Logo } from "../Logo";
+import { Words } from "@/components/home/Words";
 
 /** Centered card layout shared by the account pages. */
 export function AuthShell({ title, children }: { title: string; children: React.ReactNode }) {
@@ -6,8 +7,12 @@ export function AuthShell({ title, children }: { title: string; children: React.
     <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
       <Logo />
       <div className="mx-auto my-auto w-full max-w-sm py-10">
-        <h1 className="font-display text-center text-4xl font-semibold leading-tight tracking-tight">{title}</h1>
-        <div className="slab mt-6 rounded-xl bg-white p-6">{children}</div>
+        <h1 className="font-display text-center text-4xl font-semibold leading-tight tracking-tight">
+          <Words text={title} />
+        </h1>
+        <div className="slab enter mt-6 rounded-xl bg-white p-6" style={{ "--i": 3 } as React.CSSProperties}>
+          {children}
+        </div>
       </div>
     </main>
   );

@@ -113,3 +113,56 @@ describe("the site's own screens", () => {
     expect(qr).toMatch(/backgroundColor: "#ffffff"/);
   });
 });
+
+describe("the site's own screens move like the home page", () => {
+  const titles: [string, RegExp][] = [
+    ["components/admin/AuthScreen.tsx", /<h1[^>]*>\s*<Words/],
+    ["components/auth/AuthShell.tsx", /<h1[^>]*>\s*<Words/],
+    ["components/StatusScreens.tsx", /<h1[^>]*>\s*<Words/],
+    ["components/admin/AdminApp.tsx", /<h2 id="sessions-h"[^>]*>\s*<Words/],
+    ["components/admin/PresentationForm.tsx", /<h2[^>]*>\s*<Words/],
+    ["components/admin/ReportApp.tsx", /<h1[^>]*>\s*<Words/],
+  ];
+
+  it("page titles rise word by word", () => {
+    for (const [f, re] of titles) expect(read(f), f).toMatch(re);
+  });
+
+  it("cards and blocks rise in one after another (--i)", () => {
+    expect(css).toMatch(/\.enter\s*\{[^}]*animation:[^;]*calc\(var\(--i/);
+    for (const f of ["components/admin/AuthScreen.tsx", "components/auth/AuthShell.tsx", "components/admin/AdminApp.tsx", "components/admin/PresentationForm.tsx", "components/admin/ReportApp.tsx", "components/StatusScreens.tsx"])
+      expect(read(f), f).toMatch(/\benter\b/);
+    // presentations and questions stagger by their place in the list
+    expect(read("components/admin/AdminApp.tsx")).toMatch(/className="enter[^"]*"[^>]*style=\{\{ "--i": i/);
+    expect(read("components/admin/PresentationForm.tsx")).toMatch(/enter[^"]*"[^>]*\n?[^>]*"--i": i/);
+  });
+
+  it("the logo's pulse draws itself on every page of the site", () => {
+    expect(read("components/Logo.tsx")).toContain('className="logo-mark');
+    expect(css).toMatch(/\.quiet \.logo-mark path\s*\{[^}]*stroke-dasharray/);
+  });
+
+  it("dialogs fade in and rise; their backdrops fade", () => {
+    expect(css).toMatch(/:root:has\(\.quiet\) \[aria-modal="true"\][^{]*\{[^}]*animation: dialog-in/);
+    expect(css).toMatch(/@keyframes dialog-in/);
+    expect(css).toMatch(/:root:has\(\.quiet\) \.fixed\.inset-0\[class\*="bg-ink\/"\]:has\(> \[aria-modal="true"\]\)[^{]*\{[^}]*animation: fade/);
+    // a solid full-page layer never fades (the page behind would show through)
+    expect(css).not.toMatch(/:root:has\(\.quiet\) \.fixed\.inset-0:has/);
+  });
+
+  it("menus drop down when opened", () => {
+    expect(css).toMatch(/\.quiet details\[open\] > summary \+ \*\s*\{[^}]*animation: drop-down/);
+    expect(css).toMatch(/@keyframes drop-down\s*\{[^}]*translateY\(-/);
+  });
+
+  it("nothing is caught half-way when the report prints", () => {
+    const print = css.slice(css.indexOf("@media print"));
+    expect(print).toMatch(/\.enter,\s*\.w > span\s*\{[^}]*animation: none !important/);
+  });
+
+  it("reduced motion settles everything at once", () => {
+    const home = css.slice(css.indexOf(":root:has(.quiet) {"));
+    const reduced = home.slice(home.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduced).toContain(".enter");
+  });
+});

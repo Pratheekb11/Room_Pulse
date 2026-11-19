@@ -8,6 +8,7 @@ import { CenteredMessage, LoadingScreen } from "../StatusScreens";
 import { isOverdue, pointCounts, sortPoints, statusLabel } from "@/lib/points";
 import type { Report, ReportRow, ReportSection } from "@/lib/report";
 import type { OpenPoint } from "@/lib/types";
+import { Words } from "@/components/home/Words";
 
 type State = { kind: "loading" } | { kind: "ready"; report: Report } | { kind: "signin" } | { kind: "missing" } | { kind: "error" };
 
@@ -81,13 +82,15 @@ export function ReportApp({ code, autoPrint }: { code: string; autoPrint: boolea
         </div>
       </div>
 
-      <article className="report slab mx-auto max-w-[52rem] rounded-xl bg-white p-5 sm:p-10">
+      <article className="report slab enter mx-auto max-w-[52rem] rounded-xl bg-white p-5 sm:p-10">
         <header className="report-keep border-b-2 border-ink pb-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Logo />
             <p className="text-sm text-ink-soft">Report · {report.generatedAt ? longDate(report.generatedAt) : ""}</p>
           </div>
-          <h1 className="font-display mt-4 text-3xl font-semibold leading-tight break-words sm:text-4xl">{report.title}</h1>
+          <h1 className="font-display mt-4 text-3xl font-semibold leading-tight break-words sm:text-4xl">
+            <Words text={report.title} />
+          </h1>
           <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="People took part" value={String(report.people)} />
             <Stat label="Questions" value={String(report.sections.length)} />

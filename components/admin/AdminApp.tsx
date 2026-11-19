@@ -13,6 +13,7 @@ import { ConfirmDialog } from "../ConfirmDialog";
 import { inputClass } from "../auth/AuthShell";
 import { readGuestCode, rememberGuestCode } from "./guestCode";
 import { useClientValue } from "../useClientValue";
+import { Words } from "@/components/home/Words";
 
 type Account = { email: string | null; guest: boolean; emailVerified: boolean; verificationRequired: boolean };
 type Auth = { kind: "checking" } | { kind: "signed_out" } | ({ kind: "signed_in" } & Account);
@@ -206,15 +207,17 @@ function Console({
         <section aria-labelledby="sessions-h" className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="sessions-h" className="font-display text-3xl">
-              Your presentations
+              <Words text="Your presentations" />
             </h2>
             <button type="button" onClick={() => setFormOpen(true)} disabled={mustVerify} className="key rounded-lg bg-ink px-4 py-2.5 font-semibold text-white">
               + New presentation
             </button>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {sessions.map((s) => (
-              <SessionCard key={s.code} session={s} call={call} onChanged={refresh} guest={guest} aiAvailable={aiAvailable} onNeedAccount={askForAccount} />
+            {sessions.map((s, i) => (
+              <div key={s.code} className="enter min-w-0" style={{ "--i": i + 2 } as React.CSSProperties}>
+                <SessionCard session={s} call={call} onChanged={refresh} guest={guest} aiAvailable={aiAvailable} onNeedAccount={askForAccount} />
+              </div>
             ))}
           </div>
         </section>

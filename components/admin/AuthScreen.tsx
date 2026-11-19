@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Logo } from "../Logo";
 import { apiFetch } from "./api";
 import { GuestOptions } from "./GuestOptions";
+import { Words } from "@/components/home/Words";
 
 type Mode = "login" | "signup";
 
@@ -56,21 +57,25 @@ export function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
     <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
       <Logo />
       <div className="mx-auto my-auto w-full max-w-sm">
-        <h1 className="font-display text-center text-4xl leading-tight tracking-tight">{returning ? "Welcome back" : "Make a presentation"}</h1>
+        <h1 className="font-display text-center text-4xl leading-tight tracking-tight">
+          <Words text={returning ? "Welcome back" : "Make a presentation"} />
+        </h1>
         {!returning && (
-          <p className="mt-2 text-center text-ink-soft">
+          <p className="enter mt-2 text-center text-ink-soft" style={{ "--i": 3 } as React.CSSProperties}>
             Takes about two minutes. <HowToButton label="Need help? See how it works" />
           </p>
         )}
 
-        <GuestOptions onSignedIn={onSignedIn} returning={returning} onReturningChange={setReturning} />
+        <div className="enter" style={{ "--i": 4 } as React.CSSProperties}>
+          <GuestOptions onSignedIn={onSignedIn} returning={returning} onReturningChange={setReturning} />
+        </div>
         {!returning && (
           <>
 
-        <p className="mt-6 flex items-center gap-3 text-sm text-ink-soft before:h-px before:flex-1 before:bg-line-strong after:h-px after:flex-1 after:bg-line-strong">
+        <p className="enter mt-6 flex items-center gap-3 text-sm text-ink-soft before:h-px before:flex-1 before:bg-line-strong after:h-px after:flex-1 after:bg-line-strong">
           or use an account
         </p>
-        <form onSubmit={submit} className="slab mt-4 rounded-xl bg-white p-6" noValidate>
+        <form onSubmit={submit} className="slab enter mt-4 rounded-xl bg-white p-6" style={{ "--i": 6 } as React.CSSProperties} noValidate>
           <div role="tablist" aria-label="Account" className="flex rounded-full border border-line-strong p-0.5">
             {tab("login", "Log in")}
             {tab("signup", "Sign up")}

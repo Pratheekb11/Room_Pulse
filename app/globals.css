@@ -351,8 +351,8 @@ body,
   transform: translateY(108%);
 }
 
-/* The logo's pulse draws itself as the page opens */
-.home-quiet header svg path {
+/* The logo's pulse draws itself as the page opens, on every page of the site (components/Logo.tsx) */
+.quiet .logo-mark path {
   stroke-dasharray: 26;
   stroke-dashoffset: 26;
   animation: draw-line 1300ms cubic-bezier(0.65, 0, 0.35, 1) 250ms forwards;
@@ -413,6 +413,50 @@ body,
   opacity: 1;
   transform: none;
   transition-delay: calc(var(--j, 0) * 45ms + 180ms);
+}
+
+/* The site's own screens (sign-in, dashboard, builder, report…): blocks rise in one after another (`--i`) */
+.enter {
+  animation: enter 800ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 70ms + 80ms) both;
+}
+@keyframes enter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Dialogs rise and settle; their backdrops fade. Dialogs render into <body>, outside the page's marker,
+   so these are keyed on the root (the same as the colours). */
+:root:has(.quiet) [aria-modal="true"],
+:root:has(.quiet) [role="alertdialog"] {
+  animation: dialog-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+/* Only see-through backdrops (bg-ink/50) fade; a full-page layer (the guest code) is solid, so fading it would
+   show the page behind it for a moment */
+:root:has(.quiet) .fixed.inset-0[class*="bg-ink/"]:has(> [aria-modal="true"]),
+:root:has(.quiet) .fixed.inset-0[class*="bg-ink/"]:has(> [role="alertdialog"]) {
+  animation: fade 320ms ease-out both;
+}
+
+/* Menus and "What does this mean?" open like a drop-down */
+.quiet details[open] > summary + * {
+  animation: drop-down 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top;
+}
+@keyframes drop-down {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Cards answer the pointer: the hairline brightens */
+.quiet .slab {
+  transition: border-color 300ms ease;
+}
+.quiet article.slab:hover {
+  border-color: var(--color-line-strong);
 }
 
 /* Underlines that sweep across on hover: a faint line always, an ink one that grows over it */
@@ -542,6 +586,9 @@ body,
     animation: none !important;
     opacity: 0;
   }
+  .enter {
+    animation: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -583,6 +630,13 @@ body,
     --color-success: #1b7f5e;
     --display-weight: 600;
     color-scheme: light;
+  }
+  /* Print what's there, not an animation caught half-way */
+  .enter,
+  .w > span {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
   @page {
     size: A4;

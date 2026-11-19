@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
 import { SlowHint } from "./SlowHint";
+import { Words } from "@/components/home/Words";
 
 export function CenteredMessage({ title, body, link = true }: { title: string; body: string; link?: boolean }) {
   return (
     <main className="flex min-h-dvh flex-col px-5 py-5 sm:px-8">
       <Logo />
       <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center text-center">
-        <h1 className="font-display text-4xl font-semibold tracking-tight">{title}</h1>
-        <p className="mt-3 text-lg text-ink-soft">{body}</p>
+        <h1 className="font-display text-4xl font-semibold tracking-tight">
+          <Words text={title} />
+        </h1>
+        <p className="enter mt-3 text-lg text-ink-soft" style={{ "--i": 3 } as React.CSSProperties}>
+          {body}
+        </p>
         {link && (
           <Link href="/" className="key font-display mt-8 rounded-xl bg-primary px-6 py-3 text-lg font-bold text-white">
             Go to the home page

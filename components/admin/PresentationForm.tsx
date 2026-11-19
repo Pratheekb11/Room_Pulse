@@ -37,6 +37,7 @@ import { isThemeId, recommendTheme, type ThemeId } from "@/lib/themes";
 import { previewQuestions } from "@/lib/preview";
 import { scoringHost } from "@/lib/scoring";
 import { HowToDialog } from "./HowToDialog";
+import { Words } from "@/components/home/Words";
 
 type Call = (path: string, init?: RequestInit) => Promise<Response>;
 type Kind = QuestionKind;
@@ -705,7 +706,7 @@ export function PresentationForm({
         noValidate
       >
         <h2 className="font-display text-3xl font-semibold">
-          {editing ? "Edit presentation" : "New presentation"}
+          <Words text={editing ? "Edit presentation" : "New presentation"} />
         </h2>
         {editing && (
           <p className="mt-1 text-sm text-ink-soft">
@@ -906,8 +907,8 @@ export function PresentationForm({
               return (
                 <li
                   key={f.key}
-                  className="rounded-xl border border-line-strong p-3 pl-5 sm:p-4 sm:pl-6"
-                  style={{ boxShadow: `inset 6px 0 0 ${topicColor(i)}` }}
+                  className="enter rounded-xl border border-line-strong p-3 pl-5 sm:p-4 sm:pl-6"
+                  style={{ boxShadow: `inset 6px 0 0 ${topicColor(i)}`, "--i": i } as React.CSSProperties}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-display text-lg">Question {i + 1}</p>

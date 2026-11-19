@@ -117,7 +117,7 @@ describe("motion that feels designed", () => {
   });
 
   it("the logo's pulse draws itself as the page opens", () => {
-    expect(css).toMatch(/\.home-quiet header svg path\s*\{[^}]*stroke-dasharray/);
+    expect(css).toMatch(/\.quiet \.logo-mark path\s*\{[^}]*stroke-dasharray/);
   });
 
   it("scrolling moves things: the headline drifts away, the demo settles in, the tree floats", () => {
