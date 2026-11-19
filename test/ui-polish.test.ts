@@ -271,7 +271,9 @@ describe("the home page's words and pictures", () => {
     const { FeatureList } = await import("@/components/FeatureList");
     const out = html(createElement(FeatureList, { ai: true }));
     expect(out).not.toMatch(emoji);
-    expect(out).not.toContain("<svg");
+    // no sticker icons (the fold button's small arrow is the only drawing)
+    expect(read("components/FeatureList.tsx")).not.toContain("Sticker");
+    expect(out.match(/<svg/g) ?? []).toHaveLength(1);
     expect(page).not.toMatch(emoji);
     expect(page).not.toMatch(/>\s*\{a\.icon\}/);
     expect(page).not.toContain("<Sticker");

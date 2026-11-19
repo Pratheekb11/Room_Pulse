@@ -42,7 +42,9 @@ export function LiveDemo() {
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white text-ink" aria-hidden>
-      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3 text-sm text-muted">
+      <div className="relative flex items-center justify-between gap-3 border-b border-line px-5 py-3 text-sm text-muted">
+        {/* each vote sends a light along the line, from the phone to the results */}
+        {stage >= 0 && <span key={`glint-${tap.tick}`} aria-hidden className="glint-once absolute inset-x-0 -bottom-px" />}
         <span>
           Join code <span className="font-mono text-ink">k7m2qp</span>
         </span>

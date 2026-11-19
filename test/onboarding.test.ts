@@ -111,6 +111,6 @@ describe("home page: start as a guest is the headline, before joining with a cod
 
   it("lists all 9 question types (the walkthrough moved to the create page)", () => {
     expect(src).not.toMatch(/Three kinds of question/);
-    expect(src).toContain("KIND_INFO");
+    expect(src + readFileSync(new URL("../components/FeatureList.tsx", import.meta.url), "utf8")).toContain("KIND_INFO");
   });
 });

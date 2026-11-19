@@ -196,3 +196,73 @@ describe("team activities: a few up front, the rest a tap away", () => {
     expect(css).toMatch(/\.unfold\[data-open="true"\] \.unfold-item\s*\{[^}]*transition-delay: calc\(var\(--j/);
   });
 });
+
+describe("what you can do: a few up front, the rest a tap away", () => {
+  it("shows 4 features, then a button that unfolds the rest and the question types", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { FeatureList } = await import("@/components/FeatureList");
+    const { productFeatures } = await import("@/lib/features");
+    const { KIND_INFO } = await import("@/lib/kinds");
+    const all = productFeatures({ ai: true });
+    const html = renderToStaticMarkup(createElement(FeatureList, { ai: true }));
+    const shown = html.slice(0, html.indexOf('id="more-features"'));
+    const folded = html.slice(html.indexOf('id="more-features"'));
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&#x27;");
+    for (const f of all.slice(0, 4)) expect(shown).toContain(esc(f.title));
+    for (const f of all.slice(4)) expect(folded).toContain(esc(f.title));
+    for (const k of KIND_INFO) expect(folded).toContain(esc(k.label));
+    expect(html).toMatch(/aria-controls="more-features"/);
+    expect(html).toContain(`See all ${all.length} features`);
+  });
+
+  it("activities and features fold the same way (one Fold)", () => {
+    expect(read("components/FeatureList.tsx")).toContain("<Fold");
+    expect(read("components/home/ActivityList.tsx")).toContain("<Fold");
+    const fold = read("components/home/Fold.tsx");
+    expect(fold).toContain('className="unfold"');
+    expect(fold).toMatch(/inert=\{!open\}/);
+  });
+});
+
+describe("flow: light runs along the lines, like the heartbeat", () => {
+  it("a signal drops down each thread", () => {
+    expect(css).toMatch(/\.thread::after\s*\{[^}]*animation: signal[^;]*infinite/);
+    expect(css).toMatch(/@keyframes signal/);
+  });
+
+  it("How it works passes a light from step to step", () => {
+    expect(css).toMatch(/\.glint\s*\{[^}]*animation: glint[^;]*calc\(var\(--i[^;]*infinite/);
+    const how = page.slice(page.indexOf('id="how-h"'), page.indexOf('aria-labelledby="activities-h"'));
+    expect(how).toMatch(/className="glint"[^>]*"--i": i/);
+  });
+
+  it("each vote in the demo sends a light from the phone to the results", () => {
+    const demo = read("components/LiveDemo.tsx");
+    expect(demo).toMatch(/key=\{`glint-\$\{tap\.tick\}`\}[^>]*className="glint-once/);
+    expect(css).toMatch(/\.glint-once\s*\{[^}]*animation: glint-once/);
+  });
+
+  it("links light up along their line on hover", () => {
+    expect(css).toMatch(/\.link-row:hover::after[^{]*\{[^}]*animation: glint-once/);
+  });
+
+  it("never reaches past the edge of the page (lights move inside their line, not across the page)", () => {
+    for (const sel of [".glint", ".glint-once"]) {
+      const at = css.indexOf(`${sel} {`);
+      const rule = css.slice(at, css.indexOf("}", at));
+      expect(rule, sel).not.toMatch(/translateX/);
+    }
+    for (const kf of ["glint", "glint-once"]) {
+      const at = css.indexOf(`@keyframes ${kf} {`);
+      const body = css.slice(at, css.indexOf("\n}", at));
+      expect(body, kf).not.toMatch(/translateX/);
+    }
+  });
+
+  it("all of it rests for reduced motion", () => {
+    const home = css.slice(css.indexOf(":root:has(.quiet) {"));
+    const reduced = home.slice(home.indexOf("@media (prefers-reduced-motion: reduce)"));
+    for (const sel of [".thread::after", ".glint", ".glint-once"]) expect(reduced, sel).toContain(sel);
+  });
+});

@@ -8,7 +8,6 @@ import { LiveDemo } from "@/components/LiveDemo";
 import { aiAvailable } from "@/lib/ai";
 import { Logo } from "@/components/Logo";
 import { WarmUp } from "@/components/WarmUp";
-import { KIND_INFO } from "@/lib/kinds";
 import { ACTIVITIES } from "@/lib/activities";
 import { MiniTree } from "@/components/MiniTree";
 import { LinkRow } from "@/components/home/LinkRow";
@@ -100,6 +99,8 @@ export default function Home() {
             {STEPS.map((step, i) => (
               <li key={step.title} className="min-w-0">
                 <Reveal delay={i * 120} className="rule pt-5 pb-8">
+                  {/* a light passes along the line from step to step: write, scan, watch */}
+                  <span aria-hidden className="glint" style={{ "--i": i } as CSSProperties} />
                   <span className="text-sm text-muted tabular-nums">0{i + 1}</span>
                   <h3 className="mt-6 text-lg text-ink">{step.title}</h3>
                   <p className="mt-1 text-ink-soft">{step.body}</p>
@@ -141,16 +142,6 @@ export default function Home() {
           </Reveal>
           <Reveal>
             <FeatureList ai={aiAvailable()} />
-            <div style={{ "--i": 9 } as CSSProperties} className="rule grid grid-cols-1 gap-x-6 gap-y-2 pt-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-              <p className="text-ink">Question types</p>
-              <ul className="flex flex-wrap gap-x-5 gap-y-1 text-ink-soft">
-                {KIND_INFO.map((k) => (
-                  <li key={k.id} title={k.hint}>
-                    {k.label}
-                  </li>
-                ))}
-              </ul>
-            </div>
           </Reveal>
         </section>
 

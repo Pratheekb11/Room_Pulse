@@ -34,7 +34,8 @@ describe("the page is short", () => {
   // Activities: four with a line each, the rest folded behind a button (test/home-quiet.test.ts); question types as short labels.
   it("shows activities and question types briefly, not a card of text each", () => {
     expect(page).toContain("ACTIVITIES.map");
-    expect(page).toContain("KIND_INFO.map");
+    // question types are folded under the features (components/FeatureList.tsx)
+    expect(read("components/FeatureList.tsx")).toContain("KIND_INFO.map");
     expect(page).not.toMatch(/>\s*\{a\.blurb\}\s*</);
     expect(page).not.toMatch(/>\s*\{k\.hint\}\s*</);
     // question types sit with the features, not in a section of their own

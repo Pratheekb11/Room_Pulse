@@ -516,6 +516,85 @@ body,
   transform: scaleY(0);
 }
 
+/* Flow: a light runs along the lines, like the heartbeat at the end of the page. */
+.quiet {
+  --flow-light: linear-gradient(90deg, transparent, var(--color-primary) 30%, #e4e8ff 50%, var(--color-primary) 70%, transparent);
+}
+/* A signal drops down each thread, once it has grown */
+.thread {
+  position: relative;
+  overflow: hidden;
+}
+.thread::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 40%;
+  background: linear-gradient(transparent, var(--color-primary) 70%, #e4e8ff);
+  transform: translateY(-100%);
+  animation: signal 3200ms cubic-bezier(0.45, 0, 0.2, 1) 2000ms infinite;
+}
+@keyframes signal {
+  from { transform: translateY(-100%); }
+  60%, to { transform: translateY(260%); }
+}
+[data-shown="false"] .thread::after {
+  animation: none;
+}
+/* How it works: a light passes along each step's line in turn (`--i`), so the three read as one flow */
+.glint {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  /* the light moves inside a full-width line (background-position), so nothing ever reaches past the page edge */
+  background: var(--flow-light) no-repeat;
+  background-size: 35% 100%;
+  background-position: -60% 0;
+  animation: glint 3600ms cubic-bezier(0.45, 0, 0.2, 1) calc(var(--i, 0) * 1200ms + 1800ms) infinite;
+}
+@keyframes glint {
+  0% { background-position: -60% 0; opacity: 1; }
+  33% { background-position: 160% 0; opacity: 1; }
+  34%, 100% { background-position: 160% 0; opacity: 0; }
+}
+[data-shown="false"] .glint {
+  animation: none;
+}
+/* Once, along a line: each vote in the demo, and a link's line on hover */
+.glint-once {
+  height: 1px;
+  background: var(--flow-light) no-repeat;
+  background-size: 35% 100%;
+  animation: glint-once 900ms cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+@keyframes glint-once {
+  from { background-position: -60% 0; opacity: 1; }
+  90% { opacity: 1; }
+  to { background-position: 160% 0; opacity: 0; }
+}
+.link-row {
+  position: relative;
+}
+.link-row::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--flow-light) no-repeat;
+  background-size: 35% 100%;
+  opacity: 0;
+}
+.link-row:hover::after,
+.link-row:focus-visible::after {
+  animation: glint-once 900ms cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
 /* Sections fade in when scrolled to (components/home/Reveal.tsx); hidden only once the browser has checked */
 .reveal {
   transition: opacity 1100ms var(--ease-out-soft), transform 1200ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -588,6 +667,13 @@ body,
   }
   .enter {
     animation: none !important;
+  }
+  .thread::after,
+  .glint,
+  .glint-once,
+  .link-row::after {
+    animation: none !important;
+    opacity: 0 !important;
   }
 }
 
