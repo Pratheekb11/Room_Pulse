@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { DEFAULT_THEME, themeStyle } from "@/lib/themes";
+import { themeStyle } from "@/lib/themes";
 
 /**
  * Puts a presentation's slide design on the whole page (<html>), so the background, the footer
@@ -9,7 +9,8 @@ import { DEFAULT_THEME, themeStyle } from "@/lib/themes";
  */
 export function useDocumentTheme(theme: string | undefined) {
   useEffect(() => {
-    if (!theme || theme === DEFAULT_THEME) return;
+    // Paper is the page's built-in look (app/globals.css), so it needs nothing put on the page
+    if (!theme || theme === "paper") return;
     const root = document.documentElement;
     const style = themeStyle(theme);
     for (const [k, v] of Object.entries(style)) {

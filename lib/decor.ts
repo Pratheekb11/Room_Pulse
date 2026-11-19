@@ -7,6 +7,7 @@ export const CHARACTERS = ["blob", "mug", "bulb", "star", "cat", "robot", "troph
 export type Character = (typeof CHARACTERS)[number];
 
 const BY_THEME: Record<ThemeId, { screen: Character; phone: Character }> = {
+  quiet: { screen: "moon", phone: "plane" },
   paper: { screen: "plane", phone: "blob" },
   mono: { screen: "pencil", phone: "plane" },
   harbour: { screen: "boat", phone: "mug" },

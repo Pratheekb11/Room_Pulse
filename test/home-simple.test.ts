@@ -31,7 +31,8 @@ describe("the page is short", () => {
     expect(page.match(/<section/g)!.length).toBeLessThanOrEqual(5);
   });
 
-  it("shows activities and question types as small chips, not a card of text each", () => {
+  // Activities: four with a line each, the rest folded behind a button (test/home-quiet.test.ts); question types as short labels.
+  it("shows activities and question types briefly, not a card of text each", () => {
     expect(page).toContain("ACTIVITIES.map");
     expect(page).toContain("KIND_INFO.map");
     expect(page).not.toMatch(/>\s*\{a\.blurb\}\s*</);

@@ -275,10 +275,12 @@ body,
   from { scale: 0 1; }
 }
 
-/* ---- The home page: quiet two tones (app/page.tsx, components/home/) ----
-   Near-black and soft grey, one weight of type, hairlines, one small accent. The colour variables are swapped
-   for the page only, so shared pieces (logo, join box, credit) follow; dialogs render outside it and stay light. */
-.home-quiet {
+/* ---- Quiet: the site's own look (the home page, sign-in, dashboard, builder, report, account pages, 404) ----
+   Near-black and soft grey, one weight of type, hairlines, one calm blue. A page that carries the `quiet` marker
+   (app/page.tsx, app/admin/…, app/forgot…) switches the colour variables on the root, so everything follows,
+   dialogs and sheets rendered into <body> included. The same colours are the "Quiet" slide design (lib/themes.ts),
+   which voters' phones and the big screen get through useDocumentTheme instead. */
+:root:has(.quiet) {
   --color-canvas: #131314;
   --color-canvas-soft: #161617;
   --color-white: #1a1a1c;
@@ -292,16 +294,37 @@ body,
   --color-line-strong: #3b3d42;
   --color-primary: #7383ff;
   --color-primary-active: #8f9cff;
+  --color-sun: #38331f;
+  --color-mint: #1e3a2f;
+  --color-lavender: #2b2e4a;
   --color-error: #ff7a8c;
+  --color-success: #7fd6a8;
+  --color-warn: #f5c56b;
   --display-weight: 400;
-  background-color: var(--color-canvas);
-  color: var(--color-ink);
+  --doodle-halo: drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff);
+  --topic-0: #9aa6ff;
+  --topic-1: #e6d38f;
+  --topic-2: #f0a898;
+  --topic-3: #8fd3b1;
+  --topic-4: #c4b1f0;
+  --topic-5: #bcd58b;
+  --topic-6: #94d2e2;
+  --topic-7: #e4a9cb;
+  --topic-ink-0: #9aa6ff;
+  --topic-ink-1: #e6d38f;
+  --topic-ink-2: #f0a898;
+  --topic-ink-3: #8fd3b1;
+  --topic-ink-4: #c4b1f0;
+  --topic-ink-5: #bcd58b;
+  --topic-ink-6: #94d2e2;
+  --topic-ink-7: #e4a9cb;
+  color-scheme: dark;
 }
-html:has(.home-quiet),
-body:has(.home-quiet) {
+:root:has(.quiet),
+:root:has(.quiet) body {
   background-color: #131314;
 }
-.home-quiet ::selection {
+.quiet ::selection {
   background: rgb(205 208 213 / 0.22);
 }
 
@@ -369,6 +392,27 @@ body:has(.home-quiet) {
 .rule[data-shown="false"] > * {
   animation: none;
   opacity: 0;
+}
+
+/* A list that unfolds like a drop-down (components/home/ActivityList.tsx): the box grows to its height,
+   then the names slide in one after another (`--j`) */
+.unfold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 700ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+.unfold[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.unfold-item {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 400ms ease, transform 600ms var(--ease-out-soft);
+}
+.unfold[data-open="true"] .unfold-item {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--j, 0) * 45ms + 180ms);
 }
 
 /* Underlines that sweep across on hover: a faint line always, an ink one that grows over it */
@@ -518,6 +562,28 @@ body:has(.home-quiet) {
   break-after: avoid;
 }
 @media print {
+  /* Quiet pages print in Paper's light colours, so the report reads on paper */
+  :root:has(.quiet) {
+    --color-canvas: #ffffff;
+    --color-canvas-soft: #fbfbfc;
+    --color-white: #ffffff;
+    --color-surface-strong: #e4e5ea;
+    --color-ink: #0f1115;
+    --color-ink-soft: #3f434b;
+    --color-muted: #5d616a;
+    --color-muted-soft: #858a94;
+    --color-line: #e2e3e8;
+    --color-line-soft: #eeeff2;
+    --color-line-strong: #c8cad2;
+    --color-primary: #2747f5;
+    --color-sun: #ffe58a;
+    --color-mint: #b3e5cc;
+    --color-lavender: #cfd6fc;
+    --color-error: #cf2747;
+    --color-success: #1b7f5e;
+    --display-weight: 600;
+    color-scheme: light;
+  }
   @page {
     size: A4;
     margin: 14mm;

@@ -12,6 +12,7 @@ import { KIND_INFO } from "@/lib/kinds";
 import { ACTIVITIES } from "@/lib/activities";
 import { MiniTree } from "@/components/MiniTree";
 import { LinkRow } from "@/components/home/LinkRow";
+import { ActivityList } from "@/components/home/ActivityList";
 import { Reveal } from "@/components/home/Reveal";
 import { Words } from "@/components/home/Words";
 import type { CSSProperties } from "react";
@@ -32,7 +33,7 @@ const H2 = "font-display font-normal text-[clamp(2rem,4.4vw,3.5rem)] leading-[1.
 // Quiet: two tones, one weight of type, hairlines and room. The only accent is the logo's colour.
 export default function Home() {
   return (
-    <div className="home-quiet min-h-dvh">
+    <div className="quiet home-quiet min-h-dvh">
       <WarmUp />
       <header className="mx-auto flex h-[72px] max-w-[1320px] items-center justify-between gap-3 px-5 sm:px-8">
         <Logo />
@@ -118,13 +119,9 @@ export default function Home() {
                 <p className="mt-6 max-w-md text-[17px] leading-relaxed text-ink-soft">
                   In the room or on a call, everyone writes from their phone and the picture fills up live.
                 </p>
-                <ul className="mt-10 grid grid-cols-1 gap-x-8 text-ink-soft min-[420px]:grid-cols-2" aria-label="Team activities">
-                  {ACTIVITIES.map((a, i) => (
-                    <li key={a.id} title={a.blurb} style={{ "--i": i } as CSSProperties} className="rule py-2.5">
-                      <span>{a.label}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-10">
+                  <ActivityList items={ACTIVITIES.map((a) => ({ id: a.id, label: a.label, blurb: a.blurb, minutes: a.minutes }))} />
+                </div>
                 <LinkRow href="/admin" className="mt-8 max-w-md">
                   Start an activity
                 </LinkRow>

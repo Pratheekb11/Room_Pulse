@@ -50,9 +50,9 @@ beforeEach(async () => {
 });
 
 describe("slide design (theme) of a presentation", () => {
-  it("is Paper unless the presenter picks one", async () => {
+  it("is Quiet unless the presenter picks one", async () => {
     const { code } = (await (await create()).json()) as { code: string };
-    expect((await info(code)).session.theme).toBe("paper");
+    expect((await info(code)).session.theme).toBe("quiet");
   });
 
   it("keeps the picked design, and phones see it", async () => {

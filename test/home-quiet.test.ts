@@ -17,12 +17,12 @@ const contrast = (a: string, b: string) => {
   const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
   return (x + 0.05) / (y + 0.05);
 };
-const quiet = /\.home-quiet\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+const quiet = /:root:has\(\.quiet\)\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
 const scoped = (name: string) => new RegExp(`--color-${name}: (#[0-9a-f]{6})`).exec(quiet)?.[1] ?? "";
 
 describe("two tones", () => {
   it("the page swaps the colour variables for near-black and soft grey, so shared pieces follow", () => {
-    expect(page).toMatch(/className="home-quiet /);
+    expect(page).toMatch(/className="quiet home-quiet /);
     const canvas = scoped("canvas");
     const ink = scoped("ink");
     expect(canvas).toMatch(/^#1[0-9a-f]{5}$/);
@@ -35,7 +35,7 @@ describe("two tones", () => {
   });
 
   it("the space round the page is dark too, not the light canvas", () => {
-    expect(css).toMatch(/:has\(\.home-quiet\)[^{]*\{[^}]*background/);
+    expect(css).toMatch(/:root:has\(\.quiet\) body[^{]*\{[^}]*background/);
   });
 
   it("has no neon, glow, hard shadows, stickers or emoji", () => {
@@ -107,7 +107,8 @@ describe("motion that feels designed", () => {
     expect(css).toMatch(/\.rule::before\s*\{[^}]*transform-origin: left/);
     expect(css).toMatch(/@keyframes rule/);
     expect(css).toMatch(/\[data-shown="false"\] \.rule::before[^{]*\{[^}]*animation: none/);
-    expect(page.match(/\brule\b/g)!.length).toBeGreaterThanOrEqual(3);
+    const pieces = page + read("components/home/ActivityList.tsx") + read("components/FeatureList.tsx");
+    expect(pieces.match(/\brule\b/g)!.length).toBeGreaterThanOrEqual(4);
   });
 
   it("a hairline grows down the middle, like a thread to the next part", () => {
@@ -152,7 +153,7 @@ describe("motion that feels designed", () => {
 
   it("nothing moves for people who ask for reduced motion", () => {
     const reduced = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)") - 1);
-    const home = css.slice(css.indexOf(".home-quiet {"));
+    const home = css.slice(css.indexOf(":root:has(.quiet) {"));
     const quietReduced = home.slice(home.indexOf("@media (prefers-reduced-motion: reduce)"));
     for (const sel of [".reveal[data-shown]", ".thread", ".w > span", ".rule::before", ".heartbeat"]) expect(quietReduced, sel).toContain(sel);
     expect(reduced).toBeTruthy();
@@ -164,5 +165,34 @@ describe("the demo fits the page", () => {
     const demo = read("components/LiveDemo.tsx");
     expect(demo).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(demo).not.toMatch(/#[0-9a-f]{6}/i);
+  });
+});
+
+describe("team activities: a few up front, the rest a tap away", () => {
+  it("shows 4 activities with what they are and how long they take, then a button for the rest", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ACTIVITIES } = await import("@/lib/activities");
+    const { ActivityList } = await import("@/components/home/ActivityList");
+    const items = ACTIVITIES.map((a) => ({ id: a.id, label: a.label, blurb: a.blurb, minutes: a.minutes }));
+    const html = renderToStaticMarkup(createElement(ActivityList, { items }));
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&#x27;");
+    for (const a of ACTIVITIES.slice(0, 4)) {
+      expect(html).toContain(esc(a.blurb));
+      expect(html).toContain(`${a.minutes} min`);
+    }
+    // the rest are listed (for search engines and screen readers once opened), folded away until asked for
+    for (const a of ACTIVITIES.slice(4)) expect(html).toContain(esc(a.label));
+    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-controls="more-activities"/);
+    expect(html).toContain(`See all ${ACTIVITIES.length} activities`);
+    expect(html).toMatch(/id="more-activities"[^>]*data-open="false"/);
+    expect(html).toMatch(/<div[^>]*inert/);
+    expect(page).toContain("<ActivityList");
+  });
+
+  it("unfolds with a drop-down: the box grows, then the names slide in one after another", () => {
+    expect(css).toMatch(/\.unfold\s*\{[^}]*grid-template-rows: 0fr[^}]*transition: grid-template-rows/);
+    expect(css).toMatch(/\.unfold\[data-open="true"\]\s*\{[^}]*grid-template-rows: 1fr/);
+    expect(css).toMatch(/\.unfold\[data-open="true"\] \.unfold-item\s*\{[^}]*transition-delay: calc\(var\(--j/);
   });
 });
