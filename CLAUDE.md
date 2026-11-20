@@ -6,6 +6,11 @@ Build test-first: write a failing test, then the code. Check every screen at 390
 
 ## Not finished
 
+### To do (owner)
+
+- [ ] **Review the `feat/quiet-home` preview on Vercel** (phone and laptop), then approve merging it into `main` (planned for 2026-11-21). No database change is needed.
+
+
 ### More question types — planned, not built yet
 
 LiveRate has 9 question types: Quiz (`quiz`), Score items (`rating`), Pick one (`poll`), Pick several (`multi`), Put in order (`rank`), Number (`number`), Open answer (`text`), Audience Q&A (`qa`) and Word cloud (`words`). The builder also has a one-tap **Yes / No / Not sure** shortcut (`lib/presets.ts`), which makes a Pick one question with those options. These are still to build:
