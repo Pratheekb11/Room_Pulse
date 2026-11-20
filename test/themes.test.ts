@@ -5,8 +5,8 @@ import { TEMPLATES } from "@/lib/templates";
 import { createSessionSchema, editSessionSchema } from "@/lib/validation";
 
 describe("slide designs", () => {
-  it("offers a handful of looks, light and dark, with Quiet (the site's own look) as the default", () => {
-    expect(DEFAULT_THEME).toBe("quiet");
+  it("offers a handful of looks, light and dark, with Paper (the current look) as the default", () => {
+    expect(DEFAULT_THEME).toBe("paper");
     expect(THEMES.map((t) => t.id)).toEqual([...THEME_IDS]);
     expect(THEMES.length).toBeGreaterThanOrEqual(11);
     // the usual families of slide design are all there
@@ -52,8 +52,8 @@ describe("slide designs", () => {
   });
 
   it("unknown or missing ids fall back to the default", () => {
-    expect(getTheme("nope").id).toBe("quiet");
-    expect(getTheme(undefined).id).toBe("quiet");
+    expect(getTheme("nope").id).toBe("paper");
+    expect(getTheme(undefined).id).toBe("paper");
     expect(getTheme("chalk").id).toBe("chalk");
   });
 
@@ -76,9 +76,9 @@ describe("recommendTheme", () => {
     expect(recommendTheme({ title: "Friday fun", kinds: kinds("poll", "quiz") }).id).toBe("arcade");
   });
 
-  it("suggests Quiet, the calm default, for retros and standups", () => {
-    expect(recommendTheme({ title: "Sprint retro", kinds: kinds("poll", "text") }).id).toBe("quiet");
-    expect(recommendTheme({ title: "Daily standup", kinds: kinds("words") }).id).toBe("quiet");
+  it("suggests a calm look for retros and standups", () => {
+    expect(recommendTheme({ title: "Sprint retro", kinds: kinds("poll", "text") }).id).toBe("harbour");
+    expect(recommendTheme({ title: "Daily standup", kinds: kinds("words") }).id).toBe("harbour");
   });
 
   it("suggests the chalkboard for workshops, classes and icebreakers", () => {
@@ -86,21 +86,21 @@ describe("recommendTheme", () => {
     expect(recommendTheme({ title: "React workshop", kinds: kinds("poll") }).id).toBe("chalk");
   });
 
-  it("suggests a dark look for talks and evening events (Quiet is dark)", () => {
-    expect(recommendTheme({ title: "Keynote Q&A", kinds: kinds("qa") }).id).toBe("quiet");
-    expect(getTheme(recommendTheme({ title: "Anything", kinds: kinds("qa") }).id).dark).toBe(true);
+  it("suggests a dark look for talks and evening events", () => {
+    expect(recommendTheme({ title: "Keynote Q&A", kinds: kinds("qa") }).id).toBe("midnight");
+    expect(recommendTheme({ title: "Anything", kinds: kinds("qa") }).id).toBe("midnight");
   });
 
   it("suggests the warm blush look for celebrations", () => {
     expect(recommendTheme({ title: "Team party", kinds: kinds("poll") }).id).toBe("blush");
   });
 
-  it("suggests Pop for fun and Forest for the outdoors; tech and business get Quiet", () => {
-    expect(recommendTheme({ title: "Hackathon kickoff", kinds: kinds("poll") }).id).toBe("quiet");
-    expect(recommendTheme({ title: "Frontend dev meetup", kinds: kinds("poll") }).id).toBe("quiet");
+  it("suggests Neon for tech crowds, Pop for fun, Forest for the outdoors, Harbour for business", () => {
+    expect(recommendTheme({ title: "Hackathon kickoff", kinds: kinds("poll") }).id).toBe("neon");
+    expect(recommendTheme({ title: "Frontend dev meetup", kinds: kinds("poll") }).id).toBe("neon");
     expect(recommendTheme({ title: "Family fun day", kinds: kinds("poll") }).id).toBe("pop");
     expect(recommendTheme({ title: "Sustainability town hall", kinds: kinds("poll") }).id).toBe("forest");
-    expect(recommendTheme({ title: "Q3 all-hands", kinds: kinds("poll") }).id).toBe("quiet");
+    expect(recommendTheme({ title: "Q3 all-hands", kinds: kinds("poll") }).id).toBe("harbour");
   });
 
   it("suggests the anime look for anime, manga and cosplay crowds", () => {
@@ -110,9 +110,9 @@ describe("recommendTheme", () => {
     expect(recommendTheme({ title: "Anime trivia", kinds: kinds("quiz") }).id).toBe("arcade");
   });
 
-  it("falls back to Quiet and always says why", () => {
+  it("falls back to Paper and always says why", () => {
     const r = recommendTheme({ title: "Event feedback", kinds: kinds("rating", "text") });
-    expect(r.id).toBe("quiet");
+    expect(r.id).toBe("paper");
     for (const t of ["", "Sprint retro", "Quiz night", "Workshop"])
       expect(recommendTheme({ title: t, kinds: kinds("poll") }).reason.length).toBeGreaterThan(10);
   });
@@ -126,8 +126,8 @@ describe("recommendTheme", () => {
 describe("theme in requests", () => {
   const base = { title: "x", focusTopics: [{ name: "Q", kind: "poll", topics: ["a", "b"] }], criteria: [] };
 
-  it("create defaults to quiet, accepts known themes, rejects unknown ones", () => {
-    expect(createSessionSchema.parse(base).theme).toBe("quiet");
+  it("create defaults to paper, accepts known themes, rejects unknown ones", () => {
+    expect(createSessionSchema.parse(base).theme).toBe("paper");
     expect(createSessionSchema.parse({ ...base, theme: "chalk" }).theme).toBe("chalk");
     expect(createSessionSchema.safeParse({ ...base, theme: "sparkly" }).success).toBe(false);
   });

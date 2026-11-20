@@ -278,8 +278,8 @@ body,
 /* ---- Quiet: the site's own look (the home page, sign-in, dashboard, builder, report, account pages, 404) ----
    Near-black and soft grey, one weight of type, hairlines, one calm blue. A page that carries the `quiet` marker
    (app/page.tsx, app/admin/…, app/forgot…) switches the colour variables on the root, so everything follows,
-   dialogs and sheets rendered into <body> included. The same colours are the "Quiet" slide design (lib/themes.ts),
-   which voters' phones and the big screen get through useDocumentTheme instead. */
+   dialogs and sheets rendered into <body> included. Voters' phones and the big screen keep the presentation's
+   own slide design (lib/themes.ts, Paper by default). */
 :root:has(.quiet) {
   --color-canvas: #131314;
   --color-canvas-soft: #161617;

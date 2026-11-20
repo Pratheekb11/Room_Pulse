@@ -373,10 +373,9 @@ create table if not exists ai_usage (
 -- Slide design of a presentation (lib/themes.ts): colours and headline type on the big screen
 -- and on voters' phones.
 alter table sessions add column if not exists theme text not null default 'paper';
--- New presentations send their design; 'quiet' (2026-11-19) is the builder's default, the column's default stays 'paper'.
 alter table sessions drop constraint if exists sessions_theme_check;
 alter table sessions add constraint sessions_theme_check
-  check (theme in ('quiet', 'paper', 'mono', 'harbour', 'forest', 'blush', 'pop', 'anime', 'chalk', 'midnight', 'neon', 'arcade'));
+  check (theme in ('paper', 'mono', 'harbour', 'forest', 'blush', 'pop', 'anime', 'chalk', 'midnight', 'neon', 'arcade'));
 -- Fun illustrations (lib/decor.ts): doodle characters on the big screen and phones.
 alter table sessions add column if not exists decor boolean not null default true;
 -- Recreate the view so it includes the columns above.

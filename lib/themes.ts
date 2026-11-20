@@ -6,10 +6,9 @@ import type { QuestionKind } from "./types";
 // screen follows without per-component changes. `surface` replaces white, so in dark designs
 // `bg-white` cards turn dark and `text-white` on buttons turns dark too.
 
-export const THEME_IDS = ["quiet", "paper", "mono", "harbour", "forest", "blush", "pop", "anime", "chalk", "midnight", "neon", "arcade"] as const;
+export const THEME_IDS = ["paper", "mono", "harbour", "forest", "blush", "pop", "anime", "chalk", "midnight", "neon", "arcade"] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
-// New presentations start in Quiet, the same look as the site's own screens (app/globals.css, `:root:has(.quiet)`).
-export const DEFAULT_THEME: ThemeId = "quiet";
+export const DEFAULT_THEME: ThemeId = "paper";
 
 export interface ThemeColors {
   canvas: string;
@@ -42,8 +41,6 @@ export interface Theme {
   dark: boolean;
   /** Headline typeface (body text stays the same everywhere). */
   font: "grotesk" | "sans" | "serif" | "chalk" | "poster" | "mono" | "anime";
-  /** Headline weight, when not the face's usual one (Quiet sets Gabarito in its regular weight). */
-  displayWeight?: "400" | "600";
   /** Plain design: option colours, score colours and illustrations turn grey (`--theme-chroma: 0%`). */
   plain?: boolean;
   /** Background pattern drawn behind everything (CSS image), e.g. halftone dots. */
@@ -56,36 +53,6 @@ export interface Theme {
 }
 
 export const THEMES: Theme[] = [
-  {
-    id: "quiet",
-    style: "Minimal",
-    label: "Quiet",
-    blurb: "Near-black and soft grey with one calm blue, like the LiveRate site. Fits any room.",
-    dark: true,
-    font: "grotesk",
-    displayWeight: "400",
-    topics: ["#9aa6ff", "#e6d38f", "#f0a898", "#8fd3b1", "#c4b1f0", "#bcd58b", "#94d2e2", "#e4a9cb"],
-    colors: {
-      canvas: "#131314",
-      canvasSoft: "#161617",
-      surface: "#1a1a1c",
-      surfaceStrong: "#242427",
-      ink: "#cdd0d5",
-      inkSoft: "#a4a8ae",
-      muted: "#8c9097",
-      mutedSoft: "#6c7077",
-      line: "#2a2b2f",
-      lineSoft: "#202124",
-      lineStrong: "#3b3d42",
-      primary: "#7383ff",
-      primaryActive: "#8f9cff",
-      sun: "#38331f",
-      mint: "#1e3a2f",
-      lavender: "#2b2e4a",
-      error: "#ff7a8c",
-      success: "#7fd6a8",
-    },
-  },
   {
     id: "paper",
     style: "Minimal",
@@ -452,7 +419,7 @@ export function themeStyle(id: string | null | undefined): Record<string, string
     "--color-warn": t.dark ? "#f5c56b" : "#9a5b00",
     "--font-display": FONTS[t.font],
     // Gabarito reads best a little heavier; the other faces are drawn for 400
-    "--display-weight": t.displayWeight ?? (t.font === "grotesk" || t.font === "sans" ? "600" : "400"),
+    "--display-weight": t.font === "grotesk" || t.font === "sans" ? "600" : "400",
     "--theme-pattern": t.pattern?.image ?? "none",
     // Doodles (components/Doodle.tsx) have dark outlines: a white sticker edge keeps them visible on dark designs.
     "--doodle-halo": t.plain ? "grayscale(1)" : t.dark ? "drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff)" : "none",
@@ -491,13 +458,21 @@ export function recommendTheme({ title, kinds }: { title: string; kinds: Questio
     return { id: "arcade", reason: "It has a quiz: bold colours and big type read well from the back of the room." };
   if (has(title, /\b(anime|manga|cosplay|otaku|kawaii|weeb|j-?pop|k-?pop|japan)/))
     return { id: "anime", reason: "An anime crowd: sakura pink, halftone dots and bubbly lettering." };
-  if (has(title, /\b(workshop|class|lesson|training|course|icebreaker|ice breaker|bootcamp|school)/))
-    return { id: "chalk", reason: "Workshops and classes feel at home on a chalkboard." };
+  if (has(title, /\b(hackathon|dev|developer|engineering|code|coding|tech|devops|frontend|backend|ai|data|startup)\b/))
+    return { id: "neon", reason: "A tech crowd: dark screen, cyan accents and code-style type." };
+  if (has(title, /\b(retro|retrospective|standup|stand-up|sprint|check-in|checkin|1:1|one-on-one)/))
+    return { id: "harbour", reason: "Retros and standups go better with calm, cool colours." };
+  if (has(title, /\b(workshop|class|lesson|training|course|icebreaker|ice breaker|meetup|meet-up|bootcamp|school)/))
+    return { id: "chalk", reason: "Workshops and meetups feel at home on a chalkboard." };
   if (has(title, /\b(fun|kids|family|games?|team.?building|friday|hangout)\b/))
     return { id: "pop", reason: "Something light-hearted: bright, playful colours keep the energy up." };
   if (has(title, /\b(sustainab|green|climate|garden|outdoor|wellness|wellbeing|health|nature|eco)/))
     return { id: "forest", reason: "Earthy greens fit wellbeing and nature topics." };
+  if (has(title, /\b(all-hands|all hands|town hall|board|quarterly|q[1-4]|client|investor|strategy|kickoff|kick-off|okr)/))
+    return { id: "harbour", reason: "Business meetings read best in a clean, professional blue." };
   if (has(title, /\b(party|celebrat|birthday|wedding|social|farewell|anniversary|holiday|christmas|diwali)/))
     return { id: "blush", reason: "A warm, friendly look suits a celebration." };
-  return { id: "quiet", reason: "Calm and easy to read, in a dim room or a bright one: the same look as LiveRate itself." };
+  if (kinds.includes("qa") || has(title, /\b(keynote|talk|conference|webinar|evening|night|panel|summit|lecture)/))
+    return { id: "midnight", reason: "Talks are often in dim rooms, where a dark screen is easier on the eyes." };
+  return { id: "paper", reason: "A quiet, readable look that fits almost any presentation." };
 }

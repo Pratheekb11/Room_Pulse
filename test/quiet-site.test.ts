@@ -1,75 +1,26 @@
 // The whole site in the home page's quiet style: the app's own screens (sign-in, dashboard, builder, edit,
-// report, password and email pages, 404) are near-black and soft grey, and "Quiet" is a slide design of its own,
-// the default for new presentations. Voters' phones and the big screen keep whichever design the presenter picks.
-import { existsSync, readFileSync } from "node:fs";
+// report, password and email pages, 404) are near-black and soft grey. Voters' phones and the big screen keep
+// whichever slide design the presenter picks (Paper by default), so presentations look as they did.
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_THEME, THEME_IDS, getTheme, recommendTheme, themeStyle } from "@/lib/themes";
+import { DEFAULT_THEME, THEME_IDS } from "@/lib/themes";
 
 const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
 const css = read("app/globals.css");
-const block = (selector: string) => {
-  const at = css.indexOf(`${selector} {`);
-  expect(at, selector).toBeGreaterThan(-1);
-  return css.slice(at, css.indexOf("}", at));
-};
-const varIn = (text: string, name: string) => new RegExp(`--color-${name}: (#[0-9a-f]{6})`).exec(text)?.[1];
 
-describe("Quiet, the slide design", () => {
-  it("is a design of its own and the default for new presentations", () => {
-    expect(THEME_IDS).toContain("quiet");
-    expect(DEFAULT_THEME).toBe("quiet");
-    const t = getTheme("quiet");
-    expect(t.dark).toBe(true);
-    expect(t.font).toBe("grotesk");
+// The site's own screens are dark; presentations keep the slide designs as they are on main, so this needs
+// no database change (2026-11-20: a "Quiet" slide design was tried and dropped for that reason).
+describe("no database change needed", () => {
+  it("adds no slide design: the designs are exactly the ones the database allows", () => {
+    expect(DEFAULT_THEME).toBe("paper");
+    expect(THEME_IDS).not.toContain("quiet" as never);
+    const allowed = /sessions_theme_check\s+check \(theme in \(([^)]*)\)\)/.exec(read("db/schema.sql"))![1];
+    expect(allowed.split(",").map((t) => t.trim().replace(/'/g, ""))).toEqual([...THEME_IDS]);
   });
 
-  it("sets headlines in the regular weight, like the home page", () => {
-    expect(themeStyle("quiet")["--display-weight"]).toBe("400");
-    expect(themeStyle("paper")["--display-weight"]).toBe("600");
-  });
-
-  it("is the same colours the site's own screens use", () => {
-    const site = block(":root:has(.quiet)");
-    const c = getTheme("quiet").colors;
-    const pairs: [string, string][] = [
-      ["canvas", c.canvas],
-      ["white", c.surface],
-      ["ink", c.ink],
-      ["ink-soft", c.inkSoft],
-      ["muted", c.muted],
-      ["muted-soft", c.mutedSoft],
-      ["line", c.line],
-      ["line-strong", c.lineStrong],
-      ["primary", c.primary],
-      ["error", c.error],
-    ];
-    for (const [name, value] of pairs) expect(varIn(site, name), name).toBe(value);
-  });
-
-  it("is what the builder suggests unless the presentation clearly suits another", () => {
-    const pick = (title: string, kinds: ("poll" | "quiz" | "qa")[] = ["poll"]) => recommendTheme({ title, kinds }).id;
-    expect(pick("Team lunch ideas")).toBe("quiet");
-    expect(pick("Sprint 42 retro")).toBe("quiet");
-    expect(pick("Q3 all hands")).toBe("quiet");
-    expect(pick("Dev meetup: AI tools")).toBe("quiet");
-    expect(pick("Friday trivia", ["quiz"])).toBe("arcade");
-    expect(pick("Anime club night")).toBe("anime");
-    expect(pick("Diwali party")).toBe("blush");
-  });
-
-  it("is put on the page like any other design (only Paper is the page's built-in look)", () => {
-    const hook = read("components/useDocumentTheme.ts");
-    expect(hook).toMatch(/theme === "paper"/);
-    expect(hook).not.toMatch(/theme === DEFAULT_THEME/);
-  });
-
-  it("is allowed by the database, with the change for production in its own file", () => {
-    expect(read("db/schema.sql")).toMatch(/sessions_theme_check\s+check \(theme in \([^)]*'quiet'/);
-    const file = "db/2026-11-19-quiet-design.sql";
-    expect(existsSync(new URL(`../${file}`, import.meta.url))).toBe(true);
-    const sql = read(file);
-    expect(sql).toMatch(/drop constraint if exists sessions_theme_check/);
-    for (const id of THEME_IDS) expect(sql, id).toContain(`'${id}'`);
+  it("brings no new database files", () => {
+    const files = readdirSync(new URL("../db/", import.meta.url)).filter((f) => /^2026-11-(1[89]|2\d)/.test(f));
+    expect(files).toEqual([]);
   });
 });
 
