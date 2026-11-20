@@ -8,7 +8,7 @@ Build test-first: write a failing test, then the code. Check every screen at 390
 
 ### To do (owner)
 
-- [ ] **Review the `feat/quiet-home` preview on Vercel** (phone and laptop), then approve merging it into `main` (planned for 2026-11-21). No database change is needed.
+- [ ] **Check the live site after the Quiet merge** (2026-11-20): home page, sign-in, dashboard, builder and report at 390px and on a laptop, and that creating and presenting a presentation still works. No database change was needed.
 
 
 ### More question types — planned, not built yet
@@ -131,7 +131,7 @@ Built test-first (`test/ui-polish.test.ts`), checked in a browser at 390px, 768p
 - **Option colours follow the design** (`Theme.topics`, `test/design-colours.test.ts`): each colourful design has its own eight option colours (card headers, bars, slices, chips), set as `--topic-N` by `themeStyle`, with a readable shade of each for coloured words (`--topic-ink-N`, `readableShade` in `lib/colors.ts`). `topicColor` / `topicInk` read the variables with the default set behind them. Paper's are in `app/globals.css` (`:root`), because the default design sets no variables; plain designs (Mono) set the default set, which `tinted()` turns grey. SVG shapes take option colours through `style`, not `fill=` / `stroke=` attributes (var() doesn't work there).
 - **Type, hierarchy, icons, motion, game words** (batch 3): headlines are Gabarito 600 in Paper and on the home page (`--font-gabarito`, `font: "grotesk"`); Inter designs (Harbour, Mono) use 600 too, one-weight faces (serif, chalk, poster, anime) 400 (`--display-weight` from `themeStyle`). On the big screen the question (`QuestionTitle`, up to 3.6rem) is the biggest text, bigger than the presentation title. Home page: both headline lines in ink, sticker icons (`components/Sticker.tsx`, `StickerName` in `lib/activities.ts` and `lib/features.ts`) instead of emoji, the demo in sentence case with no mono or all-caps labels. Illustrations bob three times, then rest; the voter count pops when it changes. Combo, points, "+10" and level-up toasts show only for a quiz or a playful design (`isPlayful` in `lib/themes.ts`: Pop, Anime, Arcade).
 
-### Quiet: the home page and the site's own screens (2026-11-18/20, on branch `feat/quiet-home`, not merged yet; no database change)
+### Quiet: the home page and the site's own screens (2026-11-18/20, branch `feat/quiet-home`, merged into `main` 2026-11-20; no database change)
 
 Built test-first (`test/home-quiet.test.ts`), checked in a browser at 390px and desktop (no sideways scroll at either). Modelled on duotone.design: the first try (cobalt and acid volt, stickers, spinning badge, pointer glow, hard shadows, marquee) read as neon and "AI generated", so it was replaced by a quiet two-tone page.
 
