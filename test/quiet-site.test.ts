@@ -87,7 +87,8 @@ describe("the site's own screens move like the home page", () => {
       expect(read(f), f).toMatch(/\benter\b/);
     // presentations and questions stagger by their place in the list
     expect(read("components/admin/AdminApp.tsx")).toMatch(/className="enter[^"]*"[^>]*style=\{\{ "--i": i/);
-    expect(read("components/admin/PresentationForm.tsx")).toMatch(/enter[^"]*"[^>]*\n?[^>]*"--i": i/);
+    // the builder's question list
+    expect(read("components/admin/builder/QuestionRail.tsx")).toMatch(/\benter\b[\s\S]{0,200}"--i": i/);
   });
 
   it("the logo's pulse draws itself on every page of the site", () => {

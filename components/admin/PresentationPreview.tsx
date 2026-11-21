@@ -76,7 +76,7 @@ const Pill = ({ children, on = false }: { children: React.ReactNode; on?: boolea
 );
 
 /** The real results screen (same header, tabs, card and QR panel), drawn at 1280×800 and scaled to fit. */
-function ScreenSlide({ title, questions, index, onPick, session }: { title: string; questions: PreviewQuestion[]; index: number; onPick: (i: number) => void; session: SessionInfo }) {
+export function ScreenSlide({ title, questions, index, onPick, session }: { title: string; questions: PreviewQuestion[]; index: number; onPick: (i: number) => void; session: SessionInfo }) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.6);
   const [now] = useState(() => Date.now());
@@ -134,7 +134,7 @@ function ScreenSlide({ title, questions, index, onPick, session }: { title: stri
 }
 
 /** The real phone page (same header, progress, chips and buttons) with the real answer card, tappable. */
-function PhoneSlide({
+export function PhoneSlide({
   title,
   questions,
   index,

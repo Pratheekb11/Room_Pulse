@@ -27,6 +27,7 @@ import { BoardThumb } from "@/components/BoardThumb";
 import { BoardCard } from "@/components/vote/BoardCard";
 import { audienceResults } from "@/lib/answers";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
+import { builderSource } from "./builder-source";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -345,7 +346,7 @@ describe("how many leaves each person may add, per board", () => {
   });
 
   it("is a setting in the builder next to the board picker", () => {
-    const form = read("components/admin/PresentationForm.tsx");
+    const form = builderSource();
     expect(form).toContain("each person can add");
     expect(form).toMatch(/maxLeaves: f\.kind === "text" && f\.board \? \(f\.maxLeaves \?\? null\) : null/);
   });

@@ -36,7 +36,7 @@ export function EditApp({ code, backTo }: { code: string; backTo: "results" | "c
   if (state.kind === "loading") return <LoadingScreen label="Opening your presentation" />;
 
   return (
-    <div className="mx-auto max-w-3xl px-5 pb-20 pt-5">
+    <div className="mx-auto max-w-7xl px-5 pb-20 pt-5">
       <header className="flex items-center justify-between gap-4">
         <Logo />
         <a href={back} className="text-sm font-semibold underline underline-offset-4">

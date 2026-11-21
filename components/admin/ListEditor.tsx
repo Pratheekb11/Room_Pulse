@@ -239,11 +239,11 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
         type="button"
         onClick={() => add(items.length - 1)}
         disabled={full}
-        className="-ml-2 mt-1.5 sm:ml-[5.5rem] rounded-lg px-2 py-1 text-sm font-semibold text-ink-soft hover:bg-canvas hover:text-ink disabled:opacity-40"
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-line-strong py-2.5 font-semibold transition-colors duration-150 hover:border-ink hover:bg-canvas disabled:opacity-40"
       >
         + Add {noun}
       </button>
-      <p className="hidden text-xs text-ink-soft sm:block sm:pl-[6rem]">Tip: press Enter for the next one, or paste a whole list.</p>
+      <p className="mt-1 hidden text-center text-xs text-ink-soft sm:block">Tip: press Enter for the next one, or paste a whole list.</p>
       {note && (
         <p role="status" className="mt-1 sm:pl-[6rem] text-xs font-semibold text-ink-soft">
           {note}

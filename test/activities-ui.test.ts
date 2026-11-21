@@ -8,6 +8,7 @@ import { BoardCard } from "@/components/vote/BoardCard";
 import { BoardView } from "@/components/results/BoardView";
 import { TextAnswers } from "@/components/results/TextResults";
 import type { TextAnswer } from "@/lib/types";
+import { builderSource } from "./builder-source";
 
 const card = (extra: Record<string, unknown>) =>
   renderToStaticMarkup(
@@ -169,8 +170,8 @@ describe("the builder", () => {
   });
 
   it("lets an open answer question be shown as a board", () => {
-    expect(src).toContain("Show answers as");
-    expect(src).toContain("chartsFor(f.kind, f.board)");
+    expect(builderSource()).toContain("Show answers as");
+    expect(builderSource()).toContain("chartsFor(f.kind, f.board)");
   });
 
   it("sends the board when creating and editing, and shares results on phones for activities", () => {

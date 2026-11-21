@@ -24,6 +24,7 @@ import { namesFor, privacyLine, reportPrivacy } from "@/lib/names";
 import { NameGate } from "@/components/vote/NameGate";
 import { WhoAnswered } from "@/components/results/WhoAnswered";
 import type { ResultsPayload, SessionPayload } from "@/lib/types";
+import { builderSource } from "./builder-source";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -225,7 +226,7 @@ describe("on the results screen", () => {
 
   it("is on the presenter's screen and the builder can turn names on", () => {
     expect(read("components/DashboardApp.tsx")).toContain("<WhoAnswered");
-    const form = read("components/admin/PresentationForm.tsx");
+    const form = builderSource();
     expect(form).toMatch(/named/);
     expect(form).toContain("Show who answered");
   });

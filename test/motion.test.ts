@@ -117,6 +117,14 @@ describe("builder rows keep their identity", () => {
     expect(new Set(pasted.map((r) => r.key)).size).toBe(pasted.length);
   });
 
+  it("a row is named with the key it was first drawn with, so naming it doesn't draw it again", () => {
+    expect(withKeys<Row>([{ name: "A" }, { name: "B" }]).map((r) => r.key)).toEqual(["new-0", "new-1"]);
+    // unless another row already has that name
+    const keys = withKeys<Row>([{ name: "A", key: "new-1" }, { name: "B" }]).map((r) => r.key);
+    expect(keys[0]).toBe("new-1");
+    expect(keys[1]).not.toBe("new-1");
+  });
+
   it("the key never reaches the server", () => {
     const rows: Row[] = withKeys([{ name: " A " }]);
     expect(filledRows(rows)[0]).toEqual({ name: "A" });

@@ -1,74 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { chartsFor, defaultChart } from "@/lib/charts";
 import { ACTIVITIES } from "@/lib/activities";
-import { BOARDS, isBoard, MAX_LEAVES, MAX_LEAVES_LIMIT, type BoardId } from "@/lib/boards";
+import { isBoard } from "@/lib/boards";
 import { topicColor } from "@/lib/colors";
-import {
-  hasOptions,
-  MAX_ABS_NUMBER,
-  MAX_CRITERIA,
-  MAX_DESCRIPTION,
-  MAX_ITEM_DESCRIPTION,
-  MAX_FOCUS_TOPICS,
-  MAX_TOPICS_PER_FOCUS,
-} from "@/lib/validation";
-import { KIND_INFO } from "@/lib/kinds";
-import { PRESETS, matchingPreset } from "@/lib/presets";
+import { hasOptions, MAX_FOCUS_TOPICS } from "@/lib/validation";
 import { TEMPLATES, type PresentationPlan } from "@/lib/templates";
+import { filledItems, filledRows, descriptionsOf, imagesOf, rowsFrom, type Row } from "@/lib/list-edit";
 import {
-  duplicateIndexes,
-  filledItems,
-  filledRows,
-  descriptionsOf,
-  imagesOf,
-  rowsForKind,
-  rowsFrom,
-  type Row,
-} from "@/lib/list-edit";
-import type { QuestionKind, SessionPayload } from "@/lib/types";
+  blank,
+  DEFAULT_CRITERIA,
+  duplicateQuestion,
+  fromPreset,
+  moveQuestion,
+  presentationProblems,
+  removeQuestion,
+  toNumber,
+  type QuestionDraft,
+} from "@/lib/builder";
+import type { SessionPayload } from "@/lib/types";
 import { ConfirmDialog } from "../ConfirmDialog";
-import { ListEditor } from "./ListEditor";
-import { PicturePicker } from "./PicturePicker";
-import { ThemePicker } from "./ThemePicker";
 import { PresentationPreview } from "./PresentationPreview";
 import { isThemeId, recommendTheme, type ThemeId } from "@/lib/themes";
 import { previewQuestions } from "@/lib/preview";
 import { scoringHost } from "@/lib/scoring";
 import { HowToDialog } from "./HowToDialog";
 import { Words } from "@/components/home/Words";
+import { useMedia } from "../useMedia";
+import { QuestionRail } from "./builder/QuestionRail";
+import { QuestionEditor, field } from "./builder/QuestionEditor";
+import { TypePicker, type TypeChoice } from "./builder/TypePicker";
+import { LivePreview } from "./builder/LivePreview";
+import { DesignSettings } from "./builder/DesignSettings";
+import type { ScoringProps } from "./builder/ScoringSettings";
 
 type Call = (path: string, init?: RequestInit) => Promise<Response>;
-type Kind = QuestionKind;
-type OptionKind = "rating" | "poll" | "multi" | "rank" | "quiz";
-
-interface QuestionDraft {
-  key: number;
-  /** Set for questions that are already saved (edit mode). */
-  id?: string;
-  kind: Kind;
-  chart: string;
-  name: string;
-  items: Row[];
-  /** Pick several: most picks (null = any). */
-  maxPicks: number | null;
-  /** Number questions, as typed. */
-  min: string;
-  max: string;
-  unit: string;
-  /** Quiz: the right option's text, and seconds to answer. */
-  correct: string;
-  seconds: number;
-  /** Optional extra words under the question; `null` = the box is closed. */
-  description: string | null;
-  /** Optional picture shown with the question (an uploaded picture's id). */
-  image?: string | null;
-  /** Open answers: shown as a board (tree, sticky notes, sky); null = a plain list. */
-  board?: BoardId | null;
-  /** Boards: how many leaves each person may add; null = the usual 5. */
-  maxLeaves?: number | null;
-}
 
 export type FormMode =
   | { kind: "create" }
@@ -79,63 +45,6 @@ export type FormMode =
       counts: Record<string, number>;
       scaleLocked: boolean;
     };
-
-const KINDS = KIND_INFO;
-
-const EXAMPLES: Record<Kind, { name: string; list: string[] }> = {
-  rating: {
-    name: "Which project first?",
-    list: ["New website", "Mobile app", "Better onboarding"],
-  },
-  poll: {
-    name: "Where should the next offsite be?",
-    list: ["Lisbon", "Kyoto", "Cape Town"],
-  },
-  words: { name: "One word for this year?", list: [] },
-  multi: {
-    name: "Which perks matter most to you?",
-    list: ["Gym", "Free lunch", "Remote days", "Learning budget"],
-  },
-  rank: {
-    name: "Put these goals in order",
-    list: ["Grow revenue", "Hire 5 people", "Launch the app"],
-  },
-  number: { name: "How many customers will we have by December?", list: [] },
-  text: { name: "What should we do differently next time?", list: [] },
-  qa: { name: "What would you like to ask us?", list: [] },
-  quiz: { name: "What is the capital of Japan?", list: ["Osaka", "Tokyo", "Kyoto"] },
-};
-
-const LIST_COPY: Record<OptionKind, { label: string; noun: string }> = {
-  rating: { label: "Items to score", noun: "item" },
-  poll: { label: "Options", noun: "option" },
-  multi: { label: "Options", noun: "option" },
-  rank: { label: "Options to put in order", noun: "option" },
-  quiz: { label: "Answers to choose from", noun: "answer" },
-};
-
-const QUIZ_TIMES = [10, 15, 20, 30, 45, 60, 90, 120];
-
-/** Questions that need 2 options start with two rows; scored questions with one. */
-const needsTwo = (kind: Kind) => kind === "poll" || kind === "multi" || kind === "rank" || kind === "quiz";
-// Score items starts with Item 1 and Item 2 too, so it's clear you can list several
-const startRows = (kind: Kind): Row[] =>
-  needsTwo(kind) || kind === "rating" ? [{ name: "" }, { name: "" }] : [{ name: "" }];
-const blank = (key: number, kind: Kind = "rating"): QuestionDraft => ({
-  key,
-  kind,
-  chart: defaultChart(kind),
-  name: "",
-  items: startRows(kind),
-  maxPicks: null,
-  min: "0",
-  max: "100",
-  unit: "",
-  correct: "",
-  seconds: 20,
-  description: null,
-  board: null,
-});
 
 /** Builder questions for a template, activity or AI-drafted plan. */
 export function draftsFromPlan(plan: PresentationPlan, firstKey: number): QuestionDraft[] {
@@ -158,15 +67,6 @@ export function draftsFromPlan(plan: PresentationPlan, firstKey: number): Questi
   });
 }
 
-/** A typed number, or null if it isn't one. Commas are allowed as thousands separators. */
-function toNumber(text: string): number | null {
-  const t = text.trim().replace(/,/g, "");
-  if (!t) return null;
-  const n = Number(t);
-  return Number.isFinite(n) && Math.abs(n) <= MAX_ABS_NUMBER ? n : null;
-}
-const field =
-  "mt-1 w-full rounded-lg border border-line-strong bg-white px-3 py-2";
 const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 
@@ -268,8 +168,6 @@ function fromSession(s: SessionPayload): Draft {
   };
 }
 
-const DEFAULT_CRITERIA: Row[] = [{ name: "Impact" }, { name: "Effort" }];
-
 export function PresentationForm({
   call,
   mode,
@@ -320,6 +218,16 @@ export function PresentationForm({
   const [start, setStart] = useState<StartChoice>(initial?.start ?? null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
+  const [designOpen, setDesignOpen] = useState(false);
+  /** The question being edited (its key); falls back to the first one. */
+  const [selected, setSelected] = useState(focus[0]?.key ?? 0);
+  /** Picking the kind of a new question: "first" replaces the empty first question, "add" adds one. */
+  const [adding, setAdding] = useState<null | "first" | "add">(null);
+  /** On the start screen: the three choices, or the list of templates or of activities. */
+  const [startView, setStartView] = useState<null | "templates" | "activities">(null);
+  // a laptop: the list beside the editor; a wide one: the live preview too
+  const wide = useMedia("(min-width: 1024px)");
+  const wider = useMedia("(min-width: 1280px)");
   const counts = mode.kind === "edit" ? mode.counts : {};
   const scaleLocked = mode.kind === "edit" && mode.scaleLocked;
 
@@ -387,74 +295,19 @@ export function PresentationForm({
   // Shared by every Score items question; shown inside the first one, where people look for it.
   const scoringKey = scoringHost(parsed);
   const scoringNumber = parsed.findIndex((f) => f.key === scoringKey) + 1;
-  const scoring = (
-    <section className="mt-3 rounded-lg bg-canvas p-3" aria-labelledby="scoring-h">
-      <h4 id="scoring-h" className="text-sm font-semibold">
-        How people score
-      </h4>
-      <p id="scale-h" className="mt-2 text-sm font-semibold">
-        Scores go from
-      </p>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        <div role="radiogroup" aria-labelledby="scale-h" className="flex gap-1.5">
-          {[5, 10].map((n) => (
-            <button
-              key={n}
-              type="button"
-              role="radio"
-              aria-checked={scaleMax === n}
-              disabled={scaleLocked}
-              onClick={() => setScaleMax(n)}
-              className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold disabled:opacity-60 ${scaleMax === n ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
-            >
-              1 to {n}
-            </button>
-          ))}
-        </div>
-        <label className="flex items-center gap-1.5 text-sm text-ink-soft">
-          or 1 to
-          <input
-            type="number"
-            min={3}
-            max={10}
-            value={scaleMax}
-            disabled={scaleLocked}
-            aria-label="Highest score"
-            onChange={(e) => setScaleMax(Math.min(10, Math.max(3, Number(e.target.value) || 5)))}
-            className="w-16 rounded-lg border border-line-strong bg-white px-2 py-1 text-base text-ink disabled:bg-canvas disabled:text-ink-soft"
-          />
-        </label>
-      </div>
-      {scaleLocked && (
-        <p className="mt-1.5 text-xs text-ink-soft">
-          People have already given scores, so the range is locked. Reset the votes to change it.
-        </p>
-      )}
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="block text-sm font-semibold">
-          1 means
-          <input value={lowLabel} onChange={(e) => setLowLabel(e.target.value)} maxLength={30} placeholder="Low" className={field} />
-        </label>
-        <label className="block text-sm font-semibold">
-          {scaleMax} means
-          <input value={highLabel} onChange={(e) => setHighLabel(e.target.value)} maxLength={30} placeholder="High" className={field} />
-        </label>
-      </div>
-      <ListEditor
-        label="Score each item on"
-        hint="For example Impact or Effort. People give every item a score for each of these."
-        noun="measure"
-        items={criteriaRows}
-        onChange={setCriteriaRows}
-        max={MAX_CRITERIA}
-        maxLength={60}
-        answers={counts}
-      />
-      {parsed.filter((f) => f.kind === "rating").length > 1 && (
-        <p className="mt-2 text-xs text-ink-soft">Every &ldquo;Score items&rdquo; question uses these settings.</p>
-      )}
-    </section>
-  );
+  const scoring: ScoringProps = {
+    scaleMax,
+    setScaleMax,
+    lowLabel,
+    setLowLabel,
+    highLabel,
+    setHighLabel,
+    criteria: criteriaRows,
+    setCriteria: setCriteriaRows,
+    locked: scaleLocked,
+    counts,
+    shared: parsed.filter((f) => f.kind === "rating").length > 1,
+  };
   const criteria = hasRating ? filledItems(criteriaRows) : [];
   const scoreCount =
     parsed
@@ -484,41 +337,7 @@ export function PresentationForm({
       })),
     );
 
-  const problems: string[] = [];
-  if (!title.trim()) problems.push("Give your presentation a name.");
-  parsed.forEach((f, i) => {
-    const label = f.name.trim() ? `“${f.name.trim()}”` : `question ${i + 1}`;
-    if (!f.name.trim()) problems.push(`Write question ${i + 1}.`);
-    if (f.kind === "rating" && f.topics.length === 0)
-      problems.push(`Add at least 1 item to score in ${label}.`);
-    if (needsTwo(f.kind) && f.topics.length < 2)
-      problems.push(`Add at least 2 options to ${label}.`);
-    if (hasOptions(f.kind) && duplicateIndexes(f.items).size)
-      problems.push(
-        `${label} has the same ${LIST_COPY[f.kind as OptionKind].noun} twice.`,
-      );
-    if (f.kind === "quiz" && f.topics.length >= 2 && !f.topics.some((t) => t.trim() === f.correct.trim()))
-      problems.push(`Pick the right answer for ${label}.`);
-    if (f.kind === "number") {
-      const lo = toNumber(f.min);
-      const hi = toNumber(f.max);
-      if (lo === null || hi === null)
-        problems.push(`Give ${label} a lowest and a highest number.`);
-      else if (lo >= hi)
-        problems.push(
-          `In ${label}, the lowest number must be below the highest.`,
-        );
-    }
-  });
-  const names = parsed.map((f) => f.name.trim().toLowerCase()).filter(Boolean);
-  if (new Set(names).size !== names.length)
-    problems.push("Two questions have the same wording. Change one of them.");
-  if (hasRating && criteria.length < 1)
-    problems.push("Add at least 1 thing to score on, like Impact.");
-  if (hasRating && duplicateIndexes(criteriaRows).size)
-    problems.push("“Score each item on” lists the same thing twice.");
-  if (hasRating && (!lowLabel.trim() || !highLabel.trim()))
-    problems.push("Say what the lowest and highest scores mean.");
+  const { all: problems, byKey: problemsByKey } = presentationProblems({ title, questions: focus, criteria: criteriaRows, lowLabel, highLabel });
 
   /** Nothing typed yet, so a template can fill the form without losing anything. */
   const pristine =
@@ -532,6 +351,8 @@ export function PresentationForm({
     const drafts = draftsFromPlan(plan, nextKey.current);
     setTitle(plan.title);
     setFocus(drafts);
+    setSelected(drafts[0].key);
+    setAdding(null);
     nextKey.current += plan.questions.length;
     setStart({ label, snapshot: snapshotOf(plan.title, drafts), ...(steps?.length ? { steps } : {}) });
     // activities are watched together: everyone sees the tree fill up on their phone,
@@ -549,6 +370,8 @@ export function PresentationForm({
     setShowResults(false);
     setNamed(false);
     setConfirmRestart(false);
+    setAdding(null);
+    setStartView(null);
   }
   const changedSinceStart = start !== null && start !== "blank" && snapshotOf(title, focus) !== start.snapshot;
 
@@ -557,6 +380,14 @@ export function PresentationForm({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  /** Guests are asked to save their account first (AI is for accounts only). */
+  function askAi() {
+    if (guest) {
+      setAiOpen(true);
+      return;
+    }
+    void draftWithAi();
+  }
   async function draftWithAi(e?: React.FormEvent) {
     e?.preventDefault();
     setAiBusy(true);
@@ -684,7 +515,11 @@ export function PresentationForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
+    setAdding(null);
     if (problems.length) {
+      // open the first question that needs fixing, so its problems show where they're fixed
+      const firstBad = focus.find((f) => problemsByKey.has(f.key));
+      if (firstBad) setSelected(firstBad.key);
       setFailedTries((n) => n + 1);
       return;
     }
@@ -698,6 +533,58 @@ export function PresentationForm({
     void save();
   }
 
+  const selectedQuestion = focus.find((f) => f.key === selected) ?? focus[0];
+  const selectedIndex = focus.indexOf(selectedQuestion);
+  /** Still choosing how to start: only the choices show, with no empty form underneath. */
+  const choosing = pristine && start === null;
+
+  function pickType(choice: TypeChoice) {
+    const key = nextKey.current++;
+    const q = "preset" in choice ? fromPreset(choice.preset, key) : blank(key, choice.kind);
+    setFocus((list) => (adding === "first" ? [q] : [...list, q]));
+    setSelected(key);
+    setAdding(null);
+    // straight into the question box
+    requestAnimationFrame(() => document.getElementById(`question-${key}`)?.focus({ preventScroll: true }));
+  }
+  const typePicker = (
+    <TypePicker
+      title={adding === "first" ? "What's your first question?" : "Add a question: what kind?"}
+      onPick={pickType}
+      onCancel={() => setAdding(null)}
+    />
+  );
+  const editor = (
+    <QuestionEditor
+      key={selectedQuestion.key}
+      question={selectedQuestion}
+      index={selectedIndex}
+      total={focus.length}
+      onChange={(patch) => update(selectedQuestion.key, patch)}
+      onRemove={() => {
+        const out = removeQuestion(focus, selectedQuestion.key);
+        setFocus(out.list);
+        setSelected(out.selected);
+      }}
+      onDuplicate={() => {
+        const key = nextKey.current++;
+        setFocus((list) => duplicateQuestion(list, selectedQuestion.key, key));
+        setSelected(key);
+      }}
+      canDuplicate={focus.length < MAX_FOCUS_TOPICS}
+      answered={selectedQuestion.id ? (counts[selectedQuestion.id] ?? 0) : 0}
+      counts={counts}
+      problems={touched ? (problemsByKey.get(selectedQuestion.key) ?? []) : []}
+      scoring={selectedQuestion.key === scoringKey ? scoring : null}
+      scoringNumber={scoringNumber}
+      scaleMax={scaleMax}
+      lowLabel={lowLabel}
+      highLabel={highLabel}
+      criteria={criteria}
+      compact={!wide}
+    />
+  );
+
   return (
     <>
       <form
@@ -705,9 +592,21 @@ export function PresentationForm({
         className="slab h-fit min-w-0 rounded-xl bg-white p-4 sm:p-6"
         noValidate
       >
-        <h2 className="font-display text-3xl font-semibold">
-          <Words text={editing ? "Edit presentation" : "New presentation"} />
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="font-display text-3xl font-semibold">
+            <Words text={editing ? "Edit presentation" : "New presentation"} />
+          </h2>
+          <span className="flex flex-wrap gap-x-4 text-sm font-semibold">
+            <button type="button" onClick={() => setHowOpen(true)} className="underline underline-offset-4">
+              Need help? Show me how
+            </button>
+            {onCancel && !wide && (
+              <button type="button" onClick={onCancel} className="underline underline-offset-4">
+                Cancel
+              </button>
+            )}
+          </span>
+        </div>
         {editing && (
           <p className="mt-1 text-sm text-ink-soft">
             Changes reach people&rsquo;s phones within about 15 seconds. Answers
@@ -750,663 +649,335 @@ export function PresentationForm({
           </p>
         )}
 
-        {pristine && start === null && (
-          <section aria-labelledby="templates-heading" className="mt-5">
-            <h3 id="templates-heading" className="font-semibold">How do you want to start?</h3>
-            <button
-              type="button"
-              onClick={() => {
-                setStart("blank");
-                requestAnimationFrame(() => document.getElementById("presentation-name")?.focus());
-              }}
-              className="mt-2 flex w-full items-center gap-3 rounded-lg border-2 border-ink bg-white px-3 py-3 text-left hover:bg-canvas"
-            >
-              <span aria-hidden className="font-display flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink text-xl text-white">+</span>
-              <span>
-                <span className="block font-bold">Start blank</span>
-                <span className="block text-sm text-ink-soft">Write your own questions from scratch</span>
-              </span>
-            </button>
-            <p className="mt-4 text-sm font-semibold">
-              Or use a template <span className="font-normal text-ink-soft">(optional, you can change everything)</span>
-            </p>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {TEMPLATES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => applyPlan(t.plan, `the “${t.label}” template`)}
-                  className="rounded-lg border border-line-strong bg-white px-3 py-2.5 text-left hover:bg-canvas"
-                >
-                  <span className="block font-bold">{t.label}</span>
-                  <span className="block text-sm text-ink-soft">{t.blurb}</span>
-                </button>
-              ))}
-            </div>
-
-            <p className="mt-4 text-sm font-semibold">
-              Or a team activity <span className="font-normal text-ink-soft">(for people in the room and online alike)</span>
-            </p>
-            <h4 className="sr-only">Team activities</h4>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {ACTIVITIES.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => applyPlan(a.plan, `the “${a.label}” activity`, true, a.steps)}
-                  className="rounded-lg border border-line-strong bg-white px-3 py-2.5 text-left hover:bg-canvas"
-                >
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="font-bold">{a.label}</span>
-                    <span className="shrink-0 text-xs font-semibold text-ink-soft tabular-nums">{a.minutes} min</span>
-                  </span>
-                  <span className="block text-sm text-ink-soft">{a.blurb}</span>
-                </button>
-              ))}
-            </div>
-
-            {!aiAvailable ? null : !aiOpen ? (
-              <button
-                type="button"
-                onClick={() => setAiOpen(true)}
-                aria-expanded={false}
-                className="mt-3 rounded-lg border border-dashed border-line-strong bg-white px-3 py-2 text-sm font-bold hover:bg-canvas"
-              >
-                Write questions with AI
-              </button>
-            ) : guest ? (
-              <div role="alert" className="mt-3 rounded-lg bg-sun px-4 py-3 text-sm">
-                <p className="font-semibold">AI features need an account.</p>
-                <p className="mt-0.5">Save your guest account with an email and password (it&rsquo;s free and keeps your presentations), or log in to an account you already have.</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiOpen(false);
-                      onNeedAccount?.();
-                    }}
-                    className="key rounded-lg bg-white px-3 py-1.5 font-bold"
-                  >
-                    Save my account
-                  </button>
-                  <button type="button" onClick={() => setAiOpen(false)} className="rounded-lg px-3 py-1.5 font-semibold underline underline-offset-4">
-                    Not now
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-3 rounded-lg border border-line-strong p-3">
-                <label className="block text-sm font-semibold">
-                  What&rsquo;s it for?
-                  <textarea
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey && aiPrompt.trim().length >= 3 && !aiBusy) {
-                        e.preventDefault();
-                        void draftWithAi();
-                      }
-                    }}
-                    maxLength={500}
-                    rows={2}
-                    autoFocus
-                    placeholder="e.g. Retro for sprint 12 of the payments team"
-                    className={`${field} text-base`}
-                  />
-                </label>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void draftWithAi()}
-                    disabled={aiBusy || aiPrompt.trim().length < 3}
-                    className="key rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    {aiBusy ? "Writing…" : "Write questions"}
-                  </button>
-                  <button type="button" onClick={() => setAiOpen(false)} className="px-2 py-2 text-sm font-semibold underline underline-offset-4">
-                    Cancel
-                  </button>
-                </div>
-                {aiError && <p role="alert" className="mt-2 text-sm font-semibold text-error">{aiError}</p>}
-                <p className="mt-2 text-xs text-ink-soft">Your description is sent to Google Gemini. Check the questions before you use them.</p>
-              </div>
-            )}
-          </section>
-        )}
-
-        <label className="mt-5 block font-semibold">
-          Presentation name
-          <input
-            id="presentation-name"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={120}
-            placeholder="e.g. Team offsite 2027"
-            className={field}
-          />
-        </label>
-
-        <fieldset className="mt-6 min-w-0">
-          <legend className="flex w-full items-baseline justify-between font-semibold">
-            <span>Questions</span>
-            <span className="text-sm font-normal text-ink-soft">
-              {focus.length} of {MAX_FOCUS_TOPICS}
-            </span>
-          </legend>
-          <p className="text-sm text-ink-soft">
-            People answer these one at a time on their phones.{" "}
-            <button type="button" onClick={() => setHowOpen(true)} className="font-semibold text-ink underline underline-offset-4">
-              Show me how
-            </button>
-          </p>
-
-          <ol className="mt-3 flex flex-col gap-4">
-            {parsed.map((f, i) => {
-              const kind = KINDS.find((k) => k.id === f.kind)!;
-              const answered = f.id ? (counts[f.id] ?? 0) : 0;
-              return (
-                <li
-                  key={f.key}
-                  className="enter rounded-xl border border-line-strong p-3 pl-5 sm:p-4 sm:pl-6"
-                  style={{ boxShadow: `inset 6px 0 0 ${topicColor(i)}`, "--i": i } as React.CSSProperties}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-display text-lg">Question {i + 1}</p>
-                    {focus.length > 1 && (
+        {choosing ? (
+          <section aria-labelledby="templates-heading" className="enter mt-6">
+            {startView === null ? (
+              <>
+                {aiAvailable && (
+                  <div className="rounded-2xl border border-line-strong bg-canvas p-3.5">
+                    <label htmlFor="ai-prompt" className="flex items-center gap-2 font-bold">
+                      <span aria-hidden style={{ color: topicColor(3) }}>✦</span>
+                      Write questions with AI
+                    </label>
+                    <div className="mt-2 flex items-end gap-2">
+                      <textarea
+                        id="ai-prompt"
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey && aiPrompt.trim().length >= 3 && !aiBusy) {
+                            e.preventDefault();
+                            askAi();
+                          }
+                        }}
+                        maxLength={500}
+                        rows={2}
+                        placeholder="What's it for? e.g. Retro for sprint 12 of the payments team"
+                        className="min-w-0 flex-1 resize-none rounded-xl border border-line-strong bg-white px-3 py-2 text-base"
+                      />
                       <button
                         type="button"
-                        onClick={() =>
-                          setFocus((list) =>
-                            list.filter((x) => x.key !== f.key),
-                          )
-                        }
-                        className="rounded-lg px-2 py-1 text-sm font-semibold text-ink-soft hover:bg-canvas hover:text-error"
-                        aria-label={`Remove question ${i + 1}`}
+                        onClick={askAi}
+                        disabled={aiBusy || aiPrompt.trim().length < 3}
+                        aria-label="Write questions"
+                        className="key grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-lg text-white"
                       >
-                        Remove
+                        {aiBusy ? "…" : "↑"}
                       </button>
-                    )}
-                  </div>
-
-                  {f.id ? (
-                    <p className="mt-1 text-sm text-ink-soft">
-                      <span className="mr-1 rounded-full bg-canvas px-2.5 py-0.5 font-semibold text-ink">
-                        {kind.label}
-                      </span>
-                      {answered > 0
-                        ? `${plural(answered, "answer")} so far. `
-                        : ""}
-                      To use a different type, remove this question and add a
-                      new one.
-                    </p>
-                  ) : (
-                    <>
-                      <div
-                        role="radiogroup"
-                        aria-label={`Type of question ${i + 1}`}
-                        className="mt-2 flex flex-wrap gap-1.5"
-                      >
-                        {KINDS.map((k) => (
-                          <button
-                            key={k.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={f.kind === k.id}
-                            onClick={() =>
-                              update(f.key, {
-                                kind: k.id,
-                                chart: defaultChart(k.id),
-                                board: null,
-                                // a shortcut's Yes / No / Not sure doesn't carry into Score items; at least 2 rows to fill
-                                items: rowsForKind(f.items, k.id, startRows(k.id).length),
-                              })
-                            }
-                            className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold ${f.kind === k.id ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
-                          >
-                            {k.label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm">
-                        <span className="text-xs font-semibold text-ink-soft">Shortcut:</span>
-                        {PRESETS.map((p) => {
-                          const on = matchingPreset(f.kind, f.items.map((it) => it.name))?.id === p.id;
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              aria-pressed={on}
-                              onClick={() =>
-                                update(f.key, {
-                                  kind: p.kind,
-                                  chart: defaultChart(p.kind),
-                                  items: p.options.map((name) => ({ name })),
-                                })
-                              }
-                              className={`rounded-full border border-dashed border-line-strong px-3 py-1 font-bold ${on ? "bg-mint" : "bg-white hover:bg-canvas"}`}
-                            >
-                              {on ? "✓ " : "+ "}
-                              {p.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="mt-1.5 text-xs text-ink-soft">
-                        {kind.hint}
-                      </p>
-                    </>
-                  )}
-
-                  <label className="mt-3 block text-sm font-semibold">
-                    What do you want to ask?
-                    <input
-                      value={f.name}
-                      onChange={(e) => update(f.key, { name: e.target.value })}
-                      maxLength={120}
-                      placeholder={`e.g. ${EXAMPLES[f.kind].name}`}
-                      className={`${field} text-base`}
-                    />
-                  </label>
-                  {f.description === null ? (
-                    <button
-                      type="button"
-                      onClick={() => update(f.key, { description: "" })}
-                      className="mt-1.5 text-sm font-semibold text-ink-soft underline underline-offset-4 hover:text-ink"
-                    >
-                      + Add a description (optional)
-                    </button>
-                  ) : (
-                    <div className="mt-3">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <label htmlFor={`desc-${f.key}`} className="text-sm font-semibold">
-                          Description <span className="font-normal text-ink-soft">(optional)</span>
-                        </label>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {["Sprint retro", "Team icebreaker", "Event feedback", "Quick quiz"].map((idea) => (
                         <button
+                          key={idea}
                           type="button"
-                          onClick={() => update(f.key, { description: null })}
-                          aria-label={`Remove the description of question ${i + 1}`}
-                          className="text-xs font-semibold text-ink-soft underline underline-offset-4"
+                          onClick={() => setAiPrompt(idea)}
+                          className="rounded-full border border-line-strong bg-white px-3 py-1 text-sm font-semibold hover:border-ink"
                         >
-                          Remove
-                        </button>
-                      </div>
-                      <textarea
-                        id={`desc-${f.key}`}
-                        aria-describedby={`desc-${f.key}-hint`}
-                        value={f.description}
-                        onChange={(e) => update(f.key, { description: e.target.value })}
-                        maxLength={MAX_DESCRIPTION}
-                        rows={2}
-                        placeholder="e.g. Think about the last two weeks. Answers are anonymous."
-                        className={`${field} text-base`}
-                      />
-                      <p id={`desc-${f.key}-hint`} className="mt-0.5 text-xs text-ink-soft">
-                        Shown under the question on phones and on the big screen. {MAX_DESCRIPTION - f.description.length} characters left.
-                      </p>
-                    </div>
-                  )}
-
-                  <PicturePicker value={f.image} what={`question ${i + 1}`} onChange={(image) => update(f.key, { image })} />
-
-                  {hasOptions(f.kind) && (
-                    <ListEditor
-                      label={LIST_COPY[f.kind as OptionKind].label}
-                      noun={LIST_COPY[f.kind as OptionKind].noun}
-                      items={f.items}
-                      onChange={(items) => update(f.key, { items })}
-                      max={MAX_TOPICS_PER_FOCUS}
-                      maxLength={120}
-                      placeholders={EXAMPLES[f.kind].list}
-                      answers={counts}
-                      pictures
-                      describe={f.kind === "rating" ? { max: MAX_ITEM_DESCRIPTION, placeholder: "Description (optional), e.g. what it would change" } : undefined}
-                    />
-                  )}
-
-                  {f.kind === "rating" &&
-                    (f.key === scoringKey ? (
-                      scoring
-                    ) : (
-                      <p className="mt-2 text-xs text-ink-soft">
-                        Scored the same way as question {scoringNumber} (1 to {scaleMax}).
-                      </p>
-                    ))}
-
-                  {f.kind === "multi" && (
-                    <label className="mt-3 block text-sm font-semibold">
-                      Each person can pick
-                      <select
-                        value={f.maxPicks ?? ""}
-                        onChange={(e) =>
-                          update(f.key, {
-                            maxPicks: e.target.value
-                              ? Number(e.target.value)
-                              : null,
-                          })
-                        }
-                        className={`${field} text-base`}
-                      >
-                        <option value="">As many as they like</option>
-                        {Array.from(
-                          { length: MAX_TOPICS_PER_FOCUS - 1 },
-                          (_, n) => n + 1,
-                        ).map((n) => (
-                          <option key={n} value={n}>
-                            Up to {n}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-
-                  {f.kind === "quiz" && (
-                    <div className="mt-3">
-                      <p id={`right-${f.key}`} className="text-sm font-semibold">
-                        Right answer
-                      </p>
-                      <div role="radiogroup" aria-labelledby={`right-${f.key}`} className="mt-1 flex flex-wrap gap-1.5">
-                        {filledItems(f.items).map((name) => {
-                          const on = name.trim() === f.correct.trim();
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              role="radio"
-                              aria-checked={on}
-                              onClick={() => update(f.key, { correct: name })}
-                              className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold ${on ? "bg-mint" : "bg-white hover:bg-canvas"}`}
-                            >
-                              {on ? "✓ " : ""}
-                              {name}
-                            </button>
-                          );
-                        })}
-                        {filledItems(f.items).length === 0 && <span className="text-sm text-ink-soft">Type the answers above first.</span>}
-                      </div>
-                      <label className="mt-3 block text-sm font-semibold">
-                        Time to answer
-                        <select
-                          value={f.seconds}
-                          onChange={(e) => update(f.key, { seconds: Number(e.target.value) })}
-                          className={`${field} text-base`}
-                        >
-                          {QUIZ_TIMES.map((t) => (
-                            <option key={t} value={t}>
-                              {t < 60 ? `${t} seconds` : t === 60 ? "1 minute" : `${t / 60} minutes`}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <p className="mt-1.5 text-xs text-ink-soft">
-                        On the results screen you start each quiz question. Everyone&apos;s phone jumps to it, and the right answer shows when time is up.
-                      </p>
-                    </div>
-                  )}
-
-                  {f.kind === "number" && (
-                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      <label className="block text-sm font-semibold">
-                        Lowest answer
-                        <input
-                          inputMode="decimal"
-                          value={f.min}
-                          onChange={(e) =>
-                            update(f.key, { min: e.target.value })
-                          }
-                          className={`${field} text-base`}
-                        />
-                      </label>
-                      <label className="block text-sm font-semibold">
-                        Highest answer
-                        <input
-                          inputMode="decimal"
-                          value={f.max}
-                          onChange={(e) =>
-                            update(f.key, { max: e.target.value })
-                          }
-                          className={`${field} text-base`}
-                        />
-                      </label>
-                      <label className="col-span-2 block text-sm font-semibold sm:col-span-1">
-                        Unit <span className="font-normal text-ink-soft">(optional)</span>
-                        <input
-                          value={f.unit}
-                          maxLength={20}
-                          onChange={(e) =>
-                            update(f.key, { unit: e.target.value })
-                          }
-                          placeholder="e.g. %, users, km"
-                          className={`${field} text-base`}
-                        />
-                      </label>
-                    </div>
-                  )}
-
-                  {f.kind === "text" && (
-                    <div className="mt-3">
-                      <p id={`board-${f.key}`} className="text-sm font-semibold">
-                        Show answers as
-                      </p>
-                      <div role="radiogroup" aria-labelledby={`board-${f.key}`} className="mt-1 flex flex-wrap gap-1.5">
-                        {[{ id: null, label: "A list", blurb: "Answers as cards" }, ...BOARDS].map((b) => {
-                          const on = (f.board ?? null) === b.id;
-                          return (
-                            <button
-                              key={b.id ?? "list"}
-                              type="button"
-                              role="radio"
-                              aria-checked={on}
-                              title={b.blurb}
-                              onClick={() =>
-                                update(f.key, {
-                                  board: b.id,
-                                  chart: b.id ? "board" : f.chart === "board" ? defaultChart("text") : f.chart,
-                                })
-                              }
-                              className={`rounded-full border border-line-strong px-3 py-1 text-sm font-bold ${on ? "bg-ink text-white" : "bg-white hover:bg-canvas"}`}
-                            >
-                              {b.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="mt-1 text-xs text-ink-soft">
-                        {f.board
-                          ? `${BOARDS.find((b) => b.id === f.board)!.blurb}. Each one shows its writer's name.`
-                          : "Answers are anonymous. Pick a picture for team activities: each answer shows its writer's name."}
-                      </p>
-                      {f.board && (
-                        <label className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                          <span className="font-semibold">How many {f.board === "tree" ? "leaves" : f.board === "wall" ? "notes" : "stars"} each person can add</span>
-                          <select
-                            value={f.maxLeaves ?? MAX_LEAVES}
-                            onChange={(e) => {
-                              const n = Number(e.target.value);
-                              update(f.key, { maxLeaves: n === MAX_LEAVES ? null : n });
-                            }}
-                            className="rounded-md border border-line-strong bg-white px-2 py-1 font-bold tabular-nums"
-                          >
-                            {Array.from({ length: MAX_LEAVES_LIMIT }, (_, i) => i + 1).map((n) => (
-                              <option key={n} value={n}>
-                                {n}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-3">
-                    <p id={`chart-${f.key}`} className="text-sm font-semibold">
-                      Show results as
-                    </p>
-                    <div
-                      role="radiogroup"
-                      aria-labelledby={`chart-${f.key}`}
-                      className="mt-1 flex flex-wrap gap-1.5"
-                    >
-                      {chartsFor(f.kind, f.board).map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          role="radio"
-                          aria-checked={f.chart === c.id}
-                          onClick={() => update(f.key, { chart: c.id })}
-                          className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${
-                            f.chart === c.id
-                              ? "border-ink bg-ink text-white"
-                              : "border-line-strong bg-white hover:border-ink"
-                          }`}
-                        >
-                          {c.label}
+                          {idea}
                         </button>
                       ))}
                     </div>
-                    <p className="mt-1 text-xs text-ink-soft">
-                      You can switch charts on the results screen too.
-                    </p>
+                    {aiOpen && guest && (
+                      <div role="alert" className="mt-3 rounded-lg bg-sun px-4 py-3 text-sm">
+                        <p className="font-semibold">AI features need an account.</p>
+                        <p className="mt-0.5">Save your guest account with an email and password (it&rsquo;s free and keeps your presentations), or log in to an account you already have.</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAiOpen(false);
+                              onNeedAccount?.();
+                            }}
+                            className="key rounded-lg bg-white px-3 py-1.5 font-bold"
+                          >
+                            Save my account
+                          </button>
+                          <button type="button" onClick={() => setAiOpen(false)} className="rounded-lg px-3 py-1.5 font-semibold underline underline-offset-4">
+                            Not now
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {aiError && <p role="alert" className="mt-2 text-sm font-semibold text-error">{aiError}</p>}
+                    <p className="mt-2 text-xs text-ink-soft">Sent to Google Gemini. Check the questions before you use them.</p>
                   </div>
-                </li>
-              );
-            })}
-          </ol>
-          <button
-            type="button"
-            disabled={focus.length >= MAX_FOCUS_TOPICS}
-            onClick={() =>
-              setFocus((list) => [...list, blank(nextKey.current++)])
-            }
-            className="mt-3 w-full rounded-xl border border-dashed border-line-strong py-3 font-bold hover:bg-canvas disabled:opacity-40"
-          >
-            + Add another question
-          </button>
-        </fieldset>
+                )}
+                <h3 id="templates-heading" className={`font-display text-2xl ${aiAvailable ? "mt-6" : ""}`}>
+                  How do you want to start?
+                </h3>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {(
+                    [
+                      { id: "blank", label: "Start from scratch", sub: "Write your own questions", icon: "M5 19l3.5-.8L18.3 8.4a1.8 1.8 0 0 0-2.6-2.6L5.9 15.6zM14 7.5l2.5 2.5" },
+                      { id: "templates", label: "Use a template", sub: `${TEMPLATES.length} ready-made: retro, standup, feedback…`, icon: "M4 5h16v14H4zM4 10h16M10 10v9" },
+                      { id: "activities", label: "Team activity", sub: `${ACTIVITIES.length} activities for the room and online`, icon: "M12 21v-6M12 15c-4 0-7-2.5-7-6a7 7 0 0 1 14 0c0 3.5-3 6-7 6zM9 9.5h.01M15 9.5h.01" },
+                    ] as const
+                  ).map((t, n) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        if (t.id === "blank") {
+                          setStart("blank");
+                          // pick the kind of the first question straight away
+                          setAdding("first");
+                        } else setStartView(t.id);
+                      }}
+                      className="flex min-h-[9rem] flex-col items-center justify-center gap-2 rounded-2xl border border-line-strong bg-white px-3 py-5 text-center transition-[border-color,transform] duration-150 hover:border-ink active:scale-[0.98] max-sm:min-h-0 max-sm:flex-row max-sm:justify-start max-sm:text-left"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" fill="none" stroke="currentColor" style={{ color: topicColor(n) }} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d={t.icon} />
+                      </svg>
+                      <span>
+                        <span className="block text-lg font-bold">{t.label}</span>
+                        <span className="block text-sm text-ink-soft">{t.sub}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setStartView(null)} className="-ml-2 shrink-0 rounded-lg px-2 py-1 font-semibold whitespace-nowrap hover:bg-canvas">
+                    ← Back
+                  </button>
+                  <h3 id="templates-heading" className="font-display text-2xl">
+                    {startView === "templates" ? "Templates" : "Team activities"}
+                  </h3>
+                </div>
+                <p className="mt-1 text-sm text-ink-soft">
+                  {startView === "templates" ? "You can change everything afterwards." : "For people in the room and online alike. Names show on answers."}
+                </p>
+                {startView === "templates" && (
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {TEMPLATES.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => applyPlan(t.plan, `the “${t.label}” template`)}
+                        className="rounded-xl border border-line-strong bg-white px-3.5 py-3 text-left transition-colors duration-150 hover:border-ink"
+                      >
+                        <span className="block font-bold">{t.label}</span>
+                        <span className="block text-sm text-ink-soft">{t.blurb}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {startView === "activities" && (
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {ACTIVITIES.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => applyPlan(a.plan, `the “${a.label}” activity`, true, a.steps)}
+                        className="rounded-xl border border-line-strong bg-white px-3.5 py-3 text-left transition-colors duration-150 hover:border-ink"
+                      >
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="font-bold">{a.label}</span>
+                          <span className="shrink-0 text-xs font-semibold text-ink-soft tabular-nums">{a.minutes} min</span>
+                        </span>
+                        <span className="block text-sm text-ink-soft">{a.blurb}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+                ) : (
+          <>
+            <div className="mt-5 flex flex-wrap items-end gap-3">
+              <label className="block min-w-0 flex-1 basis-64 font-semibold">
+                Presentation name
+                <input
+                  id="presentation-name"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. Team offsite 2027"
+                  className={`${field} text-lg`}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setDesignOpen(true)}
+                className="key flex items-center gap-2 rounded-lg bg-white px-3.5 py-2.5 font-semibold"
+              >
+                <span aria-hidden className="h-4 w-4 rounded-full border border-line-strong" style={{ background: "var(--color-primary)" }} />
+                Design &amp; settings
+              </button>
+            </div>
+            {touched && problemsByKey.size === 0 && !title.trim() && (
+              <p className="mt-1 text-sm font-semibold text-error">Give your presentation a name.</p>
+            )}
 
-        <section className="mt-6" aria-labelledby="design-h">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 id="design-h" className="font-semibold">
-              Slide design
-            </h3>
-            <button
-              type="button"
-              onClick={() => setPreviewOpen(true)}
-              className="text-sm font-semibold underline underline-offset-4"
+            {/* The slide editor: the questions, the one being edited, and how it looks (from 1280px) */}
+            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_21rem]">
+              <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
+                {!wide && adding ? (
+                  typePicker
+                ) : (
+                  <QuestionRail
+                    questions={focus}
+                    selected={selectedQuestion.key}
+                    problems={problemsByKey}
+                    showProblems={touched}
+                    onSelect={(key) => {
+                      setAdding(null);
+                      setSelected(key);
+                    }}
+                    onMove={(key, by) => setFocus((list) => moveQuestion(list, key, by))}
+                    onAdd={() => setAdding("add")}
+                    max={MAX_FOCUS_TOPICS}
+                    renderSelected={wide ? undefined : adding ? undefined : () => editor}
+                  />
+                )}
+              </div>
+              {wide && <div className="min-w-0">{adding ? typePicker : editor}</div>}
+              {wider && (
+                <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
+                  <LivePreview
+                    title={title}
+                    questions={preview()}
+                    selected={selectedIndex}
+                    onPick={(i) => {
+                      setAdding(null);
+                      setSelected(focus[i]?.key ?? selectedQuestion.key);
+                    }}
+                    theme={theme}
+                    decor={decor}
+                    criteria={criteria}
+                    scaleMax={scaleMax}
+                    lowLabel={lowLabel}
+                    highLabel={highLabel}
+                    onOpenFull={() => setPreviewOpen(true)}
+                    onDesign={() => setDesignOpen(true)}
+                  />
+                </div>
+              )}
+            </div>
+
+          <p
+            className="mt-6 rounded-lg bg-canvas px-3 py-2 text-sm"
+            aria-live="polite"
+          >
+            Each person will {hasRating && `give ${plural(scoreCount, "score")}`}
+            {hasRating && otherQuestions > 0 && " and "}
+            {otherQuestions > 0 && `answer ${plural(otherQuestions, "question")}`}
+            .
+          </p>
+
+          <div ref={feedbackRef} tabIndex={-1} className="scroll-mb-28 outline-none">
+          {touched && problems.length > 0 && (
+            <div
+              role="alert"
+              className="mt-3 rounded-lg border border-error/40 px-4 py-3 text-sm text-error"
             >
-              Preview how it looks
-            </button>
-          </div>
-          <p className="text-sm text-ink-soft">
-            Colours and lettering on the big screen and on people&rsquo;s phones.
-          </p>
-          <div className="mt-2">
-            <ThemePicker value={theme} onChange={setThemeChoice} recommended={recommended} title={title} />
-          </div>
-          <label className="mt-3 flex items-start gap-2.5 text-sm">
-            <input type="checkbox" checked={decor} onChange={(e) => setDecor(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-ink" />
-            <span>
-              <span className="font-semibold">Fun illustrations</span>
-              <span className="block text-ink-soft">Cheerful doodle characters next to the title on the big screen and on phones, picked to match the design.</span>
-            </span>
-          </label>
-          {!editing && (
-            <label className="mt-3 flex items-start gap-2.5 text-sm">
-              <input type="checkbox" checked={showResults} onChange={(e) => setShowResults(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-ink" />
-              <span>
-                <span className="font-semibold">Show results on phones</span>
-                <span className="block text-ink-soft">People can watch the results live on their own phones, without any presenter controls. You can change this later.</span>
-              </span>
-            </label>
+              <p className="font-semibold">Fix these first:</p>
+              <ul className="mt-1 list-disc pl-5">
+                {problems.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
           )}
-          <label className="mt-3 flex items-start gap-2.5 text-sm">
-            <input type="checkbox" checked={named} onChange={(e) => setNamed(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-ink" />
-            <span>
-              <span className="font-semibold">Show who answered (names)</span>
-              <span className="block text-ink-soft">
-                Phones ask for a name once, and the results show who picked each option. Good for team activities; leave it off to keep answers anonymous.
-              </span>
-            </span>
-          </label>
-        </section>
-
-        <p
-          className="mt-5 rounded-lg bg-canvas px-3 py-2 text-sm"
-          aria-live="polite"
-        >
-          Each person will {hasRating && `give ${plural(scoreCount, "score")}`}
-          {hasRating && otherQuestions > 0 && " and "}
-          {otherQuestions > 0 && `answer ${plural(otherQuestions, "question")}`}
-          .
-        </p>
-
-        <div ref={feedbackRef} tabIndex={-1} className="scroll-mb-28 outline-none">
-        {touched && problems.length > 0 && (
-          <div
-            role="alert"
-            className="mt-3 rounded-lg border border-error/40 px-4 py-3 text-sm text-error"
-          >
-            <p className="font-semibold">Fix these first:</p>
-            <ul className="mt-1 list-disc pl-5">
-              {problems.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
+          {error && (
+            <p role="alert" className="mt-3 text-sm font-semibold text-error">
+              {error}
+            </p>
+          )}
+          {created && !error && (
+            <p role="status" className="mt-3 text-sm font-semibold text-success">
+              Done. Your presentation is ready under &ldquo;Your
+              presentations&rdquo;.
+            </p>
+          )}
           </div>
-        )}
-        {error && (
-          <p role="alert" className="mt-3 text-sm font-semibold text-error">
-            {error}
-          </p>
-        )}
-        {created && !error && (
-          <p role="status" className="mt-3 text-sm font-semibold text-success">
-            Done. Your presentation is ready under &ldquo;Your
-            presentations&rdquo;.
-          </p>
-        )}
-        </div>
 
-        <div className="sticky bottom-0 z-10 -mx-4 mt-5 flex gap-3 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-          {onCancel && (
+          <div className="sticky bottom-0 z-10 -mx-4 mt-5 flex gap-3 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+            {onCancel && wide && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-lg border border-line-strong px-3 py-3 font-semibold hover:bg-canvas sm:px-5"
+              >
+                Cancel
+              </button>
+            )}
+            {wide ? (
+              <button type="button" onClick={() => setPreviewOpen(true)} className="key rounded-lg bg-white px-3 py-3 font-semibold sm:px-5">
+                Preview
+              </button>
+            ) : (
+              // a phone: preview, the main button and + (like Slido and Mentimeter)
+              <button type="button" onClick={() => setPreviewOpen(true)} aria-label="Preview" className="key grid w-12 shrink-0 place-items-center rounded-full bg-white">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+                  <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+                  <circle cx="12" cy="12" r="2.8" />
+                </svg>
+              </button>
+            )}
             <button
-              type="button"
-              onClick={onCancel}
-              className="rounded-lg border border-line-strong px-3 py-3 font-semibold hover:bg-canvas sm:px-5"
+              type="submit"
+              disabled={busy || locked}
+              className="key font-display min-w-0 flex-1 rounded-lg bg-primary px-2 py-3 text-lg font-bold whitespace-nowrap text-white sm:text-xl"
             >
-              Cancel
+              {busy
+                ? "Saving…"
+                : editing
+                  ? (
+                      <>
+                        Save<span className="max-sm:hidden"> changes</span>
+                      </>
+                    )
+                  : (
+                      <>
+                        Create<span className="max-sm:hidden"> presentation</span>
+                      </>
+                    )}
             </button>
+            {!wide && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAdding("add");
+                  requestAnimationFrame(() => document.getElementById("type-picker-h")?.scrollIntoView({ block: "start", behavior: "smooth" }));
+                }}
+                disabled={focus.length >= MAX_FOCUS_TOPICS}
+                aria-label="Add question"
+                className="key grid w-12 shrink-0 place-items-center rounded-full bg-white text-2xl leading-none disabled:opacity-40"
+              >
+                +
+              </button>
+            )}
+          </div>
+          {locked && (
+            <p className="mt-2 text-center text-sm font-semibold text-ink-soft">
+              Confirm your email address to create presentations.
+            </p>
           )}
-          <button
-            type="button"
-            onClick={() => setPreviewOpen(true)}
-            className="key rounded-lg bg-white px-3 py-3 font-semibold sm:px-5"
-          >
-            Preview
-          </button>
-          <button
-            type="submit"
-            disabled={busy || locked}
-            className="key font-display min-w-0 flex-1 rounded-lg bg-primary px-2 py-3 text-lg font-bold whitespace-nowrap text-white sm:text-xl"
-          >
-            {busy
-              ? "Saving…"
-              : editing
-                ? (
-                    <>
-                      Save<span className="max-sm:hidden"> changes</span>
-                    </>
-                  )
-                : (
-                    <>
-                      Create<span className="max-sm:hidden"> presentation</span>
-                    </>
-                  )}
-          </button>
-        </div>
-        {locked && (
-          <p className="mt-2 text-center text-sm font-semibold text-ink-soft">
-            Confirm your email address to create presentations.
-          </p>
+          </>
         )}
       </form>
 
@@ -1421,6 +992,21 @@ export function PresentationForm({
         />
       )}
       {howOpen && <HowToDialog kind={focus[focus.length - 1]?.kind ?? "rating"} onClose={() => setHowOpen(false)} />}
+      {designOpen && (
+        <DesignSettings
+          theme={theme}
+          onTheme={setThemeChoice}
+          recommended={recommended}
+          title={title}
+          decor={decor}
+          setDecor={setDecor}
+          showResults={editing ? null : showResults}
+          setShowResults={setShowResults}
+          named={named}
+          setNamed={setNamed}
+          onClose={() => setDesignOpen(false)}
+        />
+      )}
       {previewOpen && (
         <PresentationPreview
           title={title}

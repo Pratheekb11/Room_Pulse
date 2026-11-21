@@ -211,7 +211,7 @@ function Console({
       )}
 
       {sessions !== null && (sessions.length === 0 || formOpen) && (
-        <div className="mx-auto mt-8 max-w-2xl">
+        <div className="mt-8">
           {sessions.length === 0 && (
             <p className="mb-4 text-ink-soft">Write your questions below. When you&rsquo;re done you&rsquo;ll get a QR code to show your audience.</p>
           )}

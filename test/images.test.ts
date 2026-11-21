@@ -15,6 +15,7 @@ import { imagesOf, rowsFrom } from "@/lib/list-edit";
 import { previewQuestions } from "@/lib/preview";
 import { groupByFocus } from "@/lib/focus";
 import type { SessionPayload } from "@/lib/types";
+import { builderSource } from "./builder-source";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -308,7 +309,7 @@ describe("pictures in the builder and on screen", () => {
   });
 
   it("lets the presenter add pictures to a question and to each option in the builder", () => {
-    const form = read("components/admin/PresentationForm.tsx");
+    const form = builderSource();
     expect(form).toMatch(/<PicturePicker\b/);
     expect(form).toContain("itemImages");
     expect(read("components/admin/ListEditor.tsx")).toMatch(/<PicturePicker\b/);

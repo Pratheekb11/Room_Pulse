@@ -26,10 +26,19 @@ function blankLike<T extends Item>(list: T[], name = ""): T {
   return (typeof list[0] === "object" ? { name, key: newKey() } : name) as T;
 }
 
-/** Gives every unsaved row a key of its own; the same list back when they all have one. */
+/**
+ * Gives every unsaved row a key of its own; the same list back when they all have one. A row gets the key it was
+ * already drawn with (`new-<place>`), so naming it doesn't redraw it; a random one only if that's taken.
+ */
 export function withKeys<T extends Row>(rows: T[]): T[] {
   if (rows.every((r) => r.id || r.key)) return rows;
-  return rows.map((r) => (r.id || r.key ? r : { ...r, key: newKey() }));
+  const taken = new Set(rows.map((r) => r.key).filter(Boolean));
+  return rows.map((r, i) => {
+    if (r.id || r.key) return r;
+    const key = taken.has(`new-${i}`) ? newKey() : `new-${i}`;
+    taken.add(key);
+    return { ...r, key };
+  });
 }
 
 export function setAt<T extends Item>(list: T[], index: number, value: string): T[] {
