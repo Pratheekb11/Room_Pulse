@@ -28,7 +28,7 @@ export function pollTally(options: Option[], polls: PollCount[], focusId: string
 
 /** Words for one focus topic, most-said first, with weight 0…1 for sizing. */
 export function wordWeights(words: WordCount[], focusId: string): { word: string; n: number; weight: number }[] {
-  const mine = words.filter((w) => w.focusId === focusId).sort((a, b) => b.n - a.n || a.word.localeCompare(b.word));
+  const mine = words.filter((w) => w.focusId === focusId && !w.hidden).sort((a, b) => b.n - a.n || a.word.localeCompare(b.word));
   if (mine.length === 0) return [];
   const max = mine[0].n;
   const min = mine[mine.length - 1].n;
@@ -188,11 +188,13 @@ export function audienceResults(r: ResultsPayload, quizFocusIds: Set<string>): R
     ...r,
     ...(r.who ? { who: r.who.filter((w) => !quizFocusIds.has(w.focusId)) } : {}),
     texts: r.texts.filter((t) => !t.hidden).map((t) => (t.nameHidden ? { ...t, author: null } : t)),
+    words: r.words.filter((w) => !w.hidden),
     questions: r.questions.filter((q) => !q.hidden),
     respondents: r.respondents.filter((x) => !quizFocusIds.has(x.focusId)),
     quizCounts: [],
     quizRevealed: [],
     leaderboard: [],
+    hiddenPlayers: [],
     quiz: null,
     openPoints: 0,
   };

@@ -3,6 +3,7 @@ import { inBackground, sendLink } from "@/lib/email-links";
 import { json, logDbError, readJson, unavailable } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
 import { emailEnabled } from "@/lib/policy";
+import { limited } from "@/lib/limits";
 import { upgradeGuest } from "@/lib/queries";
 import { credentialsSchema } from "@/lib/validation";
 
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
       return json({ error: "invalid", issues: parsed.error.issues.map((i) => i.message) }, 400);
     }
     if (!user.isGuest) return json({ error: "not_guest" }, 400);
+    const busy = await limited(req, "auth");
+    if (busy) return busy;
     const { email, password } = parsed.data;
     const outcome = await upgradeGuest(user.id, email, await hashPassword(password));
     if (outcome === "email_taken") return json({ error: "email_taken" }, 409);

@@ -11,6 +11,8 @@ const ERRORS: Record<string, string> = {
   closed: "Voting is closed, so new open points can't be sent.",
   points_off: "The presenter has turned open points off.",
   blocked_words: SCREEN_BLOCKED_MESSAGE,
+  full: "This presentation is full: it can't take more people.",
+  too_many_requests: "Too busy right now. Wait a moment and try again.",
 };
 
 const CHIP: Record<PointStatus, string> = {

@@ -20,9 +20,9 @@ import { NumberHistogram, NumberSummary } from "./results/NumberResults";
 import { TextAnswers } from "./results/TextResults";
 import { AiInsights } from "./results/AiInsights";
 import { QaList } from "./results/QaResults";
-import { Leaderboard, QuizStage } from "./results/QuizResults";
+import { QuizStage } from "./results/QuizResults";
+import { LeaderboardResults, WordsResults } from "./results/HideControls";
 import { PollBars, PollColumns, PollPie } from "./PollResults";
-import { WordCloud, WordList } from "./WordCloud";
 import { chartsFor, isChartFor } from "@/lib/charts";
 import { ScoreLegend } from "./Donut";
 import { Heatmap } from "./Heatmap";
@@ -599,7 +599,7 @@ function Stage({
           ) : group.kind === "quiz" ? (
             view === "leaderboard" ? (
               <ResultCard title="Leaderboard">
-                <Leaderboard rows={r.leaderboard} />
+                <LeaderboardResults code={code} rows={r.leaderboard} hiddenPlayers={r.hiddenPlayers ?? []} owner={isOwner} />
               </ResultCard>
             ) : (
               (() => {
@@ -647,11 +647,7 @@ function Stage({
           ) : group.kind === "words" ? (
             <section className="slab rounded-xl bg-white p-[clamp(1rem,2vw,2.25rem)]">
               <h2 className="font-display text-center text-[clamp(1.6rem,2.6vw,3rem)] font-semibold leading-tight">{group.focus.name}</h2>
-              {view === "list" ? (
-                <WordList words={wordWeights(r.words ?? [], group.focus.id)} />
-              ) : (
-                <WordCloud words={wordWeights(r.words ?? [], group.focus.id)} />
-              )}
+              <WordsResults code={code} words={r.words ?? []} focusId={group.focus.id} view={view === "list" ? "list" : "cloud"} owner={isOwner} />
               {who}
             </section>
           ) : view === "heatmap" ? (

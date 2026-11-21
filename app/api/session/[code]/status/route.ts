@@ -1,5 +1,5 @@
 import { getSessionStatus } from "@/lib/queries";
-import { json, logDbError, notFound, unavailable } from "@/lib/http";
+import { badRequest, json, logDbError, notFound, unavailable } from "@/lib/http";
 import { codeSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 // database read a second (quiz questions start on every phone within ~2 seconds).
 const CDN_CACHE = { "Cache-Control": "public, s-maxage=1, stale-while-revalidate=1" };
 
-export async function GET(_req: Request, ctx: RouteContext<"/api/session/[code]/status">) {
+export async function GET(req: Request, ctx: RouteContext<"/api/session/[code]/status">) {
+  // A query string would make the CDN treat each request as new and send it to the database.
+  if (new URL(req.url).search) return badRequest();
   const parsed = codeSchema.safeParse((await ctx.params).code);
   if (!parsed.success) return notFound();
   try {

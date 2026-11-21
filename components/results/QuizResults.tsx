@@ -213,7 +213,7 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
 }
 
 /** Top players, biggest score first. */
-export function Leaderboard({ rows }: { rows: LeaderRow[] }) {
+export function Leaderboard({ rows, onHide }: { rows: LeaderRow[]; onHide?: (id: string) => void }) {
   if (rows.length === 0)
     return <p className="py-16 text-center text-[clamp(1.2rem,1.8vw,2rem)] font-semibold text-ink-soft">Scores will appear here after the first question.</p>;
   const medal = ["bg-sun", "bg-canvas", "bg-[color-mix(in_srgb,var(--color-primary)_25%,var(--color-white))]"];
@@ -228,6 +228,16 @@ export function Leaderboard({ rows }: { rows: LeaderRow[] }) {
           <span className="min-w-0 flex-1 truncate text-[clamp(1.1rem,1.8vw,2.1rem)] font-bold">{p.nickname}</span>
           <span className="hidden shrink-0 text-[clamp(0.85rem,1vw,1.1rem)] font-semibold text-ink-soft sm:inline">{p.correct} right</span>
           <span className="font-display shrink-0 text-[clamp(1.3rem,2vw,2.4rem)] font-semibold tabular-nums">{p.points.toLocaleString("en-US")}</span>
+          {onHide && p.id && (
+            <button
+              type="button"
+              onClick={() => onHide(p.id!)}
+              aria-label={`Hide player ${p.nickname}`}
+              className="shrink-0 rounded-full border border-line-strong bg-white px-3 py-1 text-[clamp(0.8rem,0.9vw,1rem)] font-bold hover:bg-canvas"
+            >
+              Hide
+            </button>
+          )}
         </li>
       ))}
     </ol>

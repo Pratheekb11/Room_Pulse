@@ -1,6 +1,6 @@
 import { audienceResults } from "@/lib/answers";
 import { getResults, getSession } from "@/lib/queries";
-import { json, logDbError, notFound, unavailable } from "@/lib/http";
+import { badRequest, json, logDbError, notFound, unavailable } from "@/lib/http";
 import { codeSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 const CDN_CACHE = { "Cache-Control": "public, s-maxage=3, stale-while-revalidate=3" };
 
 /** Live results for the audience, only while the owner has "Show results on phones" on. */
-export async function GET(_req: Request, ctx: RouteContext<"/api/results/[code]/public">) {
+export async function GET(req: Request, ctx: RouteContext<"/api/results/[code]/public">) {
+  // A query string would make the CDN treat each request as new and send it to the database.
+  if (new URL(req.url).search) return badRequest();
   const parsed = codeSchema.safeParse((await ctx.params).code);
   if (!parsed.success) return notFound();
   try {

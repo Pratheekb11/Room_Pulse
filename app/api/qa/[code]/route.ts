@@ -2,6 +2,7 @@ import { listPublicQa, saveQaAction } from "@/lib/queries";
 import { hasBadWords } from "@/lib/profanity";
 import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
 import { codeSchema, qaActionSchema } from "@/lib/validation";
+import { admitVoter } from "@/lib/voter-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,9 @@ export const dynamic = "force-dynamic";
 const CDN_CACHE = { "Cache-Control": "public, s-maxage=3, stale-while-revalidate=3" };
 
 /** Audience questions anyone with the voting code can see (hidden ones left out, no voter ids). */
-export async function GET(_req: Request, ctx: RouteContext<"/api/qa/[code]">) {
+export async function GET(req: Request, ctx: RouteContext<"/api/qa/[code]">) {
+  // A query string would make the CDN treat each request as new and send it to the database.
+  if (new URL(req.url).search) return badRequest();
   const code = codeSchema.safeParse((await ctx.params).code);
   if (!code.success) return notFound();
   try {
@@ -29,6 +32,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/qa/[code]">) {
   if (!parsed.success) return badRequest();
   if (parsed.data.action === "ask" && hasBadWords(parsed.data.text)) return badRequest("blocked_words");
   try {
+    const refused = await admitVoter(req, code.data, parsed.data.voterId);
+    if (refused) return refused;
     const r = await saveQaAction(code.data, parsed.data);
     switch (r.outcome) {
       case "ok":

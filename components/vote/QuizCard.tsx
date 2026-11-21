@@ -108,7 +108,14 @@ export function QuizCard({ code, voterId, focusId, question, options, color, liv
     try {
       const r = await post({ action: "answer", focusId, topicId: id });
       if (r.ok) onAnswer(id);
-      else setNote(r.error === "closed" ? "Voting is closed." : r.error === "not_live" ? "Too late. Time was up." : "Not saved. Try again.");
+      else
+        setNote(
+          r.error === "closed" ? "Voting is closed."
+          : r.error === "not_live" ? "Too late. Time was up."
+          : r.error === "full" ? "This presentation is full: it can't take more people."
+          : r.error === "too_many_requests" ? "Too busy right now. Wait a moment and tap again."
+          : "Not saved. Try again.",
+        );
     } catch {
       setNote("Not saved. Check your internet and tap again.");
     } finally {

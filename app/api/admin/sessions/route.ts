@@ -3,6 +3,7 @@ import { countOwnedSessions, createSession, listSessions } from "@/lib/queries";
 import { GUEST_DAYS, GUEST_PRESENTATION_LIMIT, requireEmailVerification } from "@/lib/policy";
 import { json, logDbError, readJson, unavailable } from "@/lib/http";
 import { createSessionSchema } from "@/lib/validation";
+import { ACCOUNT_PRESENTATION_LIMIT } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
       if ((await countOwnedSessions(user.id)) >= GUEST_PRESENTATION_LIMIT) return json({ error: "guest_limit" }, 403);
     } else if (requireEmailVerification() && !user.emailVerified) {
       return json({ error: "verify_email" }, 403);
+    } else if ((await countOwnedSessions(user.id)) >= ACCOUNT_PRESENTATION_LIMIT) {
+      return json({ error: "account_limit" }, 403);
     }
     const parsed = createSessionSchema.safeParse(await readJson(req));
     if (!parsed.success) {

@@ -19,7 +19,7 @@ LiveRate has 9 question types: Quiz (`quiz`), Score items (`rating`), Pick one (
 Follow-ups for the types already built:
 
 - **Quiz (`quiz`).** Built. A Pick one question with a right answer (`focus_topics.quiz_correct`, the option's index) and a timer (`quiz_seconds`, 5–120, default 20). The owner starts each question from the results screen (`POST /api/admin/sessions/[code]/quiz`: start / end / stop); the running question lives on `sessions.quiz_focus_id` + `quiz_started_at`, and phones learn about it from the status poll (1.5 s while the presentation has a quiz; the CDN caches status for 1 s). Answers lock in once and are scored on arrival: right = 500 + up to 500 for speed, wrong = 0, accepted until 1.5 s after time is up. The right answer is never in the voters' copy of the presentation; it appears in status 2 s after time is up. Players pick a nickname (`quiz_players`) for the top-10 leaderboard; `/api/quiz/[code]/me` gives a player their own score and rank.
-  - Not done yet: nicknames go on the big screen with no way for the owner to hide one; changing the right answer after people have answered doesn't re-score them; "Run it again" on a played question only lets people who haven't answered it join in.
+  - Not done yet: changing the right answer after people have answered doesn't re-score them; "Run it again" on a played question only lets people who haven't answered it join in.
 
 - Open answers: the owner can hide one (`PATCH /api/admin/sessions/[code]/text`, `text_answers.hidden`, keyed by `text_answers.id` so the voter is never exposed). Hidden answers stay in exports marked "Hidden answer" and are never sent to the AI.
 - Pick several has no "at least N" setting. Add one if presenters ask for it.
@@ -64,7 +64,7 @@ Built test-first on 2026-11-14 (`test/images.test.ts`, `test/report.test.ts`, `t
 - **AI summary of the whole presentation** (`lib/ai-digest.ts`, `overview` in `lib/ai-insights.ts`, `action: "overview"` on `/api/admin/sessions/[code]/ai`, `components/results/AiOverview.tsx`): a headline, an overview, one insight per question (shown above that question's results too) and up to 5 next steps, each one tap to put on the open point list. Needs 3 people. Built from the presenter's view of the results (no hidden answers or questions, no quiz nicknames). The latest one is saved (`ai_reports`), returned by the AI GET, put in the report, and cleared with the answers. Gemini 429/500/503 answers get one retry.
 - **Open points** (an open point list, "OPL": `lib/points.ts`, `lib/signals.ts`, `open_points` table, `sessions.raise_points`, `sessions.point_seq`): owner setting "Let people raise open points" (card and the list itself). Phones then get "Raise an open point" (`components/vote/RaisePoint.tsx`: up to 5 each, name optional, `POST /api/points/[code]`) and see their own points' status and note (`/api/points/[code]/me?voter=`). The results screen's "Open points" button (count of points not closed, plus `+N` suggestions) shows the list (`components/results/OpenPoints.tsx`, `?points=1`): add, assign, due date (overdue flagged), Open / In progress / Closed, note, reword, delete, CSV (`export?type=points`). Getting back to the results is easy: a big "← Back to results" button above the heading (another under lists longer than 3), the header's Open points button turns into "← Back to results" while the list is open, Esc closes it, and opening it adds a browser history step so the browser's or phone's Back button closes it instead of leaving the page. Signals suggest points from results: items scored in the bottom 40% of the scale, items people disagree about, upvoted Q&A questions nobody answered; each is offered once (`origin_key`) and can be dismissed (remembered per device). Numbers are never reused. Open points survive "Clear all answers" and never reach voters' results.
 
-How it shipped: the production schema change is `db/2026-11-14-pictures-points-ai.sql`, run before the code with `node scripts/run-sql.mjs <file.sql>` (asks for the connection string without showing it, finds Neon's address over DNS over HTTPS because this network's DNS can't, runs the file as one transaction). Use the same script for future schema changes. The two new public writes (`POST /api/points/[code]`, `POST /api/admin/images`) have no per-address limits yet: add them in the security sweep (`security/abuse-limits` is set aside for now and will need a rebase).
+How it shipped: the production schema change is `db/2026-11-14-pictures-points-ai.sql`, run before the code with `node scripts/run-sql.mjs <file.sql>` (asks for the connection string without showing it, finds Neon's address over DNS over HTTPS because this network's DNS can't, runs the file as one transaction). Use the same script for future schema changes.
 
 Not done yet (backlog):
 
@@ -93,7 +93,7 @@ The profanity filter, names on leaves and the new tree drawing (branch `feat/pro
 Not done yet (backlog):
 
 - On a small phone (360×640) the presenter's header takes most of the first screen, so the tree fits after one scroll. Past about 50 leaves on a laptop the words show only when zoomed in or tapped, and on phones (past about 8) they're read from the list. Leaves overlap only past about 130 on a big screen or 100 on a phone. While a new leaf pops in it can brush its neighbour for a moment (the spring overshoots).
-- Profanity filter: only board leaves and their names are checked. Plain open answers, word clouds, Audience Q&A, open points and quiz nicknames aren't yet (same `hasBadWords`, one line each in `saveAnswer` / the routes). The list is English, slurs and Hindi/Hinglish; add Kannada, Tamil, Telugu and others if teams need them. No per-presentation list the presenter can edit, and no warning to the presenter when someone tries. A list never catches everything: hiding on the big screen stays the backstop.
+- Profanity filter: since the UX round it checks everything people type that reaches the screen (see below). The list is English, slurs and Hindi/Hinglish; add Kannada, Tamil, Telugu and others if teams need them. No per-presentation list the presenter can edit, and no warning to the presenter when someone tries. A list never catches everything: hiding on the big screen stays the backstop.
 - Home page: the tree is the only activity pictured (no sticky-note wall or night sky yet); the longer line behind each activity and question-type chip is a tooltip, so touch screens don't see it; "9 team activities" and "9 kinds of question" appear both as feature tiles and as chips.
 
 ### Finishing team activities (branch `feat/activities-finish`, live since 2026-11-15)
@@ -114,7 +114,7 @@ Not done yet (backlog):
 
 ### Kids and classrooms: decided not now (2026-11-14)
 
-Considered and parked. The market is big, but it isn't empty: Kahoot, Blooket, Quizizz (Wayground) and Gimkit already own kids' quizzes and are very kid-friendly. There are legal rules too: India's DPDP Act 2023 needs verifiable parental consent before handling the data of anyone under 18, and COPPA (US, under 13) and GDPR-K apply elsewhere. Kids typing free text and nicknames onto a big screen also needs moderation, and hiding nicknames is still on the unmerged `security/abuse-limits` branch.
+Considered and parked. The market is big, but it isn't empty: Kahoot, Blooket, Quizizz (Wayground) and Gimkit already own kids' quizzes and are very kid-friendly. There are legal rules too: India's DPDP Act 2023 needs verifiable parental consent before handling the data of anyone under 18, and COPPA (US, under 13) and GDPR-K apply elsewhere. Kids typing free text and nicknames onto a big screen also needs moderation (the filter and hiding nicknames came with the UX round, 2026-11-21).
 
 If it comes back, build a narrow **Classroom mode** (a per-presentation setting), not a kids product: the teacher is the only account and kids stay anonymous with no sign-up; nicknames come from a safe generated list (adjective + animal) instead of typing; answers are big emoji or picture tiles; no free text on the big screen (or the teacher approves each one first); bigger tap targets and the Pop / Arcade / Anime designs; no AI. Talk to 3–5 teachers before building, and get a legal check on consent.
 
@@ -143,6 +143,19 @@ Built test-first (`test/home-live-room.test.ts`). **Live since 2026-11-21**; pro
 
 Not done yet: on very slow phones the wipe and the blur may stutter (not seen at 390px in Chrome); there's no pause button (it stops off screen and with reduced motion).
 
+### UX round (branch `feat/ux-round`, 2026-11-21, not live yet)
+
+Built test-first (`test/ux-round.test.ts`, `test/follow.test.ts`, `test/moderation.test.ts`, plus the abuse-limits tests). Picked from the post-live-room list (3, 4, 5, 6, 8; the rest is in the backlog below). **Ships with a database change**: run `node scripts/run-sql.mjs db/2026-11-21-follow-moderation.sql` on production **before** the code (one `sessions` column + `live_sessions` recreated, and the four abuse-limit tables). Without it the status poll and every answer route fail.
+
+- **Waiting room** (`components/results/WaitingRoom.tsx`): until the first answer, the owner's results screen shows a big QR on real white (it breathes, `.waiting-qr`), "No camera? Go to <host> and type" with the code in a big block, three pulsing dots with "Waiting for the first answer" (`role="status"`) and "Show the questions" to skip it. Owner only, not voters' results; the side QR hides while it's up. Motion stops with reduced motion.
+- **Follow me** (`sessions.follow_focus_id`, `GET/POST /api/admin/sessions/[code]/follow` with `{ focusId }` or `null`, owner only, the question must be the presentation's own): the presenter's "Phones follow me" switch (questions > 1). While on, moving between questions on the big screen moves every phone there: the status poll carries `follow`, phones poll every 1.5 s while following and jump only when it changes (people can still look around), with a "Following the presenter" pill. Off by default; turning it off posts `null`.
+- **Finish screen** (`components/vote/ThankYou.tsx`): a recap of the questions answered with ticks, "See live results" (pops) when results are shared, otherwise "Look up at the big screen", and "Change my answers" (back to question 1; the "All done" banner gets "Back to the end"). Confetti in the design's colours.
+- **Guests build first** (`GuestOptions`, `components/admin/GuestCodeCard.tsx`): "Start as a guest" goes straight to the builder; the guest code shows after the first presentation is saved ("Saved. Here's your guest code", once per browser session: `codeSeen` / `markCodeSeen` in `components/admin/guestCode.ts`) and before logging out ("Before you go: your guest code", with Copy).
+- **Moderation everywhere**: the bad-word filter (`hasBadWords`) now covers plain open answers and word-cloud words (`saveAnswer` returns "blocked"), Audience Q&A questions, open points and the name on them, and quiz nicknames (each route: 400 `blocked_words`). Phones check before sending and show `SCREEN_BLOCKED_MESSAGE` ("…a word we keep off the screen…"; boards keep `BLOCKED_MESSAGE`).
+- **Abuse limits are in** (details in their own section below), and the two newer public writes got them too: raising an open point goes through `admitVoter` (answer limit, new-voter limit, voter cap); picture uploads have `LIMITS.upload` (300 an hour per address).
+
+Not done yet: phones that aren't following still pick up a presenter's change only on their next 10 s poll when Follow me is first turned on; the finish screen's recap lists question names, not the answers given.
+
 ### Backlog: parked UX ideas (2026-11-21)
 
 Suggested after the live-room sweep and parked by the owner (building 3, 4, 5, 6 and 8 of that list first):
@@ -162,18 +175,26 @@ Suggested after the live-room sweep and parked by the owner (building 3, 4, 5, 6
 
 Still to do for these users: a room code you reuse every sprint with past rounds kept (today "Clear all answers" is the only way to start fresh).
 
-### On hold: abuse limits (security sweep, 2026-11-09)
+### Abuse limits (security sweep 2026-11-09, brought into `feat/ux-round` 2026-11-21)
 
-Built and tested, not deployed: branch `security/abuse-limits` (commit `cb47b5c`, 484 tests pass, full phone/desktop sweep passed). Not merged into `main` on purpose: the code needs 4 new tables, and pushing it before they exist in production breaks every vote and answer.
+Ships with `db/2026-11-21-follow-moderation.sql` (its four tables: `rate_hits`, `session_voters`, `hidden_words`, `quiz_hidden_players`), which must run on production **before** the code. Optional: set `RATE_LIMIT_SECRET` in Vercel.
 
-What it does: per-address limits on password tries, sign-ups, guests, guest codes, answers and new voters (`rate_hits`); at most 1,000 voters per presentation (`session_voters`); lockouts per address instead of per email; at most 100 presentations per account; a site-wide daily AI cap; CDN-cached endpoints refuse query strings; the owner can hide word-cloud words (`hidden_words`) and quiz nicknames (`quiz_hidden_players`) on the big screen. Details are in the branch's CLAUDE.md / AGENTS.md ("Abuse limits").
+Built (`lib/limits.ts`, `lib/voter-gate.ts`, `test/abuse-limits.test.ts`):
 
-To ship it:
+- **Per-address request limits**, counted in the database (`rate_hits`; the bucket holds a salted hash of the address, salt `RATE_LIMIT_SECRET` or `CRON_SECRET`; the daily purge deletes counters older than a day). The address comes from `x-real-ip` / `x-forwarded-for` (set by Vercel); with none, there's no limit outside production. Limits (`LIMITS`), sized so a 100-person workshop on one Wi-Fi fits: password checks (log in, sign up, reset, save guest) 300 per 10 min; sign-ups 100 an hour; new guests 100 an hour; guest-code sign-ins 100 per 10 min; answers 6,000 a minute (a 100-person room on one Wi-Fi scoring 15 things in the same minute is 1,500); new voter ids 1,000 an hour. Over a limit = 429 `too_many_requests` with `Retry-After`.
+- **Voters per presentation**: at most `MAX_VOTERS_PER_PRESENTATION` = 1,000 (`session_voters`); a new voter after that gets 403 `full`. "Clear all answers" empties it. Every answer route (`/api/vote`, `/api/answer`, `/api/qa/[code]`, `/api/quiz/[code]`) goes through `admitVoter` first.
+- **No cache-busting**: the CDN-cached endpoints (status, Q&A list, public results) refuse any query string (400) before touching the database.
+- **Password hashing only after the limit**; a reset link that can't work is refused before hashing.
+- **Lockouts per address**: 10 wrong passwords lock that address out of that email (`email|address` in `login_failures`); 100 from everywhere lock the email (`total:email`). Guest codes: per-address limit, plus a site-wide brake at 2,000 wrong codes per 10 min. New guests site-wide: 1,000 an hour.
+- **Caps**: a saved account keeps up to `ACCOUNT_PRESENTATION_LIMIT` = 100 presentations (403 `account_limit`); AI has a site-wide daily cap `AI_SITE_DAILY_LIMIT` (default 500) on top of each account's.
+- **Owner hides on the big screen**: word-cloud words (`PATCH /api/admin/sessions/[code]/words`, `hidden_words`; exports mark them "Hidden word", Markdown leaves them out, phones never get them) and quiz players (`POST …/quiz` `hide_player` / `show_player`, by the leaderboard row's `id` = md5 of presentation + voter, `quiz_hidden_players`; `hiddenPlayers` in the owner's results).
 
-1. Run the new `create table if not exists` section at the end of `db/schema.sql` on the branch (`rate_hits`, `session_voters`, `hidden_words`, `quiz_hidden_players`) in the Neon SQL Editor (Vercel, then Storage, then Open in Neon). It only adds tables. The local network's DNS doesn't resolve `*.aws.neon.tech`, so it can't be run from this laptop; use the Neon website, a phone hotspot or DNS 1.1.1.1.
-2. Merge the branch into `main` (rebase it if `main` moved), run the tests, and push.
-3. Check the live site at 390px and desktop: voting, the quiz, hiding a word and hiding a player.
-4. Optional: set `RATE_LIMIT_SECRET` in Vercel.
+Not done (needs a plan or setting, not code), or left for later:
+
+- Neon's free compute-hours can still be used up by anyone hitting any database URL every few minutes, and Vercel Hobby's CPU allowance by a flood of cheap requests. Fix: Neon usage alerts or a paid plan, and Vercel Firewall rate-limit rules on `/api/*`.
+- Email verification is still off until Resend is set up (see below), so sign-ups only have the per-address limit.
+- A full presentation shows voters "voting is closed" on Score items cards rather than "full".
+- Lower priority from the sweep: AI prompt injection from answers (owner checks "hide repeats"), sign-up says when an email is taken, Vercel Analytics may see a reset `?token=` before it's removed (add `beforeSend` once email is on), presentation codes can be guessed slowly via `/api/session/[code]`, prefetch requests skip the CSP, guest codes are stored as unsalted SHA-256.
 
 ### Email verification and password reset — built, not switched on (INCOMPLETE)
 

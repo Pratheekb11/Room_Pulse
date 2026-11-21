@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { badRequest, json, logDbError, readJson, unavailable } from "@/lib/http";
 import { jpegSize, MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, MAX_IMAGES_PER_ACCOUNT } from "@/lib/images";
 import { saveImage } from "@/lib/queries";
+import { limited } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser(req);
     if (user instanceof Response) return user;
+    const busy = await limited(req, "upload");
+    if (busy) return busy;
     const body = (await readJson(req)) as { data?: unknown } | undefined;
     const data = body?.data;
     if (typeof data !== "string" || !data) return badRequest();

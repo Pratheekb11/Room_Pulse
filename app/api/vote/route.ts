@@ -1,6 +1,7 @@
 import { saveVote } from "@/lib/queries";
 import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
 import { voteSchema } from "@/lib/validation";
+import { admitVoter } from "@/lib/voter-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,8 @@ export async function POST(req: Request) {
   if (!parsed.success) return badRequest();
 
   try {
+    const refused = await admitVoter(req, parsed.data.code, parsed.data.voterId);
+    if (refused) return refused;
     const outcome = await saveVote(parsed.data);
     switch (outcome) {
       case "ok":

@@ -3,13 +3,15 @@ import { normalizeGuestCode } from "@/lib/code";
 import { json, logDbError, readJson, unavailable } from "@/lib/http";
 import { GUEST_CODE_FAILURES_PER_10_MIN, GUEST_DAYS, GUEST_SESSION_HOURS } from "@/lib/policy";
 import { countRecentLoginFailures, findGuestByCodeHash, recordLoginFailure } from "@/lib/queries";
+import { limited } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
 
 // Same answer for a malformed, unknown, saved or expired code.
 const invalid = () => json({ error: "invalid_guest_code" }, 401);
 
-// Failures are counted site-wide (there's no account to key them on, and no IPs are stored).
+// Each address gets a few tries (lib/limits.ts); failures are also counted site-wide, as a last
+// resort against guessing from very many addresses (there's no account to key them on).
 const FAILURE_KEY = "guest-code";
 
 /** Guest sign-in on any device with just the guest code. */
@@ -18,6 +20,8 @@ export async function POST(req: Request) {
   const body = (await readJson(req)) as { guestCode?: unknown } | undefined;
   const code = typeof body?.guestCode === "string" ? normalizeGuestCode(body.guestCode) : null;
   try {
+    const busy = await limited(req, "guestCode");
+    if (busy) return busy;
     if ((await countRecentLoginFailures(FAILURE_KEY, 10)) >= GUEST_CODE_FAILURES_PER_10_MIN) {
       return json({ error: "too_many_attempts" }, 429, { "Cache-Control": "no-store", "Retry-After": "600" });
     }

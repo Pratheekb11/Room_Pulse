@@ -384,6 +384,9 @@ export const quizControlSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), focusId: z.uuid() }),
   z.object({ action: z.literal("end") }),
   z.object({ action: z.literal("stop") }),
+  /** Hide a player from the leaderboard (or show them again), by the leaderboard row's id. */
+  z.object({ action: z.literal("hide_player"), id: z.string().regex(/^[a-f0-9]{32}$/) }),
+  z.object({ action: z.literal("show_player"), id: z.string().regex(/^[a-f0-9]{32}$/) }),
 ]);
 export type QuizControl = z.infer<typeof quizControlSchema>;
 
@@ -394,6 +397,9 @@ export const followSchema = z.object({ focusId: z.uuid().nullable() });
 export const qaModerateSchema = z
   .object({ id: z.uuid(), hidden: z.boolean().optional(), answered: z.boolean().optional() })
   .refine((m) => m.hidden !== undefined || m.answered !== undefined, "Nothing to change");
+
+/** Owner moderation of a word-cloud word (matched the way answers are stored: trimmed, lowercased). */
+export const wordModerateSchema = z.object({ focusId: z.uuid(), word, hidden: z.boolean() });
 
 /** Owner moderation of an open answer: hide it, or just the name it's signed with (at least one). */
 export const textModerateSchema = z

@@ -67,6 +67,7 @@ export function toMarkdown(title: string, ratings: SummaryRow[], choices: Choice
     switch (c.kind) {
       case "Hidden answer":
       case "Hidden question":
+      case "Hidden word":
         break;
       case "Poll choice":
       case "Quiz choice":

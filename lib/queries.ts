@@ -181,6 +181,17 @@ export async function saveVote(v: VoteInput): Promise<VoteOutcome> {
 }
 
 /**
+ * A quiz player's id on the leaderboard: a hash of the presentation and the voter, so the owner can
+ * hide a player without anyone learning the voter id. `t` is a table alias with session_id and voter_id.
+ */
+const PLAYER_ID = (t: "a" | "h" | "p") =>
+  t === "a"
+    ? sql`md5(a.session_id::text || ':' || a.voter_id::text)`
+    : t === "h"
+      ? sql`md5(h.session_id::text || ':' || h.voter_id::text)`
+      : sql`md5(p.session_id::text || ':' || p.voter_id::text)`;
+
+/**
  * Live results, only for someone holding the presentation's dashboard key or its signed-in owner.
  * Anyone else gets `null`, exactly like a missing presentation.
  */
@@ -222,12 +233,14 @@ export async function getResults(
                         from (select focus_id, topic_id from poll_answers where session_id = s.id
                               union all select focus_id, topic_id from choice_answers where session_id = s.id) a
                        group by focus_id, topic_id) p), '[]'::json) as polls,
-      coalesce((select json_agg(json_build_object('focusId', w.focus_id, 'word', w.word, 'n', w.n)
+      coalesce((select json_agg(jsonb_build_object('focusId', w.focus_id, 'word', w.word, 'n', w.n)
+                                  || case when w.hidden then jsonb_build_object('hidden', true) else '{}'::jsonb end
                                 order by w.n desc, w.word)
-                from (select focus_id, word, count(*)::int as n,
-                             row_number() over (partition by focus_id order by count(*) desc, word) as rk
-                        from word_answers where session_id = s.id
-                       group by focus_id, word) w
+                from (select x.*, row_number() over (partition by x.focus_id order by x.hidden, x.n desc, x.word) as rk
+                        from (select a.focus_id, a.word, count(*)::int as n,
+                                     exists (select 1 from hidden_words h where h.focus_id = a.focus_id and h.word = a.word) as hidden
+                                from word_answers a where a.session_id = s.id
+                               group by a.focus_id, a.word) x) w
                where w.rk <= 80), '[]'::json) as words,
       coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'topicId', x.topic_id, 'rank', x.place, 'n', x.n))
                 from (select focus_id, topic_id, place, count(*)::int as n
@@ -269,16 +282,21 @@ export async function getResults(
       coalesce((select json_agg(json_build_object('focusId', x.focus_id, 'topicId', x.topic_id, 'n', x.n))
                 from (select focus_id, topic_id, count(*)::int as n from quiz_answers where session_id = s.id
                        group by focus_id, topic_id) x), '[]'::json) as quiz_counts,
-      coalesce((select json_agg(json_build_object('nickname', x.nickname, 'points', x.points, 'correct', x.correct)
+      coalesce((select json_agg(json_build_object('id', x.id, 'nickname', x.nickname, 'points', x.points, 'correct', x.correct)
                                 order by x.points desc, x.correct desc, x.first_at)
-                from (select coalesce(p.nickname, 'Player') as nickname, sum(a.points)::int as points,
+                from (select ${PLAYER_ID('a')} as id, coalesce(p.nickname, 'Player') as nickname, sum(a.points)::int as points,
                              count(*) filter (where a.correct)::int as correct, min(a.created_at) as first_at
                         from quiz_answers a
                         left join quiz_players p on p.session_id = a.session_id and p.voter_id = a.voter_id
                        where a.session_id = s.id
-                       group by a.voter_id, p.nickname
+                         and not exists (select 1 from quiz_hidden_players h where h.session_id = a.session_id and h.voter_id = a.voter_id)
+                       group by a.session_id, a.voter_id, p.nickname
                        order by points desc, correct desc, first_at
                        limit 10) x), '[]'::json) as leaderboard,
+      coalesce((select json_agg(json_build_object('id', ${PLAYER_ID('h')}, 'nickname', coalesce(p.nickname, 'Player')) order by p.nickname)
+                from quiz_hidden_players h
+                left join quiz_players p on p.session_id = h.session_id and p.voter_id = h.voter_id
+               where h.session_id = s.id), '[]'::json) as hidden_players,
       coalesce((select json_agg(json_build_object('focusId', f.id, 'topicId', t.id))
                 from focus_topics f
                 join topics t on t.focus_id = f.id and t.position - f.position * 100 = f.quiz_correct
@@ -323,6 +341,7 @@ export async function getResults(
     leaderboard: LeaderRow[];
     open_points: number;
     who: WhoRow[];
+    hidden_players: { id: string; nickname: string }[];
     quiz: LiveQuiz | null;
   }[];
   const r = rows[0];
@@ -343,6 +362,7 @@ export async function getResults(
     quizCounts: r.quiz_counts,
     quizRevealed: r.quiz_revealed,
     leaderboard: r.leaderboard,
+    hiddenPlayers: r.hidden_players,
     quiz: isoQuiz(r.quiz),
     revision: r.revision,
     ...(r.who.length ? { who: r.who } : {}),
@@ -505,6 +525,8 @@ export async function resetSession(code: string): Promise<void> {
     sql`delete from qa_questions where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from quiz_answers where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from quiz_players where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from quiz_hidden_players where session_id = (select id from live_sessions where code = ${code})`,
+    sql`delete from session_voters where session_id = (select id from live_sessions where code = ${code})`,
     sql`update sessions set quiz_focus_id = null, quiz_started_at = null where code = ${code}`,
     sql`delete from results where session_id = (select id from live_sessions where code = ${code})`,
     sql`delete from votes   where session_id = (select id from live_sessions where code = ${code})`,
@@ -702,9 +724,11 @@ export async function countRecentLoginFailures(email: string, windowMinutes: num
   return rows[0].n;
 }
 
-export async function recordLoginFailure(email: string): Promise<void> {
+/** Records a failure under each key (an email, an email from one address, or a site-wide name). */
+export async function recordLoginFailure(keys: string | string[]): Promise<void> {
+  const list = Array.isArray(keys) ? keys : [keys];
   await sql.transaction([
-    sql`insert into login_failures (email) values (${email})`,
+    sql`insert into login_failures (email) select unnest(${list}::text[])`,
     sql`delete from login_failures where at < now() - interval '1 day'`,
   ]);
 }
@@ -977,7 +1001,7 @@ export async function getQuizMe(code: string, voterId: string): Promise<QuizMe |
 }
 
 /** Owner's controls (the caller checks ownership). `false` when the question isn't a quiz in this presentation. */
-export async function controlQuiz(code: string, c: QuizControl): Promise<boolean> {
+export async function controlQuiz(code: string, c: Extract<QuizControl, { action: "start" | "end" | "stop" }>): Promise<boolean> {
   if (c.action === "start") {
     const rows = await sql`
       update sessions s set quiz_focus_id = f.id, quiz_started_at = now()
@@ -1098,6 +1122,7 @@ export interface ChoiceSummaryRow {
   kind:
     | "Poll choice"
     | "Word"
+    | "Hidden word"
     | "Picked"
     | "Average place"
     | "Average"
@@ -1135,7 +1160,9 @@ export async function getChoiceSummaryRows(code: string): Promise<ChoiceSummaryR
         join topics t on t.focus_id = f.id
        where s.code = ${code}
       union all
-      select f.position, -count(*)::float8, f.name, w.word, 'Word', null, count(*)::int,
+      select f.position, -count(*)::float8, f.name, w.word,
+             case when exists (select 1 from hidden_words h where h.focus_id = f.id and h.word = w.word) then 'Hidden word' else 'Word' end,
+             null, count(*)::int,
              case when s.named then
                (select string_agg(n.name, ', ' order by n.name)
                   from (select distinct voter_id from word_answers x where x.focus_id = f.id and x.word = w.word) x
@@ -1220,6 +1247,15 @@ export async function insertEmailToken(tokenHash: string, userId: string, purpos
   ]);
 }
 
+/** Whether a token is valid, unused and unexpired, without using it up. */
+export async function emailTokenUsable(tokenHash: string, purpose: EmailTokenPurpose): Promise<boolean> {
+  const rows = await sql`
+    select 1 from email_tokens
+     where token_hash = ${tokenHash} and purpose = ${purpose} and used_at is null and expires_at > now()
+  `;
+  return rows.length > 0;
+}
+
 /** Marks a valid, unused, unexpired token as used (atomically). Returns its user, or null. */
 export async function consumeEmailToken(tokenHash: string, purpose: EmailTokenPurpose): Promise<UserRow | null> {
   const rows = (await sql`
@@ -1245,7 +1281,8 @@ export async function resetPassword(userId: string, email: string, passwordHash:
     sql`update users set password_hash = ${passwordHash}, email_verified_at = coalesce(email_verified_at, now()) where id = ${userId}`,
     sql`delete from auth_sessions where user_id = ${userId}`,
     sql`update email_tokens set used_at = now() where user_id = ${userId} and purpose = 'reset' and used_at is null`,
-    sql`delete from login_failures where email = ${email}`,
+    // the email's own counters: per address ("email|address") and from all addresses ("total:email")
+    sql`delete from login_failures where split_part(email, '|', 1) = ${email} or email = ${`total:${email}`}`,
   ]);
 }
 
@@ -1310,6 +1347,8 @@ export async function purgeExpiredGuestData(guestDays: number): Promise<{ sessio
            and not exists (select 1 from focus_topics f where f.image_id = i.id)
            and not exists (select 1 from topics t where t.image_id = i.id)
          returning id`,
+    // abuse-limit counters (lib/limits.ts) only matter for a day at most
+    sql`delete from rate_hits where window_start < now() - interval '1 day'`,
   ])) as unknown[][];
   return { sessions: sessions.length, users: users.length, images: images.length };
 }
@@ -1699,4 +1738,70 @@ export async function getAiReport(code: string): Promise<AiReport | null> {
   `) as { body: Omit<AiReport, "people" | "at">; people: number; created_at: Date | string }[];
   const r = rows[0];
   return r ? { ...r.body, people: r.people, at: new Date(r.created_at).toISOString() } : null;
+}
+
+// ---------------------------------------------------------------- voters
+
+/** Whether a presentation is open and already knows this voter; null when it doesn't exist. */
+export async function getVoterState(code: string, voterId: string): Promise<{ isOpen: boolean; known: boolean } | null> {
+  const rows = (await sql`
+    select s.is_open,
+           exists (select 1 from session_voters v where v.session_id = s.id and v.voter_id = ${voterId}::uuid) as known
+      from live_sessions s where s.code = ${code}
+  `) as { is_open: boolean; known: boolean }[];
+  return rows[0] ? { isOpen: rows[0].is_open, known: rows[0].known } : null;
+}
+
+/** Lets a new voter in unless the presentation already has `max` voters. */
+export async function addVoter(code: string, voterId: string, max: number): Promise<boolean> {
+  const rows = await sql`
+    insert into session_voters (session_id, voter_id)
+    select s.id, ${voterId}::uuid from live_sessions s
+     where s.code = ${code}
+       and (select count(*) from session_voters v where v.session_id = s.id) < ${max}::int
+    on conflict do nothing
+    returning 1 as ok
+  `;
+  if (rows.length > 0) return true;
+  return (await getVoterState(code, voterId))?.known === true; // let in at the same moment by another request
+}
+
+// ---------------------------------------------------------------- owner moderation of words and players
+
+/** Hides a word from a word-cloud question (or shows it again); false when there's no such question. */
+export async function setWordHidden(code: string, focusId: string, word: string, hidden: boolean): Promise<boolean> {
+  const rows = (await sql`
+    with f as (
+      select f.id from live_sessions s
+      join focus_topics f on f.session_id = s.id and f.id = ${focusId}::uuid and f.kind = 'words'
+      where s.code = ${code}
+    ), added as (
+      insert into hidden_words (focus_id, word) select f.id, ${word} from f where ${hidden}::boolean
+      on conflict do nothing
+    ), removed as (
+      delete from hidden_words h using f where not ${hidden}::boolean and h.focus_id = f.id and h.word = ${word}
+    )
+    select count(*)::int as n from f
+  `) as { n: number }[];
+  return rows[0].n > 0;
+}
+
+/** Hides a quiz player (by leaderboard id) from the leaderboard, or shows them again; false when unknown. */
+export async function setPlayerHidden(code: string, playerId: string, hidden: boolean): Promise<boolean> {
+  const rows = (await sql`
+    with s as (select id from live_sessions where code = ${code}),
+    v as (
+      select a.session_id, a.voter_id from quiz_answers a join s on a.session_id = s.id where ${PLAYER_ID("a")} = ${playerId}
+      union
+      select p.session_id, p.voter_id from quiz_players p join s on p.session_id = s.id where ${PLAYER_ID("p")} = ${playerId}
+    ), added as (
+      insert into quiz_hidden_players (session_id, voter_id) select session_id, voter_id from v where ${hidden}::boolean
+      on conflict do nothing
+    ), removed as (
+      delete from quiz_hidden_players h using v
+       where not ${hidden}::boolean and h.session_id = v.session_id and h.voter_id = v.voter_id
+    )
+    select count(*)::int as n from v
+  `) as { n: number }[];
+  return rows[0].n > 0;
 }

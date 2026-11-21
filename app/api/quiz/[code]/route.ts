@@ -2,6 +2,7 @@ import { saveQuizAction } from "@/lib/queries";
 import { hasBadWords } from "@/lib/profanity";
 import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
 import { codeSchema, quizActionSchema } from "@/lib/validation";
+import { admitVoter } from "@/lib/voter-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/quiz/[code]">) 
   if (!parsed.success) return badRequest();
   if (parsed.data.action === "join" && hasBadWords(parsed.data.nickname)) return badRequest("blocked_words");
   try {
+    const refused = await admitVoter(req, code.data, parsed.data.voterId);
+    if (refused) return refused;
     switch (await saveQuizAction(code.data, parsed.data)) {
       case "ok":
         return json({ ok: true });

@@ -38,6 +38,12 @@ describe("5. the big screen waits for the room in style", () => {
     expect(dash).toMatch(/showQr && joinUrl && !waiting/);
     expect(dash).not.toContain("No answers yet. Ask people to scan the QR code.");
   });
+
+  it("its motion stops for people who ask for reduced motion", () => {
+    const css = read("app/globals.css");
+    const reduced = css.slice(css.indexOf(".waiting-qr {"));
+    expect(reduced).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.waiting-dots > span, \.waiting-qr \{ animation: none; \}/);
+  });
 });
 
 describe("3. a finish screen worth seeing", () => {

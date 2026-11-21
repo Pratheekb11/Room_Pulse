@@ -122,3 +122,10 @@ describe("phones say why before sending", () => {
     });
   }
 });
+
+describe("the parked abuse limits ship with this round", () => {
+  it("the production change creates their tables before the code needs them", () => {
+    const prod = read("db/2026-11-21-follow-moderation.sql");
+    for (const t of ["rate_hits", "session_voters", "hidden_words", "quiz_hidden_players"]) expect(prod).toContain(`create table if not exists ${t}`);
+  });
+});

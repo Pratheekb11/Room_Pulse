@@ -21,6 +21,8 @@ const MESSAGES: Record<string, string> = {
   invalid_guest_code: `That guest code doesn't work. Check it and try again. Guest codes stop working after ${GUEST_DAYS} days.`,
   guest_limit: "Guests can have 3 presentations. Save your account to make more.",
   guest_busy: "Guest mode is busy right now. Try again in a few minutes, or sign up.",
+  account_limit: "You have 100 presentations, the most an account can keep. Delete some to make more.",
+  too_many_requests: "Too many tries from this network. Wait a few minutes, then try again.",
   verify_email: "Confirm your email address to make presentations.",
   too_many_emails: "We've sent several emails in the last hour. Check your inbox (and spam), or try again later.",
   bad_origin: "Something blocked this. Reload the page and try again.",

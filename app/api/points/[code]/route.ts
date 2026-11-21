@@ -3,6 +3,7 @@ import { hasBadWords } from "@/lib/profanity";
 import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
 import { MAX_POINTS_PER_VOTER } from "@/lib/points";
 import { codeSchema, raisePointSchema } from "@/lib/validation";
+import { admitVoter } from "@/lib/voter-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/points/[code]">
   if (!parsed.success) return badRequest();
   if (hasBadWords(parsed.data.text) || hasBadWords(parsed.data.name)) return badRequest("blocked_words");
   try {
+    const refused = await admitVoter(req, code.data, parsed.data.voterId);
+    if (refused) return refused;
     const r = await raisePoint(code.data, parsed.data.voterId, parsed.data.text, parsed.data.name, MAX_POINTS_PER_VOTER);
     switch (r.outcome) {
       case "ok":

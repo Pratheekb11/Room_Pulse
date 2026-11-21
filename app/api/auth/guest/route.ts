@@ -3,6 +3,7 @@ import { generateGuestCode, normalizeGuestCode } from "@/lib/code";
 import { json, logDbError, unavailable } from "@/lib/http";
 import { GUEST_ACCOUNTS_PER_HOUR, GUEST_DAYS, GUEST_SESSION_HOURS } from "@/lib/policy";
 import { createGuestUser, purgeExpiredGuestData } from "@/lib/queries";
+import { limited } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   if (!isSameOrigin(req)) return forbiddenOrigin();
   try {
+    const busy = await limited(req, "guest");
+    if (busy) return busy;
     await purgeExpiredGuestData(GUEST_DAYS);
     const guestCode = generateGuestCode();
     const id = await createGuestUser(GUEST_ACCOUNTS_PER_HOUR, hashToken(normalizeGuestCode(guestCode)!));

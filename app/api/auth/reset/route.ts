@@ -2,7 +2,8 @@ import { forbiddenOrigin, hashToken, isSameOrigin, startSession } from "@/lib/au
 import { tokenShape } from "@/lib/email-links";
 import { json, logDbError, readJson, unavailable } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
-import { consumeEmailToken, resetPassword } from "@/lib/queries";
+import { consumeEmailToken, emailTokenUsable, resetPassword } from "@/lib/queries";
+import { limited } from "@/lib/limits";
 import { passwordSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,11 @@ export async function POST(req: Request) {
     return json({ error: "invalid", issues: password.error.issues.map((i) => i.message) }, 400);
   }
   try {
-    // Hash first, so the link is only used up once everything else is ready.
+    const busy = await limited(req, "auth");
+    if (busy) return busy;
+    // A link that can't work is refused before the (deliberately slow) hashing.
+    if (!(await emailTokenUsable(hashToken(token), "reset"))) return json({ error: "invalid_link" }, 400);
+    // Hash before using the link up, so it's only used once everything else is ready.
     const passwordHash = await hashPassword(password.data);
     const user = await consumeEmailToken(hashToken(token), "reset");
     if (!user || !user.email) return json({ error: "invalid_link" }, 400);

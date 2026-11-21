@@ -90,6 +90,8 @@ export interface WordCount {
   focusId: string;
   word: string;
   n: number;
+  /** Hidden by the owner: never on the big screen or phones, only in the owner's list to bring back. */
+  hidden?: boolean;
 }
 
 /** How many people put an option in a place (1 = first) of a ranking question. */
@@ -191,6 +193,8 @@ export interface QuizCount {
 }
 
 export interface LeaderRow {
+  /** Opaque player id (a hash; never the voter id), for the owner to hide a player. */
+  id?: string;
   nickname: string;
   points: number;
   /** Right answers. */
@@ -250,6 +254,8 @@ export interface ResultsPayload {
   quizRevealed: { focusId: string; topicId: string }[];
   /** Quiz: top 10 players. */
   leaderboard: LeaderRow[];
+  /** Quiz: players the owner hid from the leaderboard (owner only). */
+  hiddenPlayers?: { id: string; nickname: string }[];
   /** Quiz: the question running now. */
   quiz: LiveQuiz | null;
   /** Bumped whenever the presenter edits the questions. */

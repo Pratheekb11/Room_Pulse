@@ -25,6 +25,12 @@ export function aiDailyLimit(): number {
   return Number.isInteger(n) && n > 0 ? n : 20;
 }
 
+/** AI requests the whole site may make per day (AI_SITE_DAILY_LIMIT, default 500), however many accounts ask. */
+export function aiSiteDailyLimit(): number {
+  const n = Number(process.env.AI_SITE_DAILY_LIMIT);
+  return Number.isInteger(n) && n > 0 ? n : 500;
+}
+
 /** Gemini's schema format (an OpenAPI subset). */
 export type GeminiSchema =
   | { type: "STRING"; enum?: string[] }

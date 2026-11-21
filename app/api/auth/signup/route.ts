@@ -1,6 +1,7 @@
 import { forbiddenOrigin, isSameOrigin, startSession } from "@/lib/auth";
 import { inBackground, sendLink } from "@/lib/email-links";
 import { emailEnabled } from "@/lib/policy";
+import { limited } from "@/lib/limits";
 import { json, logDbError, readJson, unavailable } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
 import { createUser } from "@/lib/queries";
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
   }
   const { email, password } = parsed.data;
   try {
+    const busy = (await limited(req, "auth")) ?? (await limited(req, "signup"));
+    if (busy) return busy;
     const user = await createUser(email, await hashPassword(password));
     if (!user) return json({ error: "email_taken" }, 409);
     const setCookie = await startSession(user.id);

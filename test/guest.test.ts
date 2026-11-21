@@ -7,6 +7,7 @@ import * as upgradeRoute from "@/app/api/auth/upgrade/route";
 import * as meRoute from "@/app/api/auth/me/route";
 import * as adminSessions from "@/app/api/admin/sessions/route";
 import { sentEmails } from "@/lib/email";
+import { GUEST_ACCOUNTS_PER_HOUR, GUEST_CODE_FAILURES_PER_10_MIN } from "@/lib/policy";
 
 let db: PGlite;
 
@@ -85,7 +86,7 @@ describe("guest mode", () => {
   });
 
   it("caps how many guest accounts can be created per hour across the site", async () => {
-    await db.exec(`insert into users (is_guest) select true from generate_series(1, 300)`);
+    await db.exec(`insert into users (is_guest) select true from generate_series(1, ${GUEST_ACCOUNTS_PER_HOUR})`);
     expect((await post(guestRoute.POST, "/api/auth/guest", {})).status).toBe(429);
   });
 
@@ -332,9 +333,9 @@ describe("guest code", () => {
     expect((await back(guestCode, { origin: "https://evil.example" })).status).toBe(403);
   });
 
-  it("slows everyone down after many wrong codes, so codes can't be guessed", async () => {
+  it("slows everyone down after very many wrong codes site-wide, so codes can't be guessed", async () => {
     const { guestCode } = await newGuest();
-    for (let i = 0; i < 100; i++) await back(`ZZZZ-${String(i).padStart(4, "2").replace(/[01]/g, "2")}`);
+    await db.exec(`insert into login_failures (email) select 'guest-code' from generate_series(1, ${GUEST_CODE_FAILURES_PER_10_MIN})`);
     expect((await back("ZZZZ-ZZZZ")).status).toBe(429);
     expect((await back(guestCode)).status).toBe(429);
     await db.exec("update login_failures set at = now() - interval '11 minutes'");

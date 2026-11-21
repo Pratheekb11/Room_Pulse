@@ -106,6 +106,8 @@ export function QaCard({ code, voterId, focusId, question, color, disabled, done
             r.error === "closed" ? "Voting is closed, so questions can't be sent."
             : r.error === "limit" ? `You've sent ${MAX_QA_PER_VOTER} questions, the most allowed.`
             : r.error === "blocked_words" ? SCREEN_BLOCKED_MESSAGE
+            : r.error === "full" ? "This presentation is full: it can't take more people."
+            : r.error === "too_many_requests" ? "Too busy right now. Wait a moment and try again."
             : "Not sent. Try again.",
         });
       }

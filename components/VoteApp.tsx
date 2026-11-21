@@ -226,6 +226,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   // "Follow me": the question the presenter is on (null = off); phones poll quickly while it's on.
   const [follow, setFollow] = useState<string | null>(null);
   const following = follow !== null;
+  const lastFollow = useRef<string | null>(null);
+  const onFollow = useRef<(follow: string | null) => void>(() => {});
 
   // Poll open/closed state while the tab is visible (served from the CDN cache).
   useEffect(() => {
@@ -239,6 +241,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         setShowResults(body.showResults === true);
         setCanRaise(body.openPoints === true);
         setFollow(body.follow ?? null);
+        onFollow.current(body.follow ?? null);
         if (body.quiz !== undefined) {
           setLiveQuiz((prev) => (JSON.stringify(prev) === JSON.stringify(body.quiz) ? prev : (body.quiz ?? null)));
           if (body.quiz) setQuizOffset(clockOffset(body.quiz.now, Date.now()));
@@ -507,19 +510,19 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   }, [liveQuiz, liveStart, steps, groups, goTo]);
 
   // "Follow me": jump to the presenter's question when it changes; in between, people move around freely.
-  const lastFollow = useRef<string | null>(null);
+  // Runs from the status poll (below), so the jump answers the presenter's move, not a render.
   useEffect(() => {
-    if (!follow) lastFollow.current = null;
-  }, [follow]);
-  useEffect(() => {
-    if (!follow || follow === lastFollow.current) return;
-    const gi = groups.findIndex((g) => g.focus.id === follow);
-    const i = steps.findIndex((s) => s.gi === gi);
-    if (gi === -1 || i === -1) return; // a question this phone doesn't have yet: try again after the reload
-    lastFollow.current = follow;
-    setReviewing(true);
-    goTo(i);
-  }, [follow, steps, groups, goTo]);
+    onFollow.current = (follow) => {
+      if (!follow) lastFollow.current = null;
+      if (!follow || follow === lastFollow.current) return;
+      const gi = groups.findIndex((g) => g.focus.id === follow);
+      const i = steps.findIndex((s) => s.gi === gi);
+      if (gi === -1 || i === -1) return; // a question this phone doesn't have yet: try again on the next poll
+      lastFollow.current = follow;
+      setReviewing(true);
+      goTo(i);
+    };
+  });
 
   // Confetti only when the voter finishes during this visit, not on reload.
   const wasComplete = useRef(complete);
