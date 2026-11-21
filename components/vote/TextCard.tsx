@@ -67,7 +67,7 @@ export function TextCard({ question, color, value, status, disabled, named = fal
           </button>
         </div>
         <p aria-live="polite" className="min-h-4 text-right text-xs font-semibold text-ink-soft">
-          {saveText(status) || (value !== undefined ? "Sent. You can change it until voting closes." : named ? "Your name goes with it." : "Your answer is anonymous.")}
+          {saveText(status) || (value !== undefined ? (disabled ? "Sent." : "Sent. You can change it until voting closes.") : named ? "Your name goes with it." : "Your answer is anonymous.")}
         </p>
       </form>
     </CardShell>

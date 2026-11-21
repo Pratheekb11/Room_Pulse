@@ -7,7 +7,7 @@ import type { Character } from "@/lib/decor";
 import type { SaveStatus } from "@/lib/vote-queue";
 
 /**
- * Shown once every question is answered: what they answered (each with a tick), a way back to change it, where to
+ * Shown once every question is answered: what they answered (each with a tick; finishing locks the answers, see lib/finish-lock.ts), where to
  * look next (the live results when shared, else the big screen) and an honest saving status. The confetti uses the
  * design's own option colours.
  */
@@ -20,7 +20,6 @@ export function ThankYou({
   resultsHref,
   raise,
   onSeeQuestions,
-  onChangeAnswers,
 }: {
   title: string;
   /** Fun illustration shown above the tick. */
@@ -36,7 +35,6 @@ export function ThankYou({
   /** Set when the presentation has a Q&A: people come back to vote on new questions. */
   onSeeQuestions?: () => void;
   /** Back to the first question, answers kept. */
-  onChangeAnswers: () => void;
 }) {
   const values = Object.values(statuses);
   const saving = values.some((s) => s === "saving" || s === "retrying");
@@ -97,9 +95,6 @@ export function ThankYou({
             See live results
           </a>
         )}
-        <button type="button" onClick={onChangeAnswers} className="animate-fade mt-4 rounded-lg px-4 py-2 text-sm font-semibold text-ink-soft underline underline-offset-4 [animation-delay:500ms]">
-          Change my answers
-        </button>
         {raise}
         <p role="status" aria-live="polite" className="font-mono animate-fade mt-8 text-xs text-muted [animation-delay:600ms]">
           {closed ? (

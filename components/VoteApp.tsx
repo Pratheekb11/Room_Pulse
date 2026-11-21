@@ -5,6 +5,7 @@ import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
 import { groupByFocus } from "@/lib/focus";
 import { getVoterId, readJSON, writeJSON } from "@/lib/storage";
+import { endedKey, lockedStep } from "@/lib/finish-lock";
 import type { LiveQuiz, QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
 import { isPlayful } from "@/lib/themes";
 import { ScorePill, StepIntro, StepNav, VoterHeader, VoterProgress } from "./VoterChrome";
@@ -321,6 +322,12 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const unitsDone =
     Object.keys(ratings).length + steps.filter((s) => s.kind !== "rating" && stepDone(s, ratings, answers)).length;
   const complete = unitsTotal > 0 && unitsDone === unitsTotal;
+  // Finishing is final (lib/finish-lock.ts): remembered on this phone, so a reload or a question added later keeps it.
+  const [endedStored] = useState(() => readJSON<boolean>(endedKey(code), false) === true);
+  const ended = endedStored || complete;
+  useEffect(() => {
+    if (complete) writeJSON(endedKey(code), true);
+  }, [complete, code]);
   const points = unitsDone * 10;
 
   const [current, setCurrent] = useState(() => {
@@ -539,6 +546,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
 
   const here = steps[current];
   const group = here ? groups[here.gi] : null;
+  const locked = here ? lockedStep(here.kind, stepDone(here, ratings, answers), ended) : false;
 
   if (complete && !reviewing)
     return (
@@ -558,10 +566,6 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                 goTo(qaStep);
               }
         }
-        onChangeAnswers={() => {
-          setReviewing(true);
-          goTo(0);
-        }}
       />
     );
 
@@ -662,7 +666,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         {complete && (
           <div role="status" className="slab rounded-xl bg-mint px-5 py-4 text-ink">
             <p className="font-display text-xl font-semibold">All done — thank you! 🏆</p>
-            <p className="text-sm font-medium">You can change any answer until voting closes.</p>
+            <p className="text-sm font-medium">Your answers are locked in.</p>
             <button type="button" onClick={() => setReviewing(false)} className="key mt-3 rounded-lg bg-white px-4 py-2 text-sm font-bold">
               Back to the end
             </button>
@@ -673,6 +677,15 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           <p className="text-ink-soft">There are no questions yet. Wait for the presenter to add some.</p>
         ) : (
           <>
+            {locked && !complete && (
+              <p role="status" className="flex items-center gap-2 text-sm font-semibold text-ink-soft">
+                <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden>
+                  <rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor" />
+                  <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+                Locked in: you’ve finished, so this answer stays as it is.
+              </p>
+            )}
             <StepIntro
               name={here.kind === "rating" ? group.focus.name : undefined}
               description={group.focus.description}
@@ -693,7 +706,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   session={session}
                   ratings={ratings}
                   statuses={statuses}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   onRate={onRate}
                 />
               ) : here.kind === "poll" ? (
@@ -703,7 +716,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   color={topicColor(here.gi)}
                   value={typeof answers[group.focus.id] === "string" ? (answers[group.focus.id] as string) : undefined}
                   status={statuses[group.focus.id]}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   onPick={(id) => onAnswer(here.gi, id)}
                 />
               ) : here.kind === "multi" ? (
@@ -714,7 +727,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   maxPicks={group.maxPicks}
                   value={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : undefined}
                   status={statuses[group.focus.id]}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   finished={finished.includes(group.focus.id)}
                   onChange={(ids) => onAnswer(here.gi, ids)}
                   onFinish={() => onFinish(here.gi)}
@@ -726,7 +739,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   color={topicColor(here.gi)}
                   value={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : undefined}
                   status={statuses[group.focus.id]}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   onRank={(order) => onAnswer(here.gi, order)}
                 />
               ) : here.kind === "number" ? (
@@ -738,7 +751,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   unit={group.unit}
                   value={typeof answers[group.focus.id] === "number" ? (answers[group.focus.id] as number) : undefined}
                   status={statuses[group.focus.id]}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   onSend={(n) => onAnswer(here.gi, n)}
                 />
               ) : here.kind === "text" && group.board ? (
@@ -749,7 +762,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   maxLeaves={leafLimit(group)}
                   leaves={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : []}
                   status={leafStatus(statuses, group.focus.id)}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   author={author}
                   seeHref={resultsHref}
                   onSave={(slot, text, name) => {
@@ -767,7 +780,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   color={topicColor(here.gi)}
                   value={typeof answers[group.focus.id] === "string" ? (answers[group.focus.id] as string) : undefined}
                   status={statuses[group.focus.id]}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   named={Boolean(session.named)}
                   onSend={(text) => onAnswer(here.gi, text)}
                 />
@@ -804,7 +817,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                   color={topicColor(here.gi)}
                   value={Array.isArray(answers[group.focus.id]) ? (answers[group.focus.id] as string[]) : undefined}
                   status={statuses[group.focus.id]}
-                  disabled={!isOpen}
+                  disabled={!isOpen || locked}
                   finished={finished.includes(group.focus.id)}
                   onSend={(words) => onAnswer(here.gi, words)}
                   onFinish={() => onFinish(here.gi)}

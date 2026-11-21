@@ -54,7 +54,6 @@ describe("3. a finish screen worth seeing", () => {
     statuses: {},
     celebrate: false,
     questions: ["How did this sprint feel?", "What went well?"],
-    onChangeAnswers: () => {},
   };
 
   it("lists the questions answered, each with a tick", () => {
@@ -64,8 +63,10 @@ describe("3. a finish screen worth seeing", () => {
     expect(out.match(/data-answered/g)?.length).toBe(2);
   });
 
-  it("lets people change their answers", () => {
-    expect(html(createElement(ThankYou, base))).toMatch(/<button[^>]*>Change my answers<\/button>/);
+  it("finishing is final: no way back to change answers (owner, 2026-11-21: keeps the big screen steady)", () => {
+    const out = html(createElement(ThankYou, base));
+    expect(out).not.toContain("Change my answers");
+    expect(read("components/vote/ThankYou.tsx")).not.toContain("onChangeAnswers");
   });
 
   it("without shared results, points people at the big screen instead of telling them to close the page", () => {
@@ -81,7 +82,52 @@ describe("3. a finish screen worth seeing", () => {
 
   it("from the questions, people can get back to the finish screen", () => {
     expect(vote).toMatch(/onClick=\{\(\) => setReviewing\(false\)\}[^>]*>\s*Back to the end/);
-    expect(vote).toMatch(/onChangeAnswers=\{\(\) => \{\s*setReviewing\(true\);\s*goTo\(0\);/);
+    expect(vote).not.toContain("onChangeAnswers");
+  });
+});
+
+describe("3b. answers lock once people finish", () => {
+  it("a question is locked once answered after reaching the end; Q&A and quiz stay as they are", async () => {
+    const { lockedStep } = await import("@/lib/finish-lock");
+    expect(lockedStep("poll", true, true)).toBe(true);
+    expect(lockedStep("rating", true, true)).toBe(true);
+    expect(lockedStep("text", true, true)).toBe(true);
+    expect(lockedStep("words", true, true)).toBe(true);
+    // not finished yet: free to go back and change
+    expect(lockedStep("poll", true, false)).toBe(false);
+    // a question added after they finished: still to answer
+    expect(lockedStep("poll", false, true)).toBe(false);
+    // Q&A is a live list (ask, upvote new questions); a quiz answer is one-shot on the server already
+    expect(lockedStep("qa", true, true)).toBe(false);
+    expect(lockedStep("quiz", true, true)).toBe(false);
+  });
+
+  it("the phone remembers it finished, per presentation", async () => {
+    const { endedKey } = await import("@/lib/finish-lock");
+    expect(endedKey("k7m2qp")).toBe("liverate:ended:k7m2qp");
+    expect(vote).toMatch(/const ended = endedStored \|\| complete;/);
+    expect(vote).toMatch(/if \(complete\) writeJSON\(endedKey\(code\), true\)/);
+  });
+
+  it("every answer card except Q&A and quiz is read-only when locked", () => {
+    expect(vote).toMatch(/const locked = here \? lockedStep\(here\.kind, stepDone\(here, ratings, answers\), ended\) : false;/);
+    for (const card of ["TopicCard", "PollCard", "MultiCard", "RankCard", "NumberCard", "BoardCard", "TextCard", "WordsCard"]) {
+      const at = vote.indexOf(`<${card}`, vote.indexOf("{!here || !group ?"));
+      const props = vote.slice(at, vote.indexOf("/>", at));
+      expect(props, card).toContain("disabled={!isOpen || locked}");
+    }
+    for (const card of ["QaCard", "QuizCard"]) {
+      const at = vote.indexOf(`<${card}`, vote.indexOf("{!here || !group ?"));
+      expect(vote.slice(at, vote.indexOf("/>", at)), card).toContain("disabled={!isOpen}");
+    }
+  });
+
+  it("says so, instead of promising changes", () => {
+    expect(vote).toContain("Locked in: you’ve finished, so this answer stays as it is.");
+    expect(vote).not.toContain("You can change any answer until voting closes.");
+    for (const f of ["components/vote/TextCard.tsx", "components/vote/NumberCard.tsx"]) {
+      expect(read(f), f).toMatch(/disabled \? "Sent\." : "Sent\. You can change it until voting closes\."/);
+    }
   });
 });
 

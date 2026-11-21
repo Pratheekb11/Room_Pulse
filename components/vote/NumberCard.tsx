@@ -46,7 +46,7 @@ export function NumberCard({ question, color, min, max, unit, value, status, dis
   const range = `${formatNumber(min)} to ${formatNumber(max)}${unit ? ` ${unit}` : ""}`;
   let hint = saveText(status);
   if (!hint && parsed !== null && !valid) hint = `Pick a number from ${range}.`;
-  if (!hint && value !== undefined) hint = "Sent. You can change it until voting closes.";
+  if (!hint && value !== undefined) hint = disabled ? "Sent." : "Sent. You can change it until voting closes.";
 
   return (
     <CardShell id="number-q" color={color} how={`Answer with a number from ${range}`} question={question}>
