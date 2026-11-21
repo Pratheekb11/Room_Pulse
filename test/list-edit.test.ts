@@ -73,13 +73,15 @@ describe("list editor helpers", () => {
       expect(moveItem(rows, 0, 1).map((r) => r.id)).toEqual(["b", "a"]);
     });
 
+    // new rows carry only the editor's own key (never saved: see test/motion.test.ts)
+    const unkeyed = <T extends { key?: string }>(list: T[]) => list.map(({ key: _k, ...r }) => (void _k, r));
     it("new rows have no id", () => {
-      expect(insertAfter(rows, 0, 10)[1]).toEqual({ name: "" });
-      expect(removeAt([rows[0]], 0)).toEqual([{ name: "" }]);
+      expect(unkeyed(insertAfter(rows, 0, 10))[1]).toEqual({ name: "" });
+      expect(unkeyed(removeAt([rows[0]], 0))).toEqual([{ name: "" }]);
     });
 
     it("pasting over a saved row keeps its id on the first line; the other lines are new", () => {
-      expect(pasteInto(rows, 1, "Osaka\nNara", 10)?.items).toEqual([
+      expect(unkeyed(pasteInto(rows, 1, "Osaka\nNara", 10)!.items)).toEqual([
         { id: "a", name: "Lisbon" },
         { id: "b", name: "Osaka" },
         { name: "Nara" },

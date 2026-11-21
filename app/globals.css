@@ -43,7 +43,6 @@
 
   --animate-pop: pop 320ms var(--ease-spring);
   --animate-flash: flash 900ms var(--ease-out-soft);
-  --animate-live: live 1.8s ease-out infinite;
   --animate-rise: rise 520ms var(--ease-out-soft) both;
   --animate-fade: fade 400ms ease-out both;
   /* a leaf, note or star arriving on a board; backwards so hover scaling still works afterwards */
@@ -57,10 +56,6 @@
   @keyframes flash {
     0% { box-shadow: inset 0 0 0 2px var(--color-primary); }
     100% { box-shadow: inset 0 0 0 0 transparent; }
-  }
-  @keyframes live {
-    0% { box-shadow: 0 0 0 0 rgb(31 138 101 / 0.45); }
-    100% { box-shadow: 0 0 0 8px rgb(31 138 101 / 0); }
   }
   @keyframes rise {
     from { opacity: 0; transform: translateY(14px); }
@@ -417,7 +412,8 @@ body,
 
 /* The site's own screens (sign-in, dashboard, builder, report…): blocks rise in one after another (`--i`) */
 .enter {
-  animation: enter 800ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 70ms + 80ms) both;
+  /* quick, and the stagger stops after 6 blocks, so a long list doesn't keep its last card waiting */
+  animation: enter 420ms cubic-bezier(0.16, 1, 0.3, 1) calc(min(var(--i, 0), 6) * 45ms + 40ms) both;
 }
 @keyframes enter {
   from { opacity: 0; transform: translateY(16px); }
@@ -428,7 +424,7 @@ body,
    so these are keyed on the root (the same as the colours). */
 :root:has(.quiet) [aria-modal="true"],
 :root:has(.quiet) [role="alertdialog"] {
-  animation: dialog-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: dialog-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes dialog-in {
   from { opacity: 0; transform: translateY(14px) scale(0.98); }
@@ -438,7 +434,7 @@ body,
    show the page behind it for a moment */
 :root:has(.quiet) .fixed.inset-0[class*="bg-ink/"]:has(> [aria-modal="true"]),
 :root:has(.quiet) .fixed.inset-0[class*="bg-ink/"]:has(> [role="alertdialog"]) {
-  animation: fade 320ms ease-out both;
+  animation: fade 200ms ease-out both;
 }
 
 /* Menus and "What does this mean?" open like a drop-down */
@@ -665,11 +661,18 @@ body,
   to { clip-path: circle(150% at 100% 45%); }
 }
 /* the screen's light on the dark page */
+/* a soft gradient, not a blur filter: a blur that moves redraws every frame (test/motion.test.ts) */
+@property --glow {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
 .room-glow {
-  filter: blur(7cqw);
-  opacity: 0.45;
-  transition: background-color 900ms var(--ease-out-soft);
+  background: radial-gradient(closest-side, var(--glow), color-mix(in srgb, var(--glow) 35%, transparent) 55%, transparent);
+  opacity: 0.5;
+  transition: --glow 900ms var(--ease-out-soft);
   animation: room-breathe 6s ease-in-out infinite alternate;
+  will-change: transform;
 }
 .room-glow-2 {
   opacity: 0.3;
@@ -706,6 +709,8 @@ body,
   transform: perspective(160cqw) rotateY(var(--tilt-x, -4deg)) rotateX(var(--tilt-y, 2deg));
   transform-style: preserve-3d;
   transition: transform 600ms var(--ease-out-soft);
+  /* its own layer: leaning it moves the picture without drawing it again */
+  will-change: transform;
 }
 [data-tilt] .room-depth {
   transform: translateZ(3cqw);
@@ -779,16 +784,47 @@ body,
   0%, 80%, 100% { opacity: 0.25; transform: scale(0.75); }
   40% { opacity: 1; transform: scale(1); }
 }
+/* a ring around the QR that grows and fades (transform and opacity only: no repaint) */
 .waiting-qr {
-  animation: waiting-glow 2.6s ease-in-out infinite;
+  position: relative;
 }
-@keyframes waiting-glow {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent); }
-  50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-primary) 22%, transparent); }
+.waiting-qr::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 10px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  animation: waiting-ring 2.6s ease-in-out infinite;
+}
+@keyframes waiting-ring {
+  0%, 100% { opacity: 0; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.02); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .waiting-dots > span, .waiting-qr { animation: none; }
+  .waiting-dots > span, .waiting-qr::after { animation: none; }
   .waiting-dots > span { opacity: 1; transform: none; }
+}
+
+/* The live dot (components/LiveBadge.tsx): a ring grows out of it and fades, on its own layer */
+.live-ring {
+  position: relative;
+}
+.live-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgb(31 138 101 / 0.45);
+  animation: live-ring 1.8s ease-out infinite;
+}
+@keyframes live-ring {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(2.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-ring::after { animation: none; opacity: 0; }
 }
 
 /* The report (components/admin/ReportApp.tsx): one page that prints well and saves as a PDF. */

@@ -189,8 +189,8 @@ export function LiveRoom() {
       >
         {/* the screen's light on the dark page, in the design's colours */}
         <div aria-hidden className="pointer-events-none absolute" style={{ left: u(4), top: u(4), width: u(74), height: u(44) }}>
-          <div className="room-glow absolute inset-0 rounded-full" style={{ ...style, backgroundColor: "var(--color-primary)" }} />
-          <div className="room-glow room-glow-2 absolute rounded-full" style={{ ...style, inset: `${u(10)} ${u(-6)} ${u(-8)} ${u(40)}`, backgroundColor: "var(--topic-2)" }} />
+          <div className="room-glow absolute rounded-full" style={{ ...style, inset: `${u(-8)}`, "--glow": "var(--color-primary)" } as CSSProperties} />
+          <div className="room-glow room-glow-2 absolute rounded-full" style={{ ...style, inset: `${u(2)} ${u(-14)} ${u(-16)} ${u(32)}`, "--glow": "var(--topic-2)" } as CSSProperties} />
         </div>
 
         <div ref={tilt} className="room-tilt absolute inset-0">

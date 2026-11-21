@@ -82,7 +82,7 @@ describe("the site's own screens move like the home page", () => {
   });
 
   it("cards and blocks rise in one after another (--i)", () => {
-    expect(css).toMatch(/\.enter\s*\{[^}]*animation:[^;]*calc\(var\(--i/);
+    expect(css).toMatch(/\.enter\s*\{[^}]*animation:[^;]*calc\((min\()?var\(--i/);
     for (const f of ["components/admin/AuthScreen.tsx", "components/auth/AuthShell.tsx", "components/admin/AdminApp.tsx", "components/admin/PresentationForm.tsx", "components/admin/ReportApp.tsx", "components/StatusScreens.tsx"])
       expect(read(f), f).toMatch(/\benter\b/);
     // presentations and questions stagger by their place in the list

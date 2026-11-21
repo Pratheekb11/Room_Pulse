@@ -143,8 +143,9 @@ describe("the room feels alive", () => {
 
   it("the screen's light spills onto the page in the design's colour", () => {
     expect(room).toContain("room-glow");
-    expect(css).toMatch(/\.room-glow\s*\{[^}]*filter: blur/);
-    expect(css).toMatch(/\.room-glow\s*\{[^}]*transition:[^}]*background-color/);
+    // a soft gradient that eases between designs' colours (no blur filter: see test/motion.test.ts)
+    expect(css).toMatch(/\.room-glow\s*\{[^}]*radial-gradient/);
+    expect(css).toMatch(/\.room-glow\s*\{[^}]*transition:[^}]*--glow/);
   });
 
   it("phones float, tapped answers ripple, and the count pops", () => {

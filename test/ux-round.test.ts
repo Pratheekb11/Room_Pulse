@@ -44,7 +44,7 @@ describe("5. the big screen waits for the room in style", () => {
   it("its motion stops for people who ask for reduced motion", () => {
     const css = read("app/globals.css");
     const reduced = css.slice(css.indexOf(".waiting-qr {"));
-    expect(reduced).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.waiting-dots > span, \.waiting-qr \{ animation: none; \}/);
+    expect(reduced).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.waiting-dots > span, \.waiting-qr(::after)? \{ animation: none; \}/);
   });
 });
 

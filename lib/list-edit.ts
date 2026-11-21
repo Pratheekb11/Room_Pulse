@@ -6,8 +6,11 @@ import { PRESETS } from "./presets";
  * a presentation keeps the answers of items that were renamed or moved.
  */
 
-/** `description`: optional words under the item; undefined = no description box open. `image`: the row's picture id. */
-export type Row = { id?: string; name: string; description?: string; image?: string };
+/**
+ * `description`: optional words under the item; undefined = no description box open. `image`: the row's picture id.
+ * `key`: the editor's own name for a new row, so adding or removing one animates the right row; never saved.
+ */
+export type Row = { id?: string; key?: string; name: string; description?: string; image?: string };
 type Item = string | Row;
 
 const clean = (s: string) => s.trim().replace(/\s+/g, " ");
@@ -15,9 +18,18 @@ const nameOf = (x: Item) => (typeof x === "string" ? x : x.name);
 function withName<T extends Item>(x: T, name: string): T {
   return (typeof x === "string" ? name : { ...(x as Row), name }) as T;
 }
+let seq = 0;
+const newKey = () => `r${(seq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
 /** A new, empty row of the same shape as the list's rows. */
 function blankLike<T extends Item>(list: T[], name = ""): T {
-  return (typeof list[0] === "object" ? { name } : name) as T;
+  return (typeof list[0] === "object" ? { name, key: newKey() } : name) as T;
+}
+
+/** Gives every unsaved row a key of its own; the same list back when they all have one. */
+export function withKeys<T extends Row>(rows: T[]): T[] {
+  if (rows.every((r) => r.id || r.key)) return rows;
+  return rows.map((r) => (r.id || r.key ? r : { ...r, key: newKey() }));
 }
 
 export function setAt<T extends Item>(list: T[], index: number, value: string): T[] {
@@ -71,7 +83,12 @@ export function filledItems(list: Item[]): string[] {
 
 /** The rows that will actually be saved, with cleaned names and their ids. */
 export function filledRows(list: Row[]): Row[] {
-  return list.map((r) => ({ ...r, name: clean(r.name) })).filter((r) => r.name);
+  return list
+    .map(({ key: _key, ...r }) => {
+      void _key;
+      return { ...r, name: clean(r.name) };
+    })
+    .filter((r) => r.name);
 }
 
 /** Rows that repeat an earlier row (case and spacing ignored). */

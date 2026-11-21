@@ -19,7 +19,7 @@ export function LiveBadge({ lastOkAt }: { lastOkAt: number | null }) {
     >
       <span
         aria-hidden
-        className={`h-3 w-3 rounded-full ${live ? "animate-live bg-mint" : "bg-[#b26a00]"}`}
+        className={`h-3 w-3 rounded-full ${live ? "live-ring bg-mint" : "bg-[#b26a00]"}`}
       />
       {live ? "Live" : "Reconnecting…"}
     </span>

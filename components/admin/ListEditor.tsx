@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { PicturePicker } from "./PicturePicker";
-import { duplicateIndexes, filledItems, insertAfter, moveItem, pasteInto, removeAt, setAt, type Row } from "@/lib/list-edit";
+import { duplicateIndexes, filledItems, insertAfter, moveItem, pasteInto, removeAt, setAt, withKeys, type Row } from "@/lib/list-edit";
 
 interface Props {
   label: string;
@@ -29,6 +29,12 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
   const focusNext = useRef<number | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
+  // every new row gets a key of its own (rows from a template or a shortcut come without one)
+  useEffect(() => {
+    const keyed = withKeys(items);
+    if (keyed !== items) onChange(keyed);
+  }, [items, onChange]);
+
   useEffect(() => {
     if (focusNext.current === null) return;
     inputs.current[focusNext.current]?.focus();
@@ -44,7 +50,7 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
   function change(next: Row[], focus?: number) {
     if (focus !== undefined) focusNext.current = focus;
     setNote(null);
-    onChange(next);
+    onChange(withKeys(next));
   }
 
   function add(after: number) {
@@ -99,7 +105,7 @@ export function ListEditor({ label, noun, items, onChange, max, maxLength, place
           const dupe = dupes.has(i);
           const saved = row.id ? (answers?.[row.id] ?? 0) : 0;
           return (
-            <li key={row.id ?? `new-${i}`} className="animate-fade group flex flex-wrap items-center gap-x-1">
+            <li key={row.id ?? row.key ?? `new-${i}`} className="animate-fade group flex flex-wrap items-center gap-x-1">
               <label htmlFor={`${id}-${i}`} className="w-full text-xs font-medium text-ink-soft sm:w-[5.75rem] sm:shrink-0 sm:text-sm">
                 {Noun} {i + 1}
               </label>
