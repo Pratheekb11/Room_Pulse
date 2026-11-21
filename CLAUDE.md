@@ -178,6 +178,9 @@ Suggested after the live-room sweep and parked by the owner (building 3, 4, 5, 6
 - **Join box first on phones.** The live room pushes "Have a code?" below the first screen on a phone, and most phone visitors come to join. A slim "Join with a code" bar at the top on phones would fix it.
 - **One room code every sprint** with past rounds kept and compared ("Sprint 12 vs 13"); today "Clear all answers" is the only way to start fresh.
 - **Split 100 points** (dot voting): see "More question types" above.
+- **Drop "Clear answer"** (owner, 2026-11-21: "drop it, no UX impact"; parked for more urgent work). Remove the phone's per-question Clear answer (`onClear`, `hasAnswer`, `canClear` in `components/VoteApp.tsx`) and the server side (`kind: "clear"` and `clearAnswer` in `lib/queries.ts` / `lib/validation.ts`, the nullable `score` on `/api/vote`). Keep the Finish tap and the lock. Rewrite `test/clear-answer.test.ts` to check the server refuses both.
+- **"Clear all answers" leaves finished phones stuck** (found 2026-11-21): phones keep their local answers and lock after the presenter clears, so they can't answer a new round. Fix: `sessions.answers_round` bumped by `resetSession`, carried in the status poll; a phone seeing a new round drops its answers, lock and pending saves (keeps name and voter id) and starts at question 1. Needs a production schema change (own SQL file).
+- **Server-side Finish lock** (low priority): the lock is on the phone; only someone sending answers to the API by hand with their old voter id can get round it (clearing storage also drops the voter id). Fix if a presenter ever reports tampering: record `finished_at` per voter, refuse changes to answers saved before it.
 
 ### Speed (first visit must feel instant)
 
