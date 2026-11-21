@@ -36,6 +36,8 @@ describe("5. the big screen waits for the room in style", () => {
     expect(dash).toMatch(/const waiting = !audience && voters === 0 && groups\.length > 0 && !skipWaiting/);
     expect(dash).toContain("<WaitingRoom");
     expect(dash).toMatch(/showQr && joinUrl && !waiting/);
+    // the waiting room is the QR: no "Hide QR" toggle that does nothing while it's up (sweep 2026-11-21)
+    expect(dash).toMatch(/\{audience \? \([\s\S]*?\) : waiting \? null : \(\s*<button[\s\S]*?aria-pressed=\{showQr\}/);
     expect(dash).not.toContain("No answers yet. Ask people to scan the QR code.");
   });
 

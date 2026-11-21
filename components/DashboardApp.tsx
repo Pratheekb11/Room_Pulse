@@ -414,7 +414,7 @@ function Stage({
               <a href={`/s/${encodeURIComponent(code)}`} className="rounded-full border border-line-strong bg-white px-3 py-1 hover:bg-canvas">
                 Back to answering
               </a>
-            ) : (
+            ) : waiting ? null : (
               <button
                 type="button"
                 aria-pressed={showQr}

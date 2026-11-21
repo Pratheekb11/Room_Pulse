@@ -118,7 +118,7 @@ export function LeaderboardResults({
   return (
     <div>
       <ErrorLine text={error} />
-      <Leaderboard rows={shown} onHide={owner ? (id) => void set(id, true) : undefined} />
+      <Leaderboard rows={shown} allHidden={hidden.length > 0} onHide={owner ? (id) => void set(id, true) : undefined} />
       {owner && hidden.length > 0 && (
         <div className="mt-5 border-t border-line pt-4">
           <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="text-sm font-bold text-ink-soft underline underline-offset-2">

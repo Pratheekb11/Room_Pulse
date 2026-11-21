@@ -143,7 +143,12 @@ export function QuizCard({ code, voterId, focusId, question, options, color, liv
               <input
                 id="quiz-nick"
                 value={nickDraft}
-                onChange={(e) => setNickDraft(e.target.value)}
+                onChange={(e) => {
+                  setNickDraft(e.target.value);
+                  setNote(null);
+                }}
+                aria-invalid={note ? true : undefined}
+                aria-describedby={note ? "nick-note" : undefined}
                 maxLength={20}
                 autoComplete="nickname"
                 placeholder="e.g. Quiz Whiz"
@@ -153,6 +158,11 @@ export function QuizCard({ code, voterId, focusId, question, options, color, liv
                 Join
               </button>
             </div>
+            {note && (
+              <p id="nick-note" role="alert" className="text-sm font-semibold text-error">
+                {note}
+              </p>
+            )}
             <p className="text-xs text-ink-soft">Everyone in the room sees it on the big screen, so keep it friendly.</p>
           </form>
         ) : !here && !value ? (

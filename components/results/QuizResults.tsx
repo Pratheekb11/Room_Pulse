@@ -212,10 +212,14 @@ export function QuizStage({ code, focusId, question, options, seconds, live, rec
   );
 }
 
-/** Top players, biggest score first. */
-export function Leaderboard({ rows, onHide }: { rows: LeaderRow[]; onHide?: (id: string) => void }) {
+/** Top players, biggest score first. `allHidden`: the owner hid everyone who scored (so don't say nothing was played). */
+export function Leaderboard({ rows, onHide, allHidden = false }: { rows: LeaderRow[]; onHide?: (id: string) => void; allHidden?: boolean }) {
   if (rows.length === 0)
-    return <p className="py-16 text-center text-[clamp(1.2rem,1.8vw,2rem)] font-semibold text-ink-soft">Scores will appear here after the first question.</p>;
+    return (
+      <p className="py-16 text-center text-[clamp(1.2rem,1.8vw,2rem)] font-semibold text-ink-soft">
+        {allHidden ? "Everyone who scored is hidden." : "Scores will appear here after the first question."}
+      </p>
+    );
   const medal = ["bg-sun", "bg-canvas", "bg-[color-mix(in_srgb,var(--color-primary)_25%,var(--color-white))]"];
   return (
     <ol className="flex flex-col gap-[clamp(0.4rem,0.8vw,0.9rem)]" aria-label="Leaderboard">

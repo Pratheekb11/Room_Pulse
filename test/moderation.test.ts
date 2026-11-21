@@ -121,11 +121,32 @@ describe("phones say why before sending", () => {
       expect(src).toContain("SCREEN_BLOCKED_MESSAGE");
     });
   }
+
+  it("the quiz nickname form shows why (sweep 2026-11-21: the note was set but never shown, so Join did nothing)", () => {
+    const src = read("components/vote/QuizCard.tsx");
+    const form = src.slice(src.indexOf("<form onSubmit={join}"), src.indexOf("</form>", src.indexOf("<form onSubmit={join}")));
+    expect(form).toMatch(/\{note && \(\s*<p id="nick-note" role="alert"/);
+    expect(form).toContain('aria-describedby={note ? "nick-note" : undefined}');
+  });
 });
 
 describe("the parked abuse limits ship with this round", () => {
   it("the production change creates their tables before the code needs them", () => {
     const prod = read("db/2026-11-21-follow-moderation.sql");
     for (const t of ["rate_hits", "session_voters", "hidden_words", "quiz_hidden_players"]) expect(prod).toContain(`create table if not exists ${t}`);
+  });
+});
+
+describe("hiding every quiz player (sweep 2026-11-21)", () => {
+  it("the empty leaderboard says the players are hidden, not that no question was played", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { Leaderboard } = await import("@/components/results/QuizResults");
+    expect(renderToStaticMarkup(createElement(Leaderboard, { rows: [] }))).toContain("Scores will appear here after the first question.");
+    const html = renderToStaticMarkup(createElement(Leaderboard, { rows: [], allHidden: true }));
+    expect(html).toContain("Everyone who scored is hidden.");
+    expect(html).not.toContain("after the first question");
+    const src = read("components/results/HideControls.tsx");
+    expect(src).toMatch(/<Leaderboard rows=\{shown\} allHidden=\{hidden\.length > 0\}/);
   });
 });
