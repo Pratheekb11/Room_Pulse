@@ -133,7 +133,7 @@ Built test-first (`test/ui-polish.test.ts`), checked in a browser at 390px, 768p
 
 ### The room, live: the home page's hook (branch `feat/live-hero`, 2026-11-21)
 
-Built test-first (`test/home-live-room.test.ts`). Why: after Quiet the page was calm but had no visual hook, and the demo sat below the fold. Now the first screen shows the product working, in colour, while the page around it stays dark.
+Built test-first (`test/home-live-room.test.ts`). **Live since 2026-11-21**; production swept at 320, 360, 390, 768, 1024, 1280, 1440 and 1920px (every scene, folds open, reduced motion, paused off screen) plus a guest flow (sign-in, builder, create, three phones voting, results, report, 404) at 390, 768 and 1440: no sideways scroll, no console errors beyond expected 401/404s. Why: after Quiet the page was calm but had no visual hook, and the demo sat below the fold. Now the first screen shows the product working, in colour, while the page around it stays dark.
 
 - **Hero** (`app/page.tsx`): headline and lead on the left, the live room on the right (`lg:grid-cols-[…]`); on phones the order is headline, room, lead, buttons (`order-*`), so the room is in the first screen. The old grey demo (`LiveDemo`) is gone.
 - **The live room** (`components/home/LiveRoom.tsx`): a big screen in a real slide design with two phones beside it. `SCENES`: Paper / Pick one, Pop / Word cloud, Arcade / Quiz, Forest / the tree. Colours and fonts come from `themeStyle()` (no colours of its own), drawn in container units (`@container`, `cqw`) so it scales like a picture and the page stays static.
