@@ -120,11 +120,11 @@ describe("motion that feels designed", () => {
     expect(css).toMatch(/\.quiet \.logo-mark path\s*\{[^}]*stroke-dasharray/);
   });
 
-  it("scrolling moves things: the headline drifts away, the demo settles in, the tree floats", () => {
+  it("scrolling moves things: the headline drifts away, the tree floats", () => {
     const scroll = css.slice(css.indexOf("@supports (animation-timeline: view())"));
     expect(scroll).toMatch(/animation-timeline: scroll\(root\)/);
     expect(scroll).toMatch(/animation-timeline: view\(\)/);
-    for (const cls of ["drift", "settle", "float-scroll"]) {
+    for (const cls of ["drift", "float-scroll"]) {
       expect(scroll, cls).toContain(`.${cls}`);
       expect(page, cls).toContain(cls);
     }
@@ -160,11 +160,11 @@ describe("motion that feels designed", () => {
   });
 });
 
-describe("the demo fits the page", () => {
-  it("scores with numbers, not emoji faces, in the page's own tones", () => {
-    const demo = read("components/LiveDemo.tsx");
-    expect(demo).not.toMatch(/\p{Extended_Pictographic}/u);
-    expect(demo).not.toMatch(/#[0-9a-f]{6}/i);
+describe("the live room fits the page", () => {
+  it("has no emoji, and takes every colour from the slide designs (test/home-live-room.test.ts)", () => {
+    const room = read("components/home/LiveRoom.tsx");
+    expect(room).not.toMatch(/\p{Extended_Pictographic}/u);
+    expect(room).not.toMatch(/#[0-9a-f]{6}/i);
   });
 });
 
@@ -237,9 +237,9 @@ describe("flow: light runs along the lines, like the heartbeat", () => {
     expect(how).toMatch(/className="glint"[^>]*"--i": i/);
   });
 
-  it("each vote in the demo sends a light from the phone to the results", () => {
-    const demo = read("components/LiveDemo.tsx");
-    expect(demo).toMatch(/key=\{`glint-\$\{tap\.tick\}`\}[^>]*className="glint-once/);
+  it("each answer in the live room flies from a phone to the screen", () => {
+    const room = read("components/home/LiveRoom.tsx");
+    expect(room).toContain('className="room-fly');
     expect(css).toMatch(/\.glint-once\s*\{[^}]*animation: glint-once/);
   });
 

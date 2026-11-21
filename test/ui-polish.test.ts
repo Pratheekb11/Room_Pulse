@@ -253,7 +253,7 @@ describe("on the big screen the question and the numbers come first", () => {
 
 describe("the home page's words and pictures", () => {
   const page = read("app/page.tsx");
-  const demo = read("components/LiveDemo.tsx");
+  const demo = read("components/home/LiveRoom.tsx");
   const emoji = /\p{Extended_Pictographic}/u;
 
   it("the headline is one voice, not a grey second line", () => {

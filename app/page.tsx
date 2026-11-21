@@ -4,7 +4,7 @@ import { Credit } from "@/components/Credit";
 import { JoinForm } from "@/components/JoinForm";
 import { FeatureList } from "@/components/FeatureList";
 import { HowToButton } from "@/components/HowToButton";
-import { LiveDemo } from "@/components/LiveDemo";
+import { LiveRoom } from "@/components/home/LiveRoom";
 import { aiAvailable } from "@/lib/ai";
 import { Logo } from "@/components/Logo";
 import { WarmUp } from "@/components/WarmUp";
@@ -48,45 +48,39 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-[1320px] px-5 sm:px-8">
-        <section className="pt-16 pb-6 sm:pt-28 lg:pt-36">
-          <h1 className="font-display drift max-w-[15ch] text-[clamp(2.75rem,7.2vw,6rem)] leading-[1] font-normal tracking-[-0.045em] text-ink">
-            <span className="block">
-              <Words text="Know what the room thinks." />
-            </span>
-            <span className="block">
-              <Words text="Right now." start={6} />
-            </span>
-          </h1>
-
-          <div className="animate-fade mt-14 grid grid-cols-1 gap-x-12 gap-y-12 [animation-delay:700ms] [animation-duration:1200ms] lg:mt-20 lg:grid-cols-2">
-            <div className="min-w-0 lg:order-2">
-              <p className="max-w-md text-[17px] leading-relaxed text-ink-soft">
-                Ask your audience questions. They answer on their phones, and the results show up on your screen straight away.
-              </p>
-              <p className="mt-4 max-w-md text-[17px] leading-relaxed text-ink-soft">Free. Start as a guest: no sign-up, nothing to install.</p>
+        {/* the hook: the headline beside a live room (a big screen in a real design, phones answering);
+            on phones the room comes straight after the headline, before the buttons */}
+        <section className="grid grid-cols-1 gap-x-14 gap-y-8 pt-6 pb-6 sm:pt-14 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-y-12 lg:pt-20">
+          {/* on phones the headline, the room, then this line: the hook shows in the first screen */}
+          <div className="contents lg:col-start-1 lg:row-start-1 lg:block lg:min-w-0 lg:self-end">
+            <h1 className="font-display drift order-1 max-w-[15ch] text-[clamp(2.6rem,5.2vw,4.9rem)] leading-[1] font-normal tracking-[-0.045em] text-ink">
+              <span className="block">
+                <Words text="Know what the room thinks." />
+              </span>
+              <span className="block">
+                <Words text="Right now." start={6} />
+              </span>
+            </h1>
+            <p className="animate-fade order-3 max-w-md text-[17px] lg:mt-6 leading-relaxed text-ink-soft [animation-delay:600ms] [animation-duration:1000ms]">
+              Ask your audience questions. They answer on their phones, and the results show up on your screen straight away.
+            </p>
+          </div>
+          <div className="animate-fade order-2 min-w-0 [animation-delay:300ms] [animation-duration:1200ms] lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-center">
+            <LiveRoom />
+          </div>
+          <div className="animate-fade order-4 min-w-0 [animation-delay:800ms] [animation-duration:1000ms] lg:order-none lg:col-start-1 lg:row-start-2 lg:self-start">
+            <div className="flex flex-wrap items-center gap-x-7 gap-y-4">
+              <Link href="/admin" className="inline-flex h-12 items-center rounded-md bg-ink px-6 text-base text-canvas transition-opacity hover:opacity-85">
+                Create a presentation
+              </Link>
+              <HowToButton label="See how it works" className="sweep text-ink" />
             </div>
-            <div className="min-w-0 lg:order-1">
-              <div className="flex flex-wrap items-center gap-x-7 gap-y-4">
-                <Link href="/admin" className="inline-flex h-12 items-center rounded-md bg-ink px-6 text-base text-canvas transition-opacity hover:opacity-85">
-                  Create a presentation
-                </Link>
-                <HowToButton label="See how it works" className="sweep text-ink" />
-              </div>
-              <div className="mt-10 max-w-md">
-                <p className="text-sm text-muted">Have a code? Join a presentation.</p>
-                <JoinForm />
-              </div>
+            <p className="mt-4 text-sm text-ink-soft">Free. Start as a guest: no sign-up, nothing to install.</p>
+            <div className="mt-9 max-w-md">
+              <p className="text-sm text-muted">Have a code? Join a presentation.</p>
+              <JoinForm />
             </div>
           </div>
-
-          <div aria-hidden className="mt-16 flex justify-center sm:mt-20">
-            <span className="thread h-20 sm:h-28" />
-          </div>
-          <Reveal className="mt-6">
-            <div className="settle">
-              <LiveDemo />
-            </div>
-          </Reveal>
         </section>
 
         <section className="pt-28 sm:pt-40" aria-labelledby="how-h">
