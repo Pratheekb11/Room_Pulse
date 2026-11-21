@@ -28,13 +28,13 @@ describe("the credit line", () => {
   });
 
   it("is at the bottom of the thank-you screen, after everything else, in its quiet form", () => {
-    const thanks = src("components/VoteApp.tsx").split("function ThankYou(")[1];
+    const thanks = src("components/vote/ThankYou.tsx").split("function ThankYou(")[1];
     expect(thanks).toMatch(/All saved[\s\S]*<Credit subtle \/>\s*<\/main>/);
   });
 
   it("is nowhere else: not in the shared layout or any other screen", () => {
     const users = [...files("app"), ...files("components")].filter((f) => /<Credit\b|Built and maintained|Pratheek/.test(src(f)));
-    expect(users.sort()).toEqual(["app/page.tsx", "components/Credit.tsx", "components/VoteApp.tsx"]);
-    expect(src("components/VoteApp.tsx").match(/<Credit\b/g)).toHaveLength(1);
+    expect(users.sort()).toEqual(["app/page.tsx", "components/Credit.tsx", "components/vote/ThankYou.tsx"]);
+    expect(src("components/vote/ThankYou.tsx").match(/<Credit\b/g)).toHaveLength(1);
   });
 });

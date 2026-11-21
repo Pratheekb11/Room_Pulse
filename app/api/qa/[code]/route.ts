@@ -1,4 +1,5 @@
 import { listPublicQa, saveQaAction } from "@/lib/queries";
+import { hasBadWords } from "@/lib/profanity";
 import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
 import { codeSchema, qaActionSchema } from "@/lib/validation";
 
@@ -26,6 +27,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/qa/[code]">) {
   if (!code.success) return notFound();
   const parsed = qaActionSchema.safeParse(await readJson(req));
   if (!parsed.success) return badRequest();
+  if (parsed.data.action === "ask" && hasBadWords(parsed.data.text)) return badRequest("blocked_words");
   try {
     const r = await saveQaAction(code.data, parsed.data);
     switch (r.outcome) {

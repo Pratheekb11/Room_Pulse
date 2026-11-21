@@ -1,6 +1,5 @@
 "use client";
 
-import { Credit } from "./Credit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
@@ -11,6 +10,7 @@ import { isPlayful } from "@/lib/themes";
 import { ScorePill, StepIntro, StepNav, VoterHeader, VoterProgress } from "./VoterChrome";
 import { VoteQueue, type SaveStatus } from "@/lib/vote-queue";
 import { Confetti } from "./Confetti";
+import { ThankYou } from "./vote/ThankYou";
 import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { TopicCard } from "./TopicCard";
 import { PollCard } from "./PollCard";
@@ -25,9 +25,8 @@ import { clockOffset } from "@/lib/quiz";
 import { useSession } from "./useSession";
 import { useClientValue } from "./useClientValue";
 import { useDocumentTheme } from "./useDocumentTheme";
-import { Doodle } from "./Doodle";
 import { RaisePoint } from "./vote/RaisePoint";
-import { charactersFor, type Character } from "@/lib/decor";
+import { charactersFor } from "@/lib/decor";
 import { leafKey, leafLimit, MAX_AUTHOR, MAX_LEAVES_LIMIT, parseLeafKey } from "@/lib/boards";
 import { BoardCard } from "./vote/BoardCard";
 import { NameGate } from "./vote/NameGate";
@@ -224,6 +223,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const game = isPlayful(session.theme, groups.map((g) => g.kind));
   const [liveQuiz, setLiveQuiz] = useState<LiveQuiz | null>(null);
   const [quizOffset, setQuizOffset] = useState(0);
+  // "Follow me": the question the presenter is on (null = off); phones poll quickly while it's on.
+  const [follow, setFollow] = useState<string | null>(null);
+  const following = follow !== null;
 
   // Poll open/closed state while the tab is visible (served from the CDN cache).
   useEffect(() => {
@@ -232,10 +234,11 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       try {
         const res = await fetch(`/api/session/${encodeURIComponent(code)}/status`, { cache: "no-store" });
         if (!res.ok) return;
-        const body = (await res.json()) as { isOpen: boolean; revision?: number; showResults?: boolean; openPoints?: boolean; quiz?: LiveQuiz | null };
+        const body = (await res.json()) as { isOpen: boolean; revision?: number; showResults?: boolean; openPoints?: boolean; quiz?: LiveQuiz | null; follow?: string | null };
         setIsOpen(body.isOpen);
         setShowResults(body.showResults === true);
         setCanRaise(body.openPoints === true);
+        setFollow(body.follow ?? null);
         if (body.quiz !== undefined) {
           setLiveQuiz((prev) => (JSON.stringify(prev) === JSON.stringify(body.quiz) ? prev : (body.quiz ?? null)));
           if (body.quiz) setQuizOffset(clockOffset(body.quiz.now, Date.now()));
@@ -247,7 +250,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     };
     const startPolling = () => {
       if (timer) clearInterval(timer);
-      timer = setInterval(check, hasQuiz ? QUIZ_POLL_MS : STATUS_POLL_MS);
+      timer = setInterval(check, hasQuiz || following ? QUIZ_POLL_MS : STATUS_POLL_MS);
     };
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -267,7 +270,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [code, session.revision, onRevision, hasQuiz]);
+  }, [code, session.revision, onRevision, hasQuiz, following]);
 
   // ---- steps: one screen per rated topic, one per poll, one per word cloud
   const steps: Step[] = useMemo(
@@ -503,6 +506,21 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     goTo(i);
   }, [liveQuiz, liveStart, steps, groups, goTo]);
 
+  // "Follow me": jump to the presenter's question when it changes; in between, people move around freely.
+  const lastFollow = useRef<string | null>(null);
+  useEffect(() => {
+    if (!follow) lastFollow.current = null;
+  }, [follow]);
+  useEffect(() => {
+    if (!follow || follow === lastFollow.current) return;
+    const gi = groups.findIndex((g) => g.focus.id === follow);
+    const i = steps.findIndex((s) => s.gi === gi);
+    if (gi === -1 || i === -1) return; // a question this phone doesn't have yet: try again after the reload
+    lastFollow.current = follow;
+    setReviewing(true);
+    goTo(i);
+  }, [follow, steps, groups, goTo]);
+
   // Confetti only when the voter finishes during this visit, not on reload.
   const wasComplete = useRef(complete);
   const [celebrate, setCelebrate] = useState(false);
@@ -526,6 +544,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         doodle={session.decor ? charactersFor(session.theme).screen : undefined}
         statuses={statuses}
         celebrate={celebrate}
+        questions={groups.map((g) => g.focus.name).filter((n) => n)}
         resultsHref={resultsHref}
         raise={canRaise && isOpen ? <RaisePoint code={code} voterId={voterId} className="animate-rise mt-4 w-full max-w-sm [animation-delay:500ms]" /> : null}
         onSeeQuestions={
@@ -536,6 +555,10 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
                 goTo(qaStep);
               }
         }
+        onChangeAnswers={() => {
+          setReviewing(true);
+          goTo(0);
+        }}
       />
     );
 
@@ -626,10 +649,20 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           </div>
         )}
 
+        {following && (
+          <p role="status" className="flex items-center gap-2 text-sm font-semibold text-ink-soft">
+            <span className="h-2 w-2 animate-[live_1.8s_ease-out_infinite] rounded-full bg-success" aria-hidden />
+            Following the presenter
+          </p>
+        )}
+
         {complete && (
           <div role="status" className="slab rounded-xl bg-mint px-5 py-4 text-ink">
             <p className="font-display text-xl font-semibold">All done — thank you! 🏆</p>
             <p className="text-sm font-medium">You can change any answer until voting closes.</p>
+            <button type="button" onClick={() => setReviewing(false)} className="key mt-3 rounded-lg bg-white px-4 py-2 text-sm font-bold">
+              Back to the end
+            </button>
           </div>
         )}
 
@@ -786,93 +819,5 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         {canRaise && isOpen && <RaisePoint code={code} voterId={voterId} className="w-full" />}
       </main>
     </div>
-  );
-}
-
-/** Shown once every question is answered: the ballot closes; saving status stays honest. */
-function ThankYou({
-  title,
-  doodle,
-  statuses,
-  celebrate,
-  resultsHref,
-  raise,
-  onSeeQuestions,
-}: {
-  title: string;
-  /** Fun illustration shown above the tick. */
-  doodle?: Character;
-  statuses: Record<string, SaveStatus>;
-  celebrate: boolean;
-  /** Set when the presenter shows results on phones. */
-  resultsHref?: string;
-  /** The "Raise an open point" button, when the presenter allows it. */
-  raise?: React.ReactNode;
-  /** Set when the presentation has a Q&A: people come back to vote on new questions. */
-  onSeeQuestions?: () => void;
-}) {
-  const values = Object.values(statuses);
-  const saving = values.some((s) => s === "saving" || s === "retrying");
-  const closed = values.some((s) => s === "closed");
-  return (
-    <main className="flex min-h-dvh flex-col">
-      {celebrate && <Confetti />}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
-      {doodle && <Doodle character={doodle} className="mb-6 h-36 w-36" />}
-      <svg viewBox="0 0 64 64" className="h-20 w-20" aria-hidden>
-        <circle cx="32" cy="32" r="29" fill="none" stroke="var(--color-line)" strokeWidth="3" />
-        <circle
-          cx="32"
-          cy="32"
-          r="29"
-          fill="none"
-          stroke="var(--color-primary)"
-          strokeWidth="3"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray="100"
-          className="origin-center -rotate-90 animate-[draw_700ms_var(--ease-out-soft)_both]"
-        />
-        <path d="M20 33l8 8 16-17" fill="none" stroke="var(--color-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" pathLength={100} strokeDasharray="100" className="animate-[draw_500ms_300ms_var(--ease-out-soft)_both]" />
-      </svg>
-      <h1 className="font-display animate-rise mt-8 text-[clamp(2.5rem,12vw,4rem)] leading-none text-ink [animation-delay:200ms]">Thank you.</h1>
-      <p className="animate-rise mt-4 max-w-xs text-[17px] leading-relaxed text-ink-soft [animation-delay:320ms]">
-        Your answers to <span className="text-ink">{title}</span> are in.{" "}
-        {onSeeQuestions ? "New questions keep coming in, so check back to vote on them." : "You can close this page."}
-      </p>
-      {onSeeQuestions && (
-        <button
-          type="button"
-          onClick={onSeeQuestions}
-          className="key animate-rise mt-6 rounded-xl bg-primary px-6 py-3 font-bold text-white [animation-delay:420ms]"
-        >
-          See the room&apos;s questions
-        </button>
-      )}
-      {resultsHref && (
-        <a
-          href={resultsHref}
-          className={`key animate-rise mt-4 rounded-xl px-6 py-3 font-bold [animation-delay:460ms] ${onSeeQuestions ? "bg-white" : "bg-primary text-white"}`}
-        >
-          See live results
-        </a>
-      )}
-      {raise}
-      <p role="status" aria-live="polite" className="font-mono animate-fade mt-8 text-xs text-muted [animation-delay:600ms]">
-        {closed ? (
-          <span className="text-error">Voting closed before your last answer was saved.</span>
-        ) : saving ? (
-          <span className="inline-flex items-center gap-2">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> Saving your last answers…
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-success" /> All saved
-          </span>
-        )}
-      </p>
-      </div>
-      <Credit subtle />
-    </main>
   );
 }

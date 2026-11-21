@@ -1,4 +1,5 @@
 import { saveQuizAction } from "@/lib/queries";
+import { hasBadWords } from "@/lib/profanity";
 import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
 import { codeSchema, quizActionSchema } from "@/lib/validation";
 
@@ -10,6 +11,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/quiz/[code]">) 
   if (!code.success) return notFound();
   const parsed = quizActionSchema.safeParse(await readJson(req));
   if (!parsed.success) return badRequest();
+  if (parsed.data.action === "join" && hasBadWords(parsed.data.nickname)) return badRequest("blocked_words");
   try {
     switch (await saveQuizAction(code.data, parsed.data)) {
       case "ok":

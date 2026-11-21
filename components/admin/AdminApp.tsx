@@ -11,7 +11,8 @@ import { PresentationForm } from "./PresentationForm";
 import { SessionCard } from "./SessionCard";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { inputClass } from "../auth/AuthShell";
-import { readGuestCode, rememberGuestCode } from "./guestCode";
+import { codeSeen, markCodeSeen, readGuestCode, rememberGuestCode } from "./guestCode";
+import { GuestCodeCard } from "./GuestCodeCard";
 import { useClientValue } from "../useClientValue";
 import { Words } from "@/components/home/Words";
 
@@ -81,6 +82,9 @@ function Console({
   const { email, guest, emailVerified, verificationRequired } = account;
   const mustVerify = !guest && verificationRequired && !emailVerified;
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Guests start building straight away; their code shows once something is saved, and again before they leave.
+  const guestCode = useClientValue(readGuestCode);
+  const [showCode, setShowCode] = useState(false);
   const [sessions, setSessions] = useState<AdminSessionRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The form shows by itself until there's a presentation; after that it opens on request.
@@ -159,17 +163,43 @@ function Console({
 
       {guest && <GuestBanner onSaved={onAccountChanged} open={saveOpen} setOpen={setSaveOpen} />}
       {mustVerify && email && <VerifyBanner email={email} onVerified={onVerified} />}
-      {confirmLeave && (
-        <ConfirmDialog
-          title="Log out of the guest account?"
-          body="To get back in later, on any device, you need your guest code. Your presentations keep working while you're logged out."
-          confirmLabel="Log out anyway"
-          danger
-          onConfirm={() => {
-            setConfirmLeave(false);
-            onSignOut();
+      {confirmLeave &&
+        (guestCode ? (
+          <GuestCodeCard
+            code={guestCode}
+            title="Before you go: your guest code"
+            body="Type it on any phone or computer to get back to your presentations. They keep working while you're logged out."
+            primary="Log out"
+            danger
+            onPrimary={() => {
+              setConfirmLeave(false);
+              onSignOut();
+            }}
+            secondary="Stay"
+            onSecondary={() => setConfirmLeave(false)}
+          />
+        ) : (
+          <ConfirmDialog
+            title="Log out of the guest account?"
+            body="To get back in later, on any device, you need your guest code. Your presentations keep working while you're logged out."
+            confirmLabel="Log out"
+            danger
+            onConfirm={() => {
+              setConfirmLeave(false);
+              onSignOut();
+            }}
+            onCancel={() => setConfirmLeave(false)}
+          />
+        ))}
+      {showCode && guestCode && (
+        <GuestCodeCard
+          code={guestCode}
+          title={<>Saved. Here&rsquo;s your guest code</>}
+          primary="I've saved it"
+          onPrimary={() => {
+            markCodeSeen();
+            setShowCode(false);
           }}
-          onCancel={() => setConfirmLeave(false)}
         />
       )}
 
@@ -192,6 +222,7 @@ function Console({
             onDone={async (code) => {
               await refresh();
               setFormOpen(false);
+              if (guest && guestCode && !codeSeen()) setShowCode(true);
               // Take the presenter straight to what they just made.
               requestAnimationFrame(() => document.getElementById(`card-${code}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
             }}

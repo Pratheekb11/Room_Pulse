@@ -117,15 +117,34 @@ const isoQuiz = (q: LiveQuiz | null): LiveQuiz | null =>
 
 /** Open/closed state, question revision and the running quiz question; `null` when the session does not exist. */
 export async function getSessionStatus(code: string): Promise<SessionStatus | null> {
-  const rows = (await sql`select s.is_open, s.revision, s.show_results, s.raise_points, ${liveQuizJson()} as quiz from live_sessions s where s.code = ${code}`) as {
+  const rows = (await sql`select s.is_open, s.revision, s.show_results, s.raise_points, s.follow_focus_id, ${liveQuizJson()} as quiz from live_sessions s where s.code = ${code}`) as {
     is_open: boolean;
     revision: number;
     show_results: boolean;
     raise_points: boolean;
+    follow_focus_id: string | null;
     quiz: LiveQuiz | null;
   }[];
   const r = rows[0];
-  return r ? { isOpen: r.is_open, revision: r.revision, showResults: r.show_results, openPoints: r.raise_points, quiz: isoQuiz(r.quiz) } : null;
+  return r
+    ? { isOpen: r.is_open, revision: r.revision, showResults: r.show_results, openPoints: r.raise_points, quiz: isoQuiz(r.quiz), follow: r.follow_focus_id }
+    : null;
+}
+
+/** "Follow me": the question the presenter leads phones to. */
+export async function getFollow(code: string): Promise<string | null> {
+  const rows = (await sql`select follow_focus_id from live_sessions where code = ${code}`) as { follow_focus_id: string | null }[];
+  return rows[0]?.follow_focus_id ?? null;
+}
+
+/** Leads every phone to one of this presentation's questions (`null` turns it off); `false` if it isn't one of them. */
+export async function setFollow(code: string, focusId: string | null): Promise<boolean> {
+  const rows = await sql`
+    update sessions s set follow_focus_id = ${focusId}::uuid
+     where s.code = ${code}
+       and (${focusId}::uuid is null or exists (select 1 from focus_topics f where f.id = ${focusId}::uuid and f.session_id = s.id))
+    returning 1 as ok`;
+  return rows.length > 0;
 }
 
 /** `null` when the session does not exist. */
@@ -732,11 +751,14 @@ export async function getOwnedSessionIsOpen(code: string, ownerId: string): Prom
 
 // ---------------------------------------------------------------- polls & word clouds
 
-/** "blocked" = a bad word on a board leaf or its name; "name_required" = a board leaf with no name. */
+/** "blocked" = a bad word in what was typed or the name; "name_required" = a board leaf with no name. */
 export type AnswerOutcome = VoteOutcome | "blocked" | "name_required";
 
 /** Saves a poll choice, word-cloud answers, picks, open answer, ranking or number (replacing earlier ones). */
 export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
+  // Nothing typed with a bad word reaches the big screen (open answers, board leaves, word clouds).
+  if (a.kind === "text" && !a.remove && hasBadWords(a.text)) return "blocked";
+  if (a.kind === "words" && a.words.some((w) => hasBadWords(w))) return "blocked";
   // Names on (team activities): keep the name this person answers under, the latest one given.
   // Only asked when a name came with the answer, so anonymous presentations pay nothing.
   if (a.author && !(a.kind === "text" && a.remove)) {
@@ -774,7 +796,7 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
     saved = rows.length > 0;
   } else if (a.kind === "text") {
     if (!a.text) return "invalid";
-    // Board leaves (team activities) need a name and no bad words; plain open answers are left as typed.
+    // Board leaves (team activities) need a name and no bad words (the text was checked above).
     const blocked = hasBadWords(a.text) || hasBadWords(a.author);
     const rows = await sql`
       insert into text_answers (session_id, focus_id, voter_id, slot, body, author)

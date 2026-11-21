@@ -143,6 +143,14 @@ Built test-first (`test/home-live-room.test.ts`). **Live since 2026-11-21**; pro
 
 Not done yet: on very slow phones the wipe and the blur may stutter (not seen at 390px in Chrome); there's no pause button (it stops off screen and with reduced motion).
 
+### Backlog: parked UX ideas (2026-11-21)
+
+Suggested after the live-room sweep and parked by the owner (building 3, 4, 5, 6 and 8 of that list first):
+
+- **Join box first on phones.** The live room pushes "Have a code?" below the first screen on a phone, and most phone visitors come to join. A slim "Join with a code" bar at the top on phones would fix it.
+- **One room code every sprint** with past rounds kept and compared ("Sprint 12 vs 13"); today "Clear all answers" is the only way to start fresh.
+- **Split 100 points** (dot voting): see "More question types" above.
+
 ### Speed (first visit must feel instant)
 
 - The home page is static and served from the CDN (`○` in the build). It gets its CSP from `next.config.ts` (no nonce, `'unsafe-inline'` scripts; it shows no user content). Every other page needs this request's nonce from `proxy.ts`, so it exports `dynamic = "force-dynamic"` (guarded by `test/speed.test.ts`). A new page must do the same.

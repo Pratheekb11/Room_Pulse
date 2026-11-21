@@ -39,6 +39,8 @@ const SAFE = new Set(["shiitake"]);
 
 /** What the phone says when a leaf or name is kept off the board. */
 export const BLOCKED_MESSAGE = "That has a word we keep off the board. Please put it another way.";
+/** The same, for everything else that can reach the big screen (open answers, word clouds, Q&A, open points, nicknames). */
+export const SCREEN_BLOCKED_MESSAGE = "That has a word we keep off the screen. Please put it another way.";
 
 const ENDINGS = ["s", "es", "ed", "er", "ers", "ing", "in", "y", "ies", "head", "heads", "face", "hole", "holes", "bag", "wad"];
 

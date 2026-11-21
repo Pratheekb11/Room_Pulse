@@ -387,6 +387,9 @@ export const quizControlSchema = z.discriminatedUnion("action", [
 ]);
 export type QuizControl = z.infer<typeof quizControlSchema>;
 
+/** "Follow me": the question every phone moves to, or null to stop leading. */
+export const followSchema = z.object({ focusId: z.uuid().nullable() });
+
 /** Owner moderation: hide/unhide and mark answered/not answered (at least one). */
 export const qaModerateSchema = z
   .object({ id: z.uuid(), hidden: z.boolean().optional(), answered: z.boolean().optional() })

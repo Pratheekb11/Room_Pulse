@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { readableOn } from "@/lib/colors";
 import type { SaveStatus } from "@/lib/vote-queue";
+import { SCREEN_BLOCKED_MESSAGE, hasBadWords } from "@/lib/profanity";
 
 const MAX = 3;
 
@@ -20,6 +21,7 @@ interface Props {
 /** Word cloud answers: up to 3 short entries, sent together. */
 export function WordsCard({ question, color, value, status, disabled, finished, onSend, onFinish }: Props) {
   const [draft, setDraft] = useState("");
+  const [blocked, setBlocked] = useState(false);
   const words = value ?? [];
   const full = words.length >= MAX;
 
@@ -27,6 +29,7 @@ export function WordsCard({ question, color, value, status, disabled, finished, 
     e.preventDefault();
     const w = draft.trim().replace(/\s+/g, " ").toLowerCase();
     if (!w || full || words.includes(w)) return setDraft("");
+    if (hasBadWords(w)) return setBlocked(true);
     onSend([...words, w]);
     setDraft("");
   }
@@ -50,8 +53,13 @@ export function WordsCard({ question, color, value, status, disabled, finished, 
           <input
             id="word-input"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setBlocked(false);
+            }}
             maxLength={40}
+            aria-invalid={blocked || undefined}
+            aria-describedby={blocked ? "word-blocked" : undefined}
             disabled={disabled || full}
             placeholder={full ? "That's 3, nice!" : "Type a word"}
             autoComplete="off"
@@ -61,6 +69,11 @@ export function WordsCard({ question, color, value, status, disabled, finished, 
             Send
           </button>
         </form>
+        {blocked && (
+          <p id="word-blocked" role="alert" className="mt-2 text-sm font-semibold text-error">
+            {SCREEN_BLOCKED_MESSAGE}
+          </p>
+        )}
 
         <ul className="mt-4 flex min-h-11 flex-wrap gap-2" aria-label="Your answers">
           {words.map((w) => (

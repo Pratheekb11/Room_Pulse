@@ -143,6 +143,8 @@ export interface SessionStatus {
   /** The owner lets people raise open points from their phones. */
   openPoints: boolean;
   quiz: LiveQuiz | null;
+  /** "Follow me": the question the presenter is on, which every phone moves to (null = off). */
+  follow: string | null;
 }
 
 export type PointStatus = "open" | "doing" | "closed";

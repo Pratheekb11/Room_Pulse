@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MAX_TEXT_ANSWER } from "@/lib/validation";
+import { SCREEN_BLOCKED_MESSAGE, hasBadWords } from "@/lib/profanity";
 import type { SaveStatus } from "@/lib/vote-queue";
 import { haptic } from "../Burst";
 import { CardShell, saveText } from "./CardShell";
@@ -23,10 +24,12 @@ export function TextCard({ question, color, value, status, disabled, named = fal
   const clean = draft.trim().replace(/\s+/g, " ");
   const unchanged = value !== undefined && clean === value;
   const left = MAX_TEXT_ANSWER - draft.length;
+  const [blocked, setBlocked] = useState(false);
 
   function send(e: React.FormEvent) {
     e.preventDefault();
     if (!clean || unchanged) return;
+    if (hasBadWords(clean)) return setBlocked(true);
     haptic();
     onSend(clean);
   }
@@ -40,13 +43,23 @@ export function TextCard({ question, color, value, status, disabled, named = fal
         <textarea
           id="text-answer"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setBlocked(false);
+          }}
           maxLength={MAX_TEXT_ANSWER}
+          aria-invalid={blocked || undefined}
+          aria-describedby={blocked ? "text-blocked" : undefined}
           rows={4}
           disabled={disabled}
           placeholder="Type here…"
           className="w-full resize-none rounded-xl border border-line-strong px-4 py-3 text-lg leading-snug"
         />
+        {blocked && (
+          <p id="text-blocked" role="alert" className="text-sm font-semibold text-error">
+            {SCREEN_BLOCKED_MESSAGE}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-3">
           <span className={`text-xs font-semibold tabular-nums ${left < 20 ? "text-error" : "text-ink-soft"}`}>{left} left</span>
           <button type="submit" disabled={disabled || !clean || unchanged} className="key rounded-xl bg-primary px-6 py-3 font-bold text-white">

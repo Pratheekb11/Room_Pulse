@@ -764,6 +764,33 @@ body,
   .confetti-piece, .spark { display: none; }
 }
 
+/* The presenter's waiting room (components/results/WaitingRoom.tsx): three dots breathe in turn and the QR code's
+   frame glows softly, until the first answer lands. */
+.waiting-dots > span {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 999px;
+  background: var(--color-primary);
+  animation: waiting-dot 1.4s ease-in-out infinite;
+}
+.waiting-dots > span:nth-child(2) { animation-delay: 0.18s; }
+.waiting-dots > span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes waiting-dot {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.75); }
+  40% { opacity: 1; transform: scale(1); }
+}
+.waiting-qr {
+  animation: waiting-glow 2.6s ease-in-out infinite;
+}
+@keyframes waiting-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent); }
+  50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-primary) 22%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .waiting-dots > span, .waiting-qr { animation: none; }
+  .waiting-dots > span { opacity: 1; transform: none; }
+}
+
 /* The report (components/admin/ReportApp.tsx): one page that prints well and saves as a PDF. */
 .report-keep {
   break-inside: avoid;

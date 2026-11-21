@@ -27,3 +27,20 @@ export function formatGuestCode(input: string): string {
   const s = input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   return s.length > 4 ? `${s.slice(0, 4)}-${s.slice(4)}` : s;
 }
+
+// A new guest sees their code after their first presentation is saved, once per browser session.
+const SEEN = "liverate:guest-code-seen";
+export function codeSeen(): boolean {
+  try {
+    return window.sessionStorage.getItem(SEEN) === "1";
+  } catch {
+    return false;
+  }
+}
+export function markCodeSeen(): void {
+  try {
+    window.sessionStorage.setItem(SEEN, "1");
+  } catch {
+    /* storage unavailable */
+  }
+}

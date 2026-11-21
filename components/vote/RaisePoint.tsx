@@ -4,11 +4,13 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ToBody } from "../Portal";
 import { MAX_POINT_NAME, MAX_POINT_TEXT, MAX_POINTS_PER_VOTER, statusLabel } from "@/lib/points";
 import type { MyOpenPoint, PointStatus } from "@/lib/types";
+import { SCREEN_BLOCKED_MESSAGE, hasBadWords } from "@/lib/profanity";
 
 const ERRORS: Record<string, string> = {
   limit: `You've raised ${MAX_POINTS_PER_VOTER} open points, the most one person can.`,
   closed: "Voting is closed, so new open points can't be sent.",
   points_off: "The presenter has turned open points off.",
+  blocked_words: SCREEN_BLOCKED_MESSAGE,
 };
 
 const CHIP: Record<PointStatus, string> = {
@@ -86,6 +88,7 @@ function Sheet({ code, voterId, onClose }: { code: string; voterId: string; onCl
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim() || busy) return;
+    if (hasBadWords(text) || hasBadWords(name)) return setError(SCREEN_BLOCKED_MESSAGE);
     setBusy(true);
     setError(null);
     setSent(null);

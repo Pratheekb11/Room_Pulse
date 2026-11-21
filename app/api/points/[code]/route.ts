@@ -1,4 +1,5 @@
 import { raisePoint } from "@/lib/queries";
+import { hasBadWords } from "@/lib/profanity";
 import { badRequest, json, logDbError, notFound, readJson, unavailable } from "@/lib/http";
 import { MAX_POINTS_PER_VOTER } from "@/lib/points";
 import { codeSchema, raisePointSchema } from "@/lib/validation";
@@ -11,6 +12,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/points/[code]">
   if (!code.success) return notFound();
   const parsed = raisePointSchema.safeParse(await readJson(req));
   if (!parsed.success) return badRequest();
+  if (hasBadWords(parsed.data.text) || hasBadWords(parsed.data.name)) return badRequest("blocked_words");
   try {
     const r = await raisePoint(code.data, parsed.data.voterId, parsed.data.text, parsed.data.name, MAX_POINTS_PER_VOTER);
     switch (r.outcome) {

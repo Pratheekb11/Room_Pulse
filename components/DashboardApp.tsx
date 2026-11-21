@@ -35,6 +35,7 @@ import { HeatScale } from "./HeatScale";
 import { LiveBadge } from "./LiveBadge";
 import { OverallBars, type BarDatum } from "./OverallBars";
 import { QrPanel } from "./QrPanel";
+import { WaitingRoom } from "./results/WaitingRoom";
 import { CenteredMessage, LoadingScreen } from "./StatusScreens";
 import { useResultsPoll } from "./useResultsPoll";
 import { useSession } from "./useSession";
@@ -144,6 +145,7 @@ function Stage({
     const v = new URLSearchParams(window.location.search).get("sort");
     return isItemSort(v) ? v : null;
   });
+  const [skipWaiting, setSkipWaiting] = useState(false);
   const [showQr, setShowQr] = useState(() => !audience && window.matchMedia("(min-width: 1024px)").matches);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Fit to screen: shrink a question's results so all of them show at once. Remembered on this device.
@@ -189,6 +191,36 @@ function Stage({
     return () => window.removeEventListener("popstate", onPop);
   }, []);
   const group = focusIndex === null ? null : (groups[focusIndex] ?? null);
+
+  // "Follow me": while it's on, every phone moves to the question on this screen.
+  const [leading, setLeading] = useState(false);
+  const followUrl = `/api/admin/sessions/${encodeURIComponent(code)}/follow`;
+  useEffect(() => {
+    if (!isOwner) return;
+    let gone = false;
+    fetch(followUrl, { cache: "no-store", credentials: "same-origin" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ focusId: string | null }>) : null))
+      .then((b) => {
+        if (!gone && b) setLeading(b.focusId !== null);
+      })
+      .catch(() => {});
+    return () => {
+      gone = true;
+    };
+  }, [followUrl, isOwner]);
+  const leadTo = useCallback(
+    (focusId: string | null) =>
+      void fetch(followUrl, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ focusId }) }).catch(() => {}),
+    [followUrl],
+  );
+  const followId = group?.focus.id || null;
+  useEffect(() => {
+    if (leading && followId) leadTo(followId);
+  }, [leading, followId, leadTo]);
+  const toggleLeading = () => {
+    if (leading) leadTo(null);
+    setLeading(!leading);
+  };
   const view = group
     ? (viewByFocus[group.focus.id] ?? (urlView && isChartFor(group.kind, urlView) ? urlView : group.chart))
     : overviewMode === "heatmap"
@@ -288,6 +320,8 @@ function Stage({
   }, [single, groups.length, setView, groupKind, audience, toggleFit, showPoints, closePoints]);
 
   const voters = r.voterCount;
+  // Before the first answer the owner's screen is a big way in, not empty charts ("Show the questions" skips it).
+  const waiting = !audience && voters === 0 && groups.length > 0 && !skipWaiting && !!joinUrl;
   // The AI's summary of the whole presentation: on "All questions", or under the only question.
   const aiSummary = (
     <AiOverview
@@ -391,6 +425,17 @@ function Stage({
                 {showQr ? "Hide QR" : "Show QR"}
               </button>
             )}
+            {isOwner && groups.length > 1 && (
+              <button
+                type="button"
+                aria-pressed={leading}
+                title={leading ? "Phones move to the question on this screen. Tap to let people move freely." : "Move every phone to the question on this screen"}
+                onClick={toggleLeading}
+                className={`rounded-full border border-line-strong px-3 py-1 ${leading ? "bg-sun" : "bg-white hover:bg-canvas"}`}
+              >
+                {leading ? "Phones follow me ✓" : "Phones follow me"}
+              </button>
+            )}
             {isOwner && (
               <button
                 type="button"
@@ -463,7 +508,8 @@ function Stage({
       <div className="flex min-h-0 flex-1 flex-col gap-[clamp(0.75rem,1.6vw,2rem)] lg:flex-row">
         <main className="min-w-0 flex-1">
           {showPoints && <OpenPoints code={code} state={pointsState} groups={groups} onClose={closePoints} />}
-          <div className={showPoints ? "hidden" : undefined}>
+          {waiting && !showPoints && joinUrl && <WaitingRoom url={joinUrl} code={code} questions={groups.length} onSkip={() => setSkipWaiting(true)} />}
+          <div className={showPoints || waiting ? "hidden" : undefined}>
           {isOwner && !audience && !fit && howTo && <HowToRun activity={howTo} />}
           {!single && (
             <QuestionTabs compact={fit} names={groups.map((g) => ({ key: g.focus.id || "loose", name: g.focus.name }))} active={focusIndex} onPick={setFocusIndex} />
@@ -661,15 +707,13 @@ function Stage({
           </div>
           </FitToScreen>
           {aiOn && single && groups.length > 0 && <div className="mt-[clamp(0.75rem,1.6vw,1.5rem)]">{aiSummary}</div>}
-          {voters === 0 && (
-            <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">
-              No answers yet. Ask people to scan the QR code.
-            </p>
+          {voters === 0 && !waiting && (
+            <p className="mt-4 text-center text-[clamp(1rem,1.4vw,1.5rem)] font-semibold text-ink-soft">No answers yet.</p>
           )}
           </div>
         </main>
 
-        {showQr && joinUrl && (
+        {showQr && joinUrl && !waiting && (
           <div className="mx-auto w-full max-w-sm shrink-0 lg:mx-0 lg:w-[clamp(15rem,22vw,22rem)] lg:max-w-none">
             <QrPanel url={joinUrl} code={code} />
           </div>

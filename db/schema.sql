@@ -481,3 +481,10 @@ create table if not exists voter_names (
   updated_at  timestamptz not null default now(),
   primary key (session_id, voter_id)
 );
+
+-- Follow me (2026-11-21): the question the presenter leads every phone to (null = off). Phones read it from
+-- the status poll and jump when it changes.
+alter table sessions add column if not exists follow_focus_id uuid references focus_topics(id) on delete set null;
+-- Recreate the view so it includes the column above.
+create or replace view live_sessions as
+  select * from sessions where expires_at is null or expires_at > now();

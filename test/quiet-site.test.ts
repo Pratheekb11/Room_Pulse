@@ -18,8 +18,10 @@ describe("no database change needed", () => {
     expect(allowed.split(",").map((t) => t.trim().replace(/'/g, ""))).toEqual([...THEME_IDS]);
   });
 
+  // The Quiet branch (2026-11-18 to 11-20) brought no database file. The UX round's "Follow me" (2026-11-21) is the
+  // next change, in its own file (test/follow.test.ts).
   it("brings no new database files", () => {
-    const files = readdirSync(new URL("../db/", import.meta.url)).filter((f) => /^2026-11-(1[89]|2\d)/.test(f));
+    const files = readdirSync(new URL("../db/", import.meta.url)).filter((f) => /^2026-11-(1[89]|20)/.test(f));
     expect(files).toEqual([]);
   });
 });

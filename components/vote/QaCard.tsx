@@ -1,5 +1,6 @@
 "use client";
 
+import { SCREEN_BLOCKED_MESSAGE, hasBadWords } from "@/lib/profanity";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { qaVoterView, type QaLocal } from "@/lib/answers";
 import { readJSON, writeJSON } from "@/lib/storage";
@@ -86,6 +87,7 @@ export function QaCard({ code, voterId, focusId, question, color, disabled, done
   async function ask(e: React.FormEvent) {
     e.preventDefault();
     if (!clean || sending || left <= 0) return;
+    if (hasBadWords(clean)) return setNote({ bad: true, text: SCREEN_BLOCKED_MESSAGE });
     setSending(true);
     setNote(null);
     try {
@@ -103,6 +105,7 @@ export function QaCard({ code, voterId, focusId, question, color, disabled, done
           text:
             r.error === "closed" ? "Voting is closed, so questions can't be sent."
             : r.error === "limit" ? `You've sent ${MAX_QA_PER_VOTER} questions, the most allowed.`
+            : r.error === "blocked_words" ? SCREEN_BLOCKED_MESSAGE
             : "Not sent. Try again.",
         });
       }

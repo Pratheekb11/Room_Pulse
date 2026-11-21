@@ -1,5 +1,6 @@
 "use client";
 
+import { SCREEN_BLOCKED_MESSAGE, hasBadWords } from "@/lib/profanity";
 import { useEffect, useState } from "react";
 import { readableOn, topicColor } from "@/lib/colors";
 import { quizTimeLeft } from "@/lib/quiz";
@@ -83,9 +84,11 @@ export function QuizCard({ code, voterId, focusId, question, options, color, liv
     e.preventDefault();
     const name = nickDraft.trim().replace(/\s+/g, " ");
     if (!name) return;
+    if (hasBadWords(name)) return setNote(SCREEN_BLOCKED_MESSAGE);
     setSending(true);
     try {
       const r = await post({ action: "join", nickname: name });
+      if (r.error === "blocked_words") return setNote(SCREEN_BLOCKED_MESSAGE);
       if (!r.ok) throw new Error();
       writeJSON(nickKey, name);
       setNick(name);
