@@ -644,7 +644,7 @@ export function PresentationForm({
           <p className="mt-4 text-sm text-ink-soft">
             Writing your own questions.{" "}
             <button type="button" onClick={() => setStart(null)} className="font-semibold text-ink underline underline-offset-4">
-              Use a template instead
+              Pick a template instead
             </button>
           </p>
         )}
@@ -728,8 +728,8 @@ export function PresentationForm({
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {(
                     [
-                      { id: "blank", label: "Start from scratch", sub: "Write your own questions", icon: "M5 19l3.5-.8L18.3 8.4a1.8 1.8 0 0 0-2.6-2.6L5.9 15.6zM14 7.5l2.5 2.5" },
-                      { id: "templates", label: "Use a template", sub: `${TEMPLATES.length} ready-made: retro, standup, feedback…`, icon: "M4 5h16v14H4zM4 10h16M10 10v9" },
+                      { id: "blank", label: "Write your own", sub: "Begin with an empty question", icon: "M5 19l3.5-.8L18.3 8.4a1.8 1.8 0 0 0-2.6-2.6L5.9 15.6zM14 7.5l2.5 2.5" },
+                      { id: "templates", label: "Pick a template", sub: `${TEMPLATES.length} ready-made: retro, standup, feedback…`, icon: "M4 5h16v14H4zM4 10h16M10 10v9" },
                       { id: "activities", label: "Team activity", sub: `${ACTIVITIES.length} activities for the room and online`, icon: "M12 21v-6M12 15c-4 0-7-2.5-7-6a7 7 0 0 1 14 0c0 3.5-3 6-7 6zM9 9.5h.01M15 9.5h.01" },
                     ] as const
                   ).map((t, n) => (
@@ -930,7 +930,7 @@ export function PresentationForm({
                 Preview
               </button>
             ) : (
-              // a phone: preview, the main button and + (like Slido and Mentimeter)
+              // a phone: preview, the main button and add a question, all within thumb's reach
               <button type="button" onClick={() => setPreviewOpen(true)} aria-label="Preview" className="key grid w-12 shrink-0 place-items-center rounded-full bg-white">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
                   <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />

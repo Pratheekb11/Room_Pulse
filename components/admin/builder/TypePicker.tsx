@@ -10,8 +10,8 @@ import { KindIcon } from "./KindIcon";
 export type TypeChoice = { kind: QuestionKind } | { preset: string };
 
 /**
- * Pick the kind of question first: a two-column grid of square tiles, a coloured icon and a name each (like Slido
- * and Mentimeter). The longer line about each kind is its tooltip and is read out by screen readers.
+ * Pick the kind of question first: a two-column grid of square tiles, a coloured icon and a name each, so the
+ * choice reads at a glance. The longer line about each kind is its tooltip and is read out by screen readers.
  */
 export function TypePicker({
   title = "What kind of question?",

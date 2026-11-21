@@ -1,8 +1,8 @@
 // The slide editor (2026-11-22). A director had to phone the owner to ask how to build a presentation: the
 // builder showed ~25 controls for one Score items question (9 type chips, a shortcut, description and picture
 // links, per-row buttons, the scoring box with two measures, chart chips) in one narrow column, and "+ Add item"
-// was small grey text like "+ description". Now it works like Mentimeter or Slido: a list of questions on the
-// left, one question at a time in the middle, and the phone it will appear on, live, on the right. You pick the
+// was small grey text like "+ description". Now it's a slide editor: a list of questions on the left, one question
+// at a time in the middle, and the phone it will appear on, live, on the right. You pick the
 // kind of question first from big tiles; extras wait under "More options". On a phone the list folds: the
 // question being edited opens in place.
 import { readFileSync, readdirSync } from "node:fs";
@@ -222,16 +222,16 @@ describe("design and settings are one tidy panel", () => {
   });
 });
 
-// After looking at Mentimeter's and Slido's phone builders together (2026-11-22): three big ways to start, the
-// kinds of question as a two-column grid of square tiles (icon and name, nothing else), the type as "Pick one ▾" at
-// the top of the question, and on a phone a bottom bar with preview, the main button and "+".
-describe("like Mentimeter and Slido", () => {
+// Common patterns of slide and audience tools, in our own words and pictures (test/originality.test.ts): three big
+// ways to start, the kinds of question as a two-column grid of square tiles (icon and name, nothing else), the type
+// as "Pick one ▾" at the top of the question, and on a phone a bottom bar with preview, the main button and "+".
+describe("quick to pick up", () => {
   const form = read("components/admin/PresentationForm.tsx");
   const picker = read(`${dir}/TypePicker.tsx`);
   const editor = read(`${dir}/QuestionEditor.tsx`);
 
   it("starts with three big choices; templates and activities open as their own list with a way back", () => {
-    for (const s of ["Start from scratch", "Use a template", "Team activity"]) expect(form, s).toContain(s);
+    for (const s of ["Write your own", "Pick a template", "Team activity"]) expect(form, s).toContain(s);
     expect(form).toMatch(/startView === "templates"/);
     expect(form).toMatch(/startView === "activities"/);
     expect(form).toContain("← Back");
@@ -241,7 +241,7 @@ describe("like Mentimeter and Slido", () => {
 
   it("puts writing with AI first, above the three choices", () => {
     expect(form.indexOf("Write questions with AI")).toBeGreaterThan(-1);
-    expect(form.indexOf("Write questions with AI")).toBeLessThan(form.indexOf("Start from scratch"));
+    expect(form.indexOf("Write questions with AI")).toBeLessThan(form.indexOf("Write your own"));
   });
 
   it("shows the kinds as a two-column grid of square tiles: a coloured icon and a name", () => {
