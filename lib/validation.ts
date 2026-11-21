@@ -15,7 +15,8 @@ export const voteSchema = z.object({
   topicId: z.uuid(),
   criterionId: z.uuid(),
   voterId: z.uuid(),
-  score: z.number().int().min(1).max(10),
+  /** null = take this rating back ("Clear answer" on the phone). */
+  score: z.number().int().min(1).max(10).nullable(),
 });
 export type VoteInput = z.infer<typeof voteSchema>;
 
@@ -349,6 +350,14 @@ export const answerSchema = z.discriminatedUnion("kind", [
     slot: z.number().int().min(0).max(MAX_LEAVES_LIMIT - 1).default(0),
     /** Board questions: take this leaf back. */
     remove: z.boolean().optional(),
+  }),
+  /** Take back this person's answer to one question (phones offer "Clear answer" until they tap Finish). */
+  z.object({
+    kind: z.literal("clear"),
+    code: codeSchema,
+    focusId: z.uuid(),
+    voterId: z.uuid(),
+    author: authorField,
   }),
 ]);
 export type AnswerInput = z.infer<typeof answerSchema>;

@@ -5,7 +5,7 @@ import { topicColor } from "@/lib/colors";
 import { cellKey } from "@/lib/stats";
 import { groupByFocus } from "@/lib/focus";
 import { getVoterId, readJSON, writeJSON } from "@/lib/storage";
-import { endedKey, lockedStep } from "@/lib/finish-lock";
+import { endedKey, lockable, lockedStep, readLocked } from "@/lib/finish-lock";
 import type { LiveQuiz, QuestionKind, SessionPayload, TopicItem } from "@/lib/types";
 import { isPlayful } from "@/lib/themes";
 import { ScorePill, StepIntro, StepNav, VoterHeader, VoterProgress } from "./VoterChrome";
@@ -156,11 +156,12 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const [voterId] = useState(() => getVoterId(code));
   const [queue] = useState(
     () =>
-      new VoteQueue({
+      // null = take the rating back ("Clear answer")
+      new VoteQueue<number | null>({
         code,
         voterId,
         initialPending: Object.fromEntries(
-          Object.entries(readJSON<Record<string, number>>(pendingKey, {})).filter(([k]) => validKeys.has(k)),
+          Object.entries(readJSON<Record<string, number | null>>(pendingKey, {})).filter(([k]) => validKeys.has(k)),
         ),
         onStatus,
         onClosed: () => setIsOpen(false),
@@ -169,7 +170,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   );
   const [answerQueue] = useState(
     () =>
-      new VoteQueue<Answer>({
+      new VoteQueue<Answer | null>({
         code,
         voterId,
         endpoint: "/api/answer",
@@ -181,6 +182,8 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
               ? { kind: "text", focusId: leaf.focusId, slot: leaf.slot, text: v, author: signedName(readJSON<unknown>(authorKey, "")) }
               : { kind: "text", focusId: leaf.focusId, slot: leaf.slot, remove: true };
           const focusId = key;
+          // "Clear answer": take this person's answer to the question back
+          if (v === null) return { kind: "clear", focusId };
           const kind = byFocus.get(focusId)?.kind;
           // names on (team activities): every answer carries the person's name
           const named = session.named ? { author: signedName(readJSON<unknown>(authorKey, "")) } : {};
@@ -193,9 +196,9 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
         initialPending: Object.fromEntries(
           Object.entries(readJSON<Record<string, unknown>>(answersPendingKey, {})).filter(([k, v]) => {
             const leaf = parseLeafKey(k);
-            return leaf ? Boolean(byFocus.get(leaf.focusId)?.board) && typeof v === "string" : validAnswer(k, v);
+            return leaf ? Boolean(byFocus.get(leaf.focusId)?.board) && typeof v === "string" : v === null ? byFocus.has(k) : validAnswer(k, v);
           }),
-        ) as Record<string, Answer>,
+        ) as Record<string, Answer | null>,
         onStatus,
         onClosed: () => setIsOpen(false),
         persistPending: (pending) => writeJSON(answersPendingKey, pending),
@@ -322,12 +325,10 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   const unitsDone =
     Object.keys(ratings).length + steps.filter((s) => s.kind !== "rating" && stepDone(s, ratings, answers)).length;
   const complete = unitsTotal > 0 && unitsDone === unitsTotal;
-  // Finishing is final (lib/finish-lock.ts): remembered on this phone, so a reload or a question added later keeps it.
-  const [endedStored] = useState(() => readJSON<boolean>(endedKey(code), false) === true);
-  const ended = endedStored || complete;
-  useEffect(() => {
-    if (complete) writeJSON(endedKey(code), true);
-  }, [complete, code]);
+  // Finishing is final (lib/finish-lock.ts): Finish locks what's answered; remembered on this phone.
+  const [lockedIds, setLockedIds] = useState<string[]>(() => readLocked(readJSON<unknown>(endedKey(code), [])));
+  const stepId = useCallback((s: Step) => (s.kind === "rating" ? s.item.id : groups[s.gi].focus.id), [groups]);
+  const finishedAll = complete && steps.every((s) => !lockable(s.kind) || lockedIds.includes(stepId(s)));
   const points = unitsDone * 10;
 
   const [current, setCurrent] = useState(() => {
@@ -476,6 +477,56 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
     [groups, finished, finishedKey, reward],
   );
 
+  /** Something to clear on this step (a score, a pick, words, leaves…). */
+  const hasAnswer = (s: Step): boolean => {
+    if (s.kind === "rating") return criteria.some((c) => ratings[cellKey(s.item.id, c.id)] !== undefined);
+    const v = answers[groups[s.gi].focus.id];
+    return v !== undefined && (!Array.isArray(v) || v.some((x) => x));
+  };
+
+  // "Clear answer": take this step's answer back, here and on the server. Bumped to start the card afresh.
+  const [clears, setClears] = useState(0);
+  const onClear = (i: number) => {
+    const s = steps[i];
+    cancelAdvance();
+    if (s.kind === "rating") {
+      const next = { ...ratings };
+      for (const c of criteria) {
+        const key = cellKey(s.item.id, c.id);
+        if (next[key] === undefined) continue;
+        delete next[key];
+        queue.set(key, null);
+      }
+      setRatings(next);
+      writeJSON(ratingsKey, next);
+    } else {
+      const g = groups[s.gi];
+      const focusId = g.focus.id;
+      const v = answers[focusId];
+      // a board: take each leaf back (each leaf saves on its own); anything else: one clear for the question
+      if (g.board && Array.isArray(v)) v.forEach((t, slot) => t && answerQueue.set(leafKey(focusId, slot), ""));
+      else answerQueue.set(focusId, null);
+      const next = { ...answers };
+      delete next[focusId];
+      setAnswers(next);
+      writeJSON(answersKey, next);
+      if (finished.includes(focusId)) {
+        const f = finished.filter((x) => x !== focusId);
+        setFinished(f);
+        writeJSON(finishedKey, f);
+      }
+    }
+    setClears((n) => n + 1);
+  };
+
+  /** Finish: lock every question answered so far (lib/finish-lock.ts), then the thank-you screen. */
+  const finishAll = () => {
+    const ids = [...new Set([...lockedIds, ...steps.filter((s) => lockable(s.kind) && stepDone(s, ratings, answers)).map(stepId)])];
+    setLockedIds(ids);
+    writeJSON(endedKey(code), ids);
+    setReviewing(false);
+  };
+
   const qaStep = steps.findIndex((s) => s.kind === "qa");
 
   /** Quiz: answer locked in on the server (no queue: a quiz answer is one-shot and timed). */
@@ -532,23 +583,24 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
   });
 
   // Confetti only when the voter finishes during this visit, not on reload.
-  const wasComplete = useRef(complete);
+  const wasComplete = useRef(finishedAll);
   const [celebrate, setCelebrate] = useState(false);
   useEffect(() => {
-    if (complete && !wasComplete.current) {
+    if (finishedAll && !wasComplete.current) {
       setCelebrate(true);
       const t = setTimeout(() => setCelebrate(false), 2400);
       wasComplete.current = true;
       return () => clearTimeout(t);
     }
-    wasComplete.current = complete;
-  }, [complete]);
+    wasComplete.current = finishedAll;
+  }, [finishedAll]);
 
   const here = steps[current];
   const group = here ? groups[here.gi] : null;
-  const locked = here ? lockedStep(here.kind, stepDone(here, ratings, answers), ended) : false;
+  const locked = here ? lockedStep(here.kind, stepId(here), lockedIds) : false;
+  const canClear = !!here && isOpen && !locked && here.kind !== "qa" && here.kind !== "quiz" && hasAnswer(here);
 
-  if (complete && !reviewing)
+  if (finishedAll && !reviewing)
     return (
       <ThankYou
         title={session.title}
@@ -663,7 +715,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           </p>
         )}
 
-        {complete && (
+        {finishedAll && (
           <div role="status" className="slab rounded-xl bg-mint px-5 py-4 text-ink">
             <p className="font-display text-xl font-semibold">All done — thank you! 🏆</p>
             <p className="text-sm font-medium">Your answers are locked in.</p>
@@ -677,7 +729,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
           <p className="text-ink-soft">There are no questions yet. Wait for the presenter to add some.</p>
         ) : (
           <>
-            {locked && !complete && (
+            {locked && !finishedAll && (
               <p role="status" className="flex items-center gap-2 text-sm font-semibold text-ink-soft">
                 <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden>
                   <rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor" />
@@ -693,7 +745,7 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
               question={group.focus.name}
             />
             <div
-              key={here.kind === "rating" ? here.item.id : group.focus.id}
+              key={`${stepId(here)}:${clears}`}
               className={direction === 1 ? "animate-[slide-in-right_260ms_ease-out]" : "animate-[slide-in-left_260ms_ease-out]"}
             >
               {here.kind === "rating" ? (
@@ -825,11 +877,26 @@ function Ballot({ code, data, onRevision }: { code: string; data: SessionPayload
               )}
             </div>
 
+            {canClear && (
+              <button type="button" onClick={() => onClear(current)} className="-mt-2 self-end rounded-lg px-3 py-2 text-sm font-semibold text-ink-soft underline underline-offset-4 hover:text-ink">
+                Clear answer
+              </button>
+            )}
             <StepNav
               current={current}
               steps={steps.map((st) => ({ label: st.kind === "rating" ? st.item.name : groups[st.gi].focus.name, done: stepDone(st, ratings, answers) }))}
               onGo={goTo}
             />
+            {/* below Back / Next, where the last answer was given: on a small phone the top is out of view by then */}
+            {complete && !finishedAll && (
+              <div role="status" className="slab animate-pop rounded-xl bg-mint px-5 py-4 text-ink">
+                <p className="font-display text-xl font-semibold">That&rsquo;s every question</p>
+                <p className="text-sm font-medium">Check your answers if you like, then tap Finish. After that, your answers are locked.</p>
+                <button type="button" onClick={finishAll} disabled={!isOpen} className="key mt-3 w-full rounded-xl bg-primary py-3 font-bold text-white">
+                  Finish
+                </button>
+              </div>
+            )}
           </>
         )}
         {canRaise && isOpen && <RaisePoint code={code} voterId={voterId} className="w-full" />}

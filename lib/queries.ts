@@ -156,6 +156,21 @@ export async function getSessionIsOpen(code: string): Promise<boolean | null> {
 export type VoteOutcome = "ok" | "not_found" | "closed" | "invalid";
 
 export async function saveVote(v: VoteInput): Promise<VoteOutcome> {
+  if (v.score === null) {
+    // Take the rating back (the results trigger takes it off the totals). Fine if it was never there.
+    const rows = (await sql`
+      with s as (select id from live_sessions where code = ${v.code} and is_open),
+      gone as (
+        delete from votes x using s
+        where x.session_id = s.id and x.topic_id = ${v.topicId}::uuid
+          and x.criterion_id = ${v.criterionId}::uuid and x.voter_id = ${v.voterId}::uuid
+      )
+      select 1 as ok from s
+    `) as { ok: number }[];
+    if (rows.length > 0) return "ok";
+    const isOpen = await getSessionIsOpen(v.code);
+    return isOpen === null ? "not_found" : "closed";
+  }
   const rows = await sql`
     insert into votes (session_id, topic_id, criterion_id, voter_id, score)
     select s.id, t.id, c.id, ${v.voterId}::uuid, ${v.score}::int
@@ -785,6 +800,7 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
   if (a.kind === "words" && a.words.some((w) => hasBadWords(w))) return "blocked";
   // Names on (team activities): keep the name this person answers under, the latest one given.
   // Only asked when a name came with the answer, so anonymous presentations pay nothing.
+  if (a.kind === "clear") return clearAnswer(a.code, a.focusId, a.voterId);
   if (a.author && !(a.kind === "text" && a.remove)) {
     const badName = hasBadWords(a.author);
     const rows = (await sql`
@@ -896,6 +912,31 @@ export async function saveAnswer(a: AnswerInput): Promise<AnswerOutcome> {
   }
   if (saved) return "ok";
   const isOpen = await getSessionIsOpen(a.code);
+  if (isOpen === null) return "not_found";
+  if (!isOpen) return "closed";
+  return "invalid";
+}
+
+/**
+ * Takes back one person's answer to one question, whatever its kind (all of a board's leaves too). Q&A and quiz
+ * questions can't be cleared: Q&A is a live list and quiz answers are one-shot. Fine if there was nothing to take back.
+ */
+async function clearAnswer(code: string, focusId: string, voterId: string): Promise<AnswerOutcome> {
+  const q = sql`
+    select f.id from live_sessions s
+    join focus_topics f on f.session_id = s.id and f.id = ${focusId}::uuid
+    where s.code = ${code} and s.is_open and f.kind not in ('qa', 'quiz')`;
+  const [, , , , , , allowed] = await sql.transaction([
+    sql`delete from poll_answers   where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${q})`,
+    sql`delete from choice_answers where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${q})`,
+    sql`delete from rank_answers   where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${q})`,
+    sql`delete from number_answers where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${q})`,
+    sql`delete from text_answers   where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${q})`,
+    sql`delete from word_answers   where focus_id = ${focusId}::uuid and voter_id = ${voterId}::uuid and exists (${q})`,
+    q,
+  ]);
+  if (allowed.length > 0) return "ok";
+  const isOpen = await getSessionIsOpen(code);
   if (isOpen === null) return "not_found";
   if (!isOpen) return "closed";
   return "invalid";
