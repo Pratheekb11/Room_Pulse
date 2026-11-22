@@ -248,9 +248,27 @@ describe("quick to pick up", () => {
     expect(form.indexOf("TEMPLATES.map")).toBeGreaterThan(form.indexOf('startView === "templates"'));
   });
 
-  it("puts writing with AI first, above the three choices", () => {
-    expect(form.indexOf("Write questions with AI")).toBeGreaterThan(-1);
-    expect(form.indexOf("Write questions with AI")).toBeLessThan(form.indexOf("Write your own"));
+  // Owner, 2026-11-22 (on a phone): the open AI box at the very top took the first screen. Guests can't use AI
+  // anyway; they get one line inviting them to save their account. Accounts get AI as one of the ways to start.
+  describe("AI on the start screen", () => {
+    it("isn't a box at the very top any more: the prompt opens from its own start choice", () => {
+      expect(form).toMatch(/startView === "ai"/);
+      expect(form.indexOf('id="ai-prompt"')).toBeGreaterThan(form.indexOf('startView === "ai"'));
+      expect(form.indexOf('id="ai-prompt"')).toBeGreaterThan(form.indexOf("Write your own"));
+    });
+
+    it("accounts get a fourth start tile, Write with AI", () => {
+      expect(form).toMatch(/aiAvailable && !guest[\s\S]{0,200}id: "ai"( as const)?, label: "Write with AI"/);
+    });
+
+    it("guests get one line, after the start choices, inviting them to save their account to unlock AI", () => {
+      const invite = form.indexOf("Save your account to unlock it");
+      expect(invite).toBeGreaterThan(form.indexOf("Write your own"));
+      expect(form.slice(invite - 900, invite)).toMatch(/aiAvailable && guest/);
+      expect(form.slice(invite, invite + 700)).toMatch(/onNeedAccount/);
+      // no prompt box for a guest to type into and then be refused
+      expect(form).not.toMatch(/AI features need an account/);
+    });
   });
 
   it("shows the kinds as a two-column grid of square tiles: a coloured icon and a name", () => {

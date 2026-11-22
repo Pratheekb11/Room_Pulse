@@ -224,7 +224,7 @@ export function PresentationForm({
   /** Picking the kind of a new question: "first" replaces the empty first question, "add" adds one. */
   const [adding, setAdding] = useState<null | "first" | "add">(null);
   /** On the start screen: the three choices, or the list of templates or of activities. */
-  const [startView, setStartView] = useState<null | "templates" | "activities">(null);
+  const [startView, setStartView] = useState<null | "templates" | "activities" | "ai">(null);
   // a laptop: the list beside the editor; a wide one: the live preview too
   const wide = useMedia("(min-width: 1024px)");
   const wider = useMedia("(min-width: 1280px)");
@@ -375,15 +375,14 @@ export function PresentationForm({
   }
   const changedSinceStart = start !== null && start !== "blank" && snapshotOf(title, focus) !== start.snapshot;
 
-  // "Write questions with AI": closed until asked for, so nothing changes for people who don't want it.
-  const [aiOpen, setAiOpen] = useState(false);
+  // "Write with AI": a start choice for accounts; guests are invited to save their account instead.
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  /** Guests are asked to save their account first (AI is for accounts only). */
+  /** AI is for accounts only: a guest is taken to saving their account. */
   function askAi() {
     if (guest) {
-      setAiOpen(true);
+      onNeedAccount?.();
       return;
     }
     void draftWithAi();
@@ -396,7 +395,6 @@ export function PresentationForm({
       const res = await call("/api/admin/ai/questions", { method: "POST", body: JSON.stringify({ prompt: aiPrompt }) });
       const { plan } = (await res.json()) as { plan: PresentationPlan };
       applyPlan(plan, "questions written by AI");
-      setAiOpen(false);
     } catch (err) {
       setAiError((err as Error).message);
     } finally {
@@ -658,11 +656,77 @@ export function PresentationForm({
           <section aria-labelledby="templates-heading" className="enter mt-6">
             {startView === null ? (
               <>
-                {aiAvailable && (
-                  <div className="rounded-2xl border border-line-strong bg-canvas p-3.5">
-                    <label htmlFor="ai-prompt" className="flex items-center gap-2 font-bold">
-                      <span aria-hidden style={{ color: topicColor(3) }}>✦</span>
-                      Write questions with AI
+                <h3 id="templates-heading" className="font-display text-2xl">
+                  How do you want to start?
+                </h3>
+                <div className={`mt-3 grid grid-cols-1 gap-3 ${aiAvailable && !guest ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+                  {(
+                    [
+                      { id: "blank", label: "Write your own", sub: "Begin with an empty question", icon: "M5 19l3.5-.8L18.3 8.4a1.8 1.8 0 0 0-2.6-2.6L5.9 15.6zM14 7.5l2.5 2.5" },
+                      { id: "templates", label: "Pick a template", sub: `${TEMPLATES.length} ready-made: retro, standup, feedback…`, icon: "M4 5h16v14H4zM4 10h16M10 10v9" },
+                      { id: "activities", label: "Team activity", sub: `${ACTIVITIES.length} activities for the room and online`, icon: "M12 21v-6M12 15c-4 0-7-2.5-7-6a7 7 0 0 1 14 0c0 3.5-3 6-7 6zM9 9.5h.01M15 9.5h.01" },
+                      ...(aiAvailable && !guest
+                        ? [{ id: "ai" as const, label: "Write with AI", sub: "Say what it’s for; AI drafts the questions", icon: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" }]
+                        : []),
+                    ] as const
+                  ).map((t, n) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        if (t.id === "blank") {
+                          setStart("blank");
+                          // pick the kind of the first question straight away
+                          setAdding("first");
+                        } else setStartView(t.id);
+                      }}
+                      className="flex min-h-[9rem] flex-col items-center justify-center gap-2 rounded-2xl border border-line-strong bg-white px-3 py-5 text-center transition-[border-color,transform] duration-150 hover:border-ink active:scale-[0.98] max-sm:min-h-0 max-sm:flex-row max-sm:justify-start max-sm:text-left"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" fill="none" stroke="currentColor" style={{ color: topicColor(n) }} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d={t.icon} />
+                      </svg>
+                      <span>
+                        <span className="block text-lg font-bold">{t.label}</span>
+                        <span className="block text-sm text-ink-soft">{t.sub}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {aiAvailable && guest && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-dashed border-line-strong px-4 py-3">
+                    <p className="text-sm">
+                      <span aria-hidden style={{ color: topicColor(3) }}>
+                        ✦{" "}
+                      </span>
+                      <strong>Want AI to write your questions?</strong> Save your account to unlock it. It&rsquo;s free.
+                    </p>
+                    <button type="button" onClick={() => onNeedAccount?.()} className="key shrink-0 rounded-lg bg-white px-3 py-1.5 text-sm font-bold">
+                      Save my account
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setStartView(null)} className="-ml-2 shrink-0 rounded-lg px-2 py-1 font-semibold whitespace-nowrap hover:bg-canvas">
+                    ← Back
+                  </button>
+                  <h3 id="templates-heading" className="font-display text-2xl">
+                    {startView === "templates" ? "Templates" : startView === "ai" ? "Write with AI" : "Team activities"}
+                  </h3>
+                </div>
+                <p className="mt-1 text-sm text-ink-soft">
+                  {startView === "templates"
+                    ? "You can change everything afterwards."
+                    : startView === "ai"
+                      ? "AI writes a first draft. You can change everything afterwards."
+                      : "For people in the room and online alike. Names show on answers."}
+                </p>
+                {startView === "ai" && (
+                  <div className="mt-3">
+                    <label htmlFor="ai-prompt" className="font-bold">
+                      What&rsquo;s it for?
                     </label>
                     <div className="mt-2 flex items-end gap-2">
                       <textarea
@@ -702,78 +766,10 @@ export function PresentationForm({
                         </button>
                       ))}
                     </div>
-                    {aiOpen && guest && (
-                      <div role="alert" className="mt-3 rounded-lg bg-sun px-4 py-3 text-sm">
-                        <p className="font-semibold">AI features need an account.</p>
-                        <p className="mt-0.5">Save your guest account with an email and password (it&rsquo;s free and keeps your presentations), or log in to an account you already have.</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAiOpen(false);
-                              onNeedAccount?.();
-                            }}
-                            className="key rounded-lg bg-white px-3 py-1.5 font-bold"
-                          >
-                            Save my account
-                          </button>
-                          <button type="button" onClick={() => setAiOpen(false)} className="rounded-lg px-3 py-1.5 font-semibold underline underline-offset-4">
-                            Not now
-                          </button>
-                        </div>
-                      </div>
-                    )}
                     {aiError && <p role="alert" className="mt-2 text-sm font-semibold text-error">{aiError}</p>}
                     <p className="mt-2 text-xs text-ink-soft">Sent to Google Gemini. Check the questions before you use them.</p>
                   </div>
                 )}
-                <h3 id="templates-heading" className={`font-display text-2xl ${aiAvailable ? "mt-6" : ""}`}>
-                  How do you want to start?
-                </h3>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {(
-                    [
-                      { id: "blank", label: "Write your own", sub: "Begin with an empty question", icon: "M5 19l3.5-.8L18.3 8.4a1.8 1.8 0 0 0-2.6-2.6L5.9 15.6zM14 7.5l2.5 2.5" },
-                      { id: "templates", label: "Pick a template", sub: `${TEMPLATES.length} ready-made: retro, standup, feedback…`, icon: "M4 5h16v14H4zM4 10h16M10 10v9" },
-                      { id: "activities", label: "Team activity", sub: `${ACTIVITIES.length} activities for the room and online`, icon: "M12 21v-6M12 15c-4 0-7-2.5-7-6a7 7 0 0 1 14 0c0 3.5-3 6-7 6zM9 9.5h.01M15 9.5h.01" },
-                    ] as const
-                  ).map((t, n) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => {
-                        if (t.id === "blank") {
-                          setStart("blank");
-                          // pick the kind of the first question straight away
-                          setAdding("first");
-                        } else setStartView(t.id);
-                      }}
-                      className="flex min-h-[9rem] flex-col items-center justify-center gap-2 rounded-2xl border border-line-strong bg-white px-3 py-5 text-center transition-[border-color,transform] duration-150 hover:border-ink active:scale-[0.98] max-sm:min-h-0 max-sm:flex-row max-sm:justify-start max-sm:text-left"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" fill="none" stroke="currentColor" style={{ color: topicColor(n) }} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d={t.icon} />
-                      </svg>
-                      <span>
-                        <span className="block text-lg font-bold">{t.label}</span>
-                        <span className="block text-sm text-ink-soft">{t.sub}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setStartView(null)} className="-ml-2 shrink-0 rounded-lg px-2 py-1 font-semibold whitespace-nowrap hover:bg-canvas">
-                    ← Back
-                  </button>
-                  <h3 id="templates-heading" className="font-display text-2xl">
-                    {startView === "templates" ? "Templates" : "Team activities"}
-                  </h3>
-                </div>
-                <p className="mt-1 text-sm text-ink-soft">
-                  {startView === "templates" ? "You can change everything afterwards." : "For people in the room and online alike. Names show on answers."}
-                </p>
                 {startView === "templates" && (
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {TEMPLATES.map((t) => (
