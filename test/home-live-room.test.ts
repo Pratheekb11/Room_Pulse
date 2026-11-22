@@ -171,3 +171,22 @@ describe("the room feels alive", () => {
     for (const c of [".room-ping", ".room-float", ".room-tap", ".room-burst", ".room-wipe"]) expect(reduced, c).toContain(c);
   });
 });
+
+// Owner, 2026-11-22 (phone): the quiz screen ("Jupiter") hung for half a second before the tree scene. The tree's
+// shape is worked out the first time it's needed, which was the moment of the hand-over (513 ms frame at 4x CPU).
+describe("the tree scene doesn't stall the hand-over", () => {
+  const room = readFileSync(new URL("../components/home/LiveRoom.tsx", import.meta.url), "utf8");
+  it("works the tree out while the browser is idle, long before its scene", () => {
+    expect(room).toMatch(/requestIdleCallback[\s\S]{0,400}tree\("wide"\)|tree\("wide"\)[\s\S]{0,400}requestIdleCallback/);
+    expect(room).toMatch(/leafSize\(s\.leaves\.length\)/);
+  });
+
+  it("builds the next screen underneath while the result is held, so the hand-over only reveals it", () => {
+    expect(room).toMatch(/next: boolean/);
+    // a screen keeps its key from being built underneath to being shown and after the wipe: never built twice
+    expect(room).not.toMatch(/key=\{`\$\{scene\.id\}-\$\{state\.from/);
+    expect(room).toMatch(/key=\{l\.scene\.id\}/);
+    // built but not painted while it waits
+    expect(room).toMatch(/l\.z === 0 \? "invisible"/);
+  });
+});

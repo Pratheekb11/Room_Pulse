@@ -93,10 +93,11 @@ const peopleIn = (s: Scene, shown: number) => (s.kind === "tree" ? s.seed : s.se
 const u = (n: number) => `${n}cqw`;
 const fs = (n: number): CSSProperties => ({ fontSize: u(n) });
 
-type State = { scene: number; tap: number; shown: number; from: number | null };
+/** `next`: the next scene's screen is being built underneath (during the hold), so the hand-over only reveals it. */
+type State = { scene: number; tap: number; shown: number; from: number | null; next: boolean };
 
 export function LiveRoom() {
-  const [state, setState] = useState<State>({ scene: 0, tap: 0, shown: 0, from: null });
+  const [state, setState] = useState<State>({ scene: 0, tap: 0, shown: 0, from: null, next: false });
   const [running, setRunning] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const tilt = useRef<HTMLDivElement>(null);
@@ -143,6 +144,27 @@ export function LiveRoom() {
     };
   }, []);
 
+  // The tree's shape is worked out the first time it's needed (then kept). Doing that at the hand-over to the tree
+  // scene stalled it: the quiz screen hung for half a second on a phone. Work it out while the browser is idle,
+  // long before that scene.
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const warm = () => {
+      const art = tree("wide");
+      for (const s of SCENES) {
+        if (s.kind !== "tree") continue;
+        art.leafSize(s.leaves.length);
+        s.leaves.forEach((_, i) => art.leaf(i));
+      }
+    };
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(warm, 1500);
+    return () => clearTimeout(id);
+  }, []);
+
   // the loop reads the latest state from a ref, so the updates themselves stay pure
   const cur = useRef(state);
   useEffect(() => {
@@ -161,9 +183,10 @@ export function LiveRoom() {
         );
       } else if (hold.current < HOLD) {
         hold.current += 1;
+        if (!s.next) setState({ ...s, next: true });
       } else {
         hold.current = 0;
-        setState({ scene: (s.scene + 1) % SCENES.length, tap: 0, shown: 0, from: s.scene });
+        setState({ scene: (s.scene + 1) % SCENES.length, tap: 0, shown: 0, from: s.scene, next: false });
       }
     }, TICK);
     return () => {
@@ -176,6 +199,13 @@ export function LiveRoom() {
   const style = themeStyle(scene.theme) as CSSProperties;
   const people = peopleIn(scene, state.shown);
   const before = state.from === null ? null : SCENES[state.from];
+  const nextScene = SCENES[(state.scene + 1) % SCENES.length];
+  const layers = [
+    ...(before ? [{ scene: before, shown: steps(before), people: peopleIn(before, steps(before)), z: 1, wipe: false }] : []),
+    // z-index only while another screen is there: on its own it stays a plain layer (cheaper to draw every frame)
+    { scene, shown: state.shown, people, z: before || state.next ? 2 : undefined, wipe: before !== null },
+    ...(state.next && nextScene !== scene ? [{ scene: nextScene, shown: 0, people: peopleIn(nextScene, 0), z: 0, wipe: false }] : []),
+  ].sort((a, b) => SCENES.indexOf(a.scene) - SCENES.indexOf(b.scene));
   const inAir = Array.from({ length: Math.max(0, state.tap - state.shown) }, (_, k) => state.shown + k);
 
   return (
@@ -197,17 +227,26 @@ export function LiveRoom() {
           {/* the big screen: the next design sweeps across the one before */}
           <div className="absolute top-0 left-0 rounded-[1.8cqw] bg-black p-[0.6cqw] shadow-2xl shadow-black/60 ring-1 ring-white/15" style={{ width: u(82), height: u(51.25) }}>
             <div className="relative h-full overflow-hidden rounded-[1.3cqw]">
-              {before && <ScreenLayer scene={before} shown={steps(before)} people={peopleIn(before, steps(before))} />}
-              <ScreenLayer
-                key={`${scene.id}-${state.from ?? "start"}`}
-                className={before ? "room-wipe" : ""}
-                onAnimationEnd={(e) => {
-                  if (e.target === e.currentTarget) setState((t) => ({ ...t, from: null }));
-                }}
-                scene={scene}
-                shown={state.shown}
-                people={people}
-              />
+              {/* Each screen keeps its key from being built underneath to being shown, so it's never built twice;
+                  the order in the page stays fixed and the stacking comes from z-index. The one built underneath is
+                  invisible (laid out, not painted), so it costs nothing per frame while the result is held. */}
+              {layers.map((l) => (
+                <ScreenLayer
+                  key={l.scene.id}
+                  className={l.wipe ? "room-wipe" : l.z === 0 ? "invisible" : ""}
+                  z={l.z}
+                  onAnimationEnd={
+                    l.wipe
+                      ? (e) => {
+                          if (e.target === e.currentTarget) setState((t) => ({ ...t, from: null }));
+                        }
+                      : undefined
+                  }
+                  scene={l.scene}
+                  shown={l.shown}
+                  people={l.people}
+                />
+              ))}
             </div>
           </div>
 
@@ -236,18 +275,21 @@ function ScreenLayer({
   shown,
   people,
   className = "",
+  z,
   onAnimationEnd,
 }: {
   scene: Scene;
   shown: number;
   people: number;
   className?: string;
+  /** Stacking: the screen being shown on top, the one it replaces under it, the next one built underneath. */
+  z?: number;
   onAnimationEnd?: (e: AnimationEvent<HTMLDivElement>) => void;
 }) {
   return (
     <div
       className={`room-screen absolute inset-0 flex flex-col bg-canvas text-ink ${className}`}
-      style={{ ...(themeStyle(scene.theme) as CSSProperties), padding: `${u(2.6)} ${u(7)} ${u(1.8)} ${u(3)}` }}
+      style={{ ...(themeStyle(scene.theme) as CSSProperties), padding: `${u(2.6)} ${u(7)} ${u(1.8)} ${u(3)}`, zIndex: z }}
       onAnimationEnd={onAnimationEnd}
     >
       <div className="flex items-center justify-between gap-[1cqw] text-muted" style={fs(1.35)}>

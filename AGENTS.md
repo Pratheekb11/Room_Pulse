@@ -162,6 +162,8 @@ Built test-first (`test/home-live-room.test.ts`). **Live since 2026-11-21**; pro
 - Runs only while on screen and the tab is visible (IntersectionObserver, `visibilityState`); never with reduced motion (the loop doesn't start, the `.room-*` animations are off). The picture is `role="img"` with a label.
 - **No numbers that read like a limit**: no "N people answering" under it and no row of design names (both removed 2026-11-21: people read the count as the most a presentation takes). Only the slide's own "N answers" count, as on a real screen.
 
+- **Smooth hand-overs** (2026-11-22, owner on a phone: the quiz screen, "Jupiter", hung half a second before the tree): the tree's shape is worked out while the browser is idle after load (`requestIdleCallback`), not at the hand-over; during the hold the next scene's screen is built underneath, invisible (`next` in the state), and keeps its key when shown and after the wipe, so it's never built twice. At 4x CPU the wipe to the tree now starts ~120 ms after the switch (was ~650 ms, with a 513 ms frame); worst frames over a cycle 100–200 ms (main: 300–733 ms).
+
 Not done yet: on very slow phones the wipe and the blur may stutter (not seen at 390px in Chrome); there's no pause button (it stops off screen and with reduced motion).
 
 ### UX round (branch `feat/ux-round`, **live since 2026-11-21**)
