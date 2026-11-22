@@ -64,9 +64,15 @@ export function VotingPills({ voters, isOpen }: { voters: number; isOpen: boolea
 
 type TabName = { key: string; name: string };
 
+/** Past this many questions the tabs are always one button: 9 or more wrap into rows that push the results down. */
+export const TAB_LIMIT = 8;
+/** Whether the question tabs fold into one button on every screen (Fit to screen, or many questions). */
+export const foldTabs = (count: number, compact: boolean) => compact || count > TAB_LIMIT;
+
 /**
  * "All questions" plus a tab per question. `active` null = all questions.
- * On a narrow screen the tabs fold into one button that opens a list (up and down, never sideways).
+ * On a narrow screen, with Fit to screen on, or past TAB_LIMIT questions, the tabs fold into one button that opens a
+ * list (up and down, never sideways).
  * Container queries, not the viewport: the builder's preview draws this screen at 1280px on any device.
  */
 export function QuestionTabs({
@@ -82,11 +88,12 @@ export function QuestionTabs({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const folded = foldTabs(names.length, compact);
   const tab = (on: boolean) =>
     `flex items-center gap-2 rounded-full border border-line-strong px-4 py-1.5 text-[clamp(0.85rem,1vw,1.1rem)] font-bold ${on ? "bg-ink text-white" : "bg-white"}`;
   return (
     <div className="@container mb-[clamp(0.6rem,1.4vh,1.25rem)]">
-      <nav aria-label="Questions" className={compact ? "hidden" : "flex flex-wrap items-center gap-2 @max-xl:hidden"}>
+      <nav aria-label="Questions" className={folded ? "hidden" : "flex flex-wrap items-center gap-2 @max-xl:hidden"}>
         <button type="button" onClick={() => onPick(null)} aria-current={active === null ? "page" : undefined} className={tab(active === null)}>
           All questions
         </button>
@@ -104,7 +111,7 @@ export function QuestionTabs({
         ))}
       </nav>
       <SheetButton
-        className={compact ? "" : "@xl:hidden"}
+        className={folded ? "" : "@xl:hidden"}
         kicker={active === null ? "Showing" : `Question ${active + 1} of ${names.length}:`}
         label={active === null ? `All questions (${names.length})` : names[active]?.name ?? ""}
         onClick={() => setOpen(true)}

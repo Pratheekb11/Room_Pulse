@@ -96,15 +96,15 @@ describe("POST /api/admin/sessions", () => {
     expect(info.criteria.map((c) => c.name)).toEqual(["Impact", "Feasibility"]);
   });
 
-  it("allows 1–10 focus topics with 1–10 topics each, and up to 10 criteria", async () => {
+  it("allows 1–30 focus topics with 1–10 topics each, and up to 10 criteria", async () => {
     const focus = (n: number, topics = 1) =>
       Array.from({ length: n }, (_, i) => ({ name: `F${i}`, topics: Array.from({ length: topics }, (_, j) => `t${j}`) }));
-    const ok = await createSession({ title: "x", focusTopics: focus(10, 10), criteria: ["a"] });
+    const ok = await createSession({ title: "x", focusTopics: focus(30, 10), criteria: ["a"] });
     expect(ok.status).toBe(201);
 
     const bad: Record<string, unknown>[] = [
       { title: "x", focusTopics: [], criteria: ["a"] },
-      { title: "x", focusTopics: focus(11), criteria: ["a"] },
+      { title: "x", focusTopics: focus(31), criteria: ["a"] },
       { title: "x", focusTopics: focus(1, 11), criteria: ["a"] },
       { title: "x", focusTopics: [{ name: "F", topics: ["", " "] }], criteria: ["a"] },
       { title: "x", focusTopics: [{ name: " ", topics: ["a"] }], criteria: ["a"] },

@@ -6,7 +6,7 @@
 export const MAX_IMAGE_BYTES = 200_000;
 /** Longest side, in pixels. */
 export const MAX_IMAGE_SIDE = 1280;
-/** Pictures one account may keep (10 questions of 10 options with a picture each is 110). */
+/** Pictures one account may keep (a 30-question presentation with a picture on every question and option would be 330; that is rare). */
 export const MAX_IMAGES_PER_ACCOUNT = 300;
 
 /** Where a stored picture is served from. */

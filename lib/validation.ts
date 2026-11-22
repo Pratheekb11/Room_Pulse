@@ -38,7 +38,7 @@ function cleanList(values: string[]): string[] {
 const listOf = (maxLen: number) =>
   z.array(z.string().max(maxLen * 4)).transform(cleanList).pipe(z.array(z.string().max(maxLen)));
 
-export const MAX_FOCUS_TOPICS = 10;
+export const MAX_FOCUS_TOPICS = 30;
 export const MAX_TOPICS_PER_FOCUS = 10;
 export const MAX_CRITERIA = 10;
 
