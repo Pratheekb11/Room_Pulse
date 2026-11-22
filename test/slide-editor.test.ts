@@ -104,9 +104,18 @@ describe("the layout", () => {
     expect(form).not.toMatch(/parsed\.map\(\(f, i\) =>[\s\S]{0,300}What do you want to ask/);
   });
 
+  it("keeps the live preview outside the builder's <form>: its answer cards have forms of their own", () => {
+    // a <form> inside a <form> is invalid HTML, and the preview's Number, Open answer and Q&A cards are forms
+    const end = form.lastIndexOf("</form>");
+    expect(end).toBeGreaterThan(0);
+    expect(form.indexOf("<LivePreview")).toBeGreaterThan(end);
+    // beside the builder in its own card from 1280px
+    expect(form).toMatch(/xl:grid-cols-\[minmax\(0,1fr\)_[^\]]*rem\]/);
+  });
+
   it("uses the whole width on a laptop: three columns from 1024px", () => {
     expect(form).toContain("(min-width: 1024px)");
-    expect(form).toMatch(/grid-cols-\[[^\]]*rem_minmax\(0,1fr\)_[^\]]*rem\]/);
+    expect(form).toMatch(/lg:grid-cols-\[[^\]]*rem_minmax\(0,1fr\)\]/);
     // the builder isn't squeezed into the narrow column anymore
     const admin = read("components/admin/AdminApp.tsx");
     expect(admin.slice(admin.indexOf("<PresentationForm") - 300, admin.indexOf("<PresentationForm"))).not.toContain("max-w-2xl");

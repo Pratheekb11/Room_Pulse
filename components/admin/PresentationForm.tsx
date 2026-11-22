@@ -585,8 +585,13 @@ export function PresentationForm({
     />
   );
 
+  // From 1280px the live preview sits beside the builder in its own card, outside the <form>: its answer cards
+  // (Number, Open answer, Q&A…) are forms themselves, and a form inside a form is invalid HTML.
+  const showPreview = wider && !choosing;
+
   return (
     <>
+      <div className={showPreview ? "grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_23rem]" : undefined}>
       <form
         onSubmit={submit}
         className="slab h-fit min-w-0 rounded-xl bg-white p-4 sm:p-6"
@@ -833,7 +838,7 @@ export function PresentationForm({
             )}
 
             {/* The slide editor: the questions, the one being edited, and how it looks (from 1280px) */}
-            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_21rem]">
+            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
               <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
                 {!wide && adding ? (
                   typePicker
@@ -855,27 +860,6 @@ export function PresentationForm({
                 )}
               </div>
               {wide && <div className="min-w-0">{adding ? typePicker : editor}</div>}
-              {wider && (
-                <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
-                  <LivePreview
-                    title={title}
-                    questions={preview()}
-                    selected={selectedIndex}
-                    onPick={(i) => {
-                      setAdding(null);
-                      setSelected(focus[i]?.key ?? selectedQuestion.key);
-                    }}
-                    theme={theme}
-                    decor={decor}
-                    criteria={criteria}
-                    scaleMax={scaleMax}
-                    lowLabel={lowLabel}
-                    highLabel={highLabel}
-                    onOpenFull={() => setPreviewOpen(true)}
-                    onDesign={() => setDesignOpen(true)}
-                  />
-                </div>
-              )}
             </div>
 
           <p
@@ -980,6 +964,28 @@ export function PresentationForm({
           </>
         )}
       </form>
+      {showPreview && (
+        <div className="slab min-w-0 rounded-xl bg-white p-4 xl:sticky xl:top-4">
+          <LivePreview
+            title={title}
+            questions={preview()}
+            selected={selectedIndex}
+            onPick={(i) => {
+              setAdding(null);
+              setSelected(focus[i]?.key ?? selectedQuestion.key);
+            }}
+            theme={theme}
+            decor={decor}
+            criteria={criteria}
+            scaleMax={scaleMax}
+            lowLabel={lowLabel}
+            highLabel={highLabel}
+            onOpenFull={() => setPreviewOpen(true)}
+            onDesign={() => setDesignOpen(true)}
+          />
+        </div>
+      )}
+      </div>
 
       {/* Outside the form, so its buttons can't submit it */}
       {confirmRestart && (
