@@ -177,6 +177,8 @@ export function PresentationForm({
   guest = false,
   aiAvailable = false,
   onNeedAccount,
+  startActivity,
+  onActivityStarted,
 }: {
   call: Call;
   mode: FormMode;
@@ -188,6 +190,9 @@ export function PresentationForm({
   /** The site has a Gemini key; without one the AI box doesn't show. */
   aiAvailable?: boolean;
   onNeedAccount?: () => void;
+  /** An activity id from the home page's links: the builder opens with it ready to go. */
+  startActivity?: string;
+  onActivityStarted?: () => void;
 }) {
   const editing = mode.kind === "edit";
   // Rendered only in the browser (after the sign-in check), so reading storage here is safe.
@@ -360,6 +365,18 @@ export function PresentationForm({
     setShowResults(shareResults);
     setNamed(shareResults);
   }
+  // A home page activity link: start from that activity once (a tap on it is the choice, so it replaces a draft).
+  const linkedDone = useRef(false);
+  useEffect(() => {
+    if (editing || !startActivity || linkedDone.current) return;
+    linkedDone.current = true;
+    const a = ACTIVITIES.find((x) => x.id === startActivity);
+    void Promise.resolve().then(() => {
+      if (a) applyPlan(a.plan, `the “${a.label}” activity`, true, a.steps);
+      onActivityStarted?.();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startActivity]);
   /** Back to the start choices with an empty form. */
   function restart() {
     setTitle("");

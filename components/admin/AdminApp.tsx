@@ -20,8 +20,10 @@ type Account = { email: string | null; guest: boolean; emailVerified: boolean; v
 type Auth = { kind: "checking" } | { kind: "signed_out" } | ({ kind: "signed_in" } & Account);
 type Me = { user: { email: string | null; guest: boolean; emailVerified: boolean }; verificationRequired: boolean };
 
-export function AdminApp() {
+export function AdminApp({ startActivity: linked }: { startActivity?: string } = {}) {
   const [auth, setAuth] = useState<Auth>({ kind: "checking" });
+  // An activity from the home page's links: used once, then forgotten (so saving a guest account doesn't reopen it).
+  const [startActivity, setStartActivity] = useState(linked);
 
   /** Reads the signed-in account (after load, sign-in, guest start or saving a guest). */
   const loadMe = useCallback(async () => {
@@ -62,6 +64,12 @@ export function AdminApp() {
       onAccountChanged={() => void loadMe()}
       onSignOut={signOut}
       onExpired={expired}
+      startActivity={startActivity}
+      onActivityStarted={() => {
+        setStartActivity(undefined);
+        // a refresh keeps the draft, not the link
+        if (window.location.search) window.history.replaceState(null, "", window.location.pathname);
+      }}
     />
   );
 }
@@ -72,8 +80,12 @@ function Console({
   onAccountChanged,
   onSignOut,
   onExpired,
+  startActivity,
+  onActivityStarted,
 }: {
   account: Account;
+  startActivity?: string;
+  onActivityStarted?: () => void;
   onVerified: () => void;
   onAccountChanged: () => void;
   onSignOut: () => void;
@@ -88,7 +100,8 @@ function Console({
   const [sessions, setSessions] = useState<AdminSessionRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The form shows by itself until there's a presentation; after that it opens on request.
-  const [formOpen, setFormOpen] = useState(false);
+  // An activity link opens it straight away, even with presentations already made.
+  const [formOpen, setFormOpen] = useState(Boolean(startActivity));
   // Guests who try an account-only feature (AI insights) get the save-account form opened for them.
   const [saveOpen, setSaveOpen] = useState(false);
   // AI controls only show once the site has a Gemini key.
@@ -230,6 +243,8 @@ function Console({
             guest={guest}
             aiAvailable={aiAvailable}
             onNeedAccount={askForAccount}
+            startActivity={startActivity}
+            onActivityStarted={onActivityStarted}
           />
         </div>
       )}
