@@ -14,6 +14,7 @@ import { LinkRow } from "@/components/home/LinkRow";
 import { ActivityList } from "@/components/home/ActivityList";
 import { Reveal } from "@/components/home/Reveal";
 import { Words } from "@/components/home/Words";
+import { FOOTER_PRIVACY } from "@/lib/privacy";
 import type { CSSProperties } from "react";
 
 // the browser bar matches the page's dark canvas
@@ -165,7 +166,12 @@ export default function Home() {
           <div>
             <Logo />
           </div>
-          <p className="max-w-xs">Answers are anonymous. We don&rsquo;t store names or IP addresses.</p>
+          <p className="max-w-xs">
+            {FOOTER_PRIVACY}{" "}
+            <Link href="/privacy" className="sweep hover:text-ink">
+              How we handle your data
+            </Link>
+          </p>
           <ul className="flex flex-col gap-1.5">
             <li>
               <Link href="/admin" className="sweep hover:text-ink">

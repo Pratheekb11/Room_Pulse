@@ -36,6 +36,7 @@ describe("the site's own screens", () => {
     "app/reset/page.tsx",
     "app/verify/page.tsx",
     "app/not-found.tsx",
+    "app/privacy/page.tsx",
   ];
 
   it("carry the quiet marker, which turns the whole page dark (dialogs included)", () => {
