@@ -25,6 +25,7 @@ import { isThemeId, recommendTheme, type ThemeId } from "@/lib/themes";
 import { previewQuestions } from "@/lib/preview";
 import { scoringHost } from "@/lib/scoring";
 import { HowToDialog } from "./HowToDialog";
+import { StartChoices } from "./builder/StartChoices";
 import { Words } from "@/components/home/Words";
 import { useMedia } from "../useMedia";
 import { QuestionRail } from "./builder/QuestionRail";
@@ -676,39 +677,16 @@ export function PresentationForm({
                 <h3 id="templates-heading" className="font-display text-2xl">
                   How do you want to start?
                 </h3>
-                <div className={`mt-3 grid grid-cols-1 gap-3 ${aiAvailable && !guest ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
-                  {(
-                    [
-                      { id: "blank", label: "Write your own", sub: "Begin with an empty question", icon: "M5 19l3.5-.8L18.3 8.4a1.8 1.8 0 0 0-2.6-2.6L5.9 15.6zM14 7.5l2.5 2.5" },
-                      { id: "templates", label: "Pick a template", sub: `${TEMPLATES.length} ready-made: retro, standup, feedback…`, icon: "M4 5h16v14H4zM4 10h16M10 10v9" },
-                      { id: "activities", label: "Team activity", sub: `${ACTIVITIES.length} activities for the room and online`, icon: "M12 21v-6M12 15c-4 0-7-2.5-7-6a7 7 0 0 1 14 0c0 3.5-3 6-7 6zM9 9.5h.01M15 9.5h.01" },
-                      ...(aiAvailable && !guest
-                        ? [{ id: "ai" as const, label: "Write with AI", sub: "Say what it’s for; AI drafts the questions", icon: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" }]
-                        : []),
-                    ] as const
-                  ).map((t, n) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => {
-                        if (t.id === "blank") {
-                          setStart("blank");
-                          // pick the kind of the first question straight away
-                          setAdding("first");
-                        } else setStartView(t.id);
-                      }}
-                      className="flex min-h-[9rem] flex-col items-center justify-center gap-2 rounded-2xl border border-line-strong bg-white px-3 py-5 text-center transition-[border-color,transform] duration-150 hover:border-ink active:scale-[0.98] max-sm:min-h-0 max-sm:flex-row max-sm:justify-start max-sm:text-left"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" fill="none" stroke="currentColor" style={{ color: topicColor(n) }} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d={t.icon} />
-                      </svg>
-                      <span>
-                        <span className="block text-lg font-bold">{t.label}</span>
-                        <span className="block text-sm text-ink-soft">{t.sub}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <StartChoices
+                  ai={aiAvailable && !guest}
+                  onPick={(id) => {
+                    if (id === "blank") {
+                      setStart("blank");
+                      // pick the kind of the first question straight away
+                      setAdding("first");
+                    } else setStartView(id);
+                  }}
+                />
                 {aiAvailable && guest && (
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-dashed border-line-strong px-4 py-3">
                     <p className="text-sm">

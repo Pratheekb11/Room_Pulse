@@ -40,6 +40,7 @@ export function QuestionEditor({
   highLabel,
   criteria,
   compact = false,
+  openMore = false,
 }: {
   question: QuestionDraft;
   index: number;
@@ -62,13 +63,15 @@ export function QuestionEditor({
   criteria: string[];
   /** Inside the phone's folded list: no header of its own. */
   compact?: boolean;
+  /** Start with More options open (the walkthrough shows the scoring settings). */
+  openMore?: boolean;
 }) {
   const [picking, setPicking] = useState(false);
   const extrasSet = [
     f.description !== null && "description",
     f.image && "picture",
   ].filter(Boolean) as string[];
-  const [moreOpen, setMoreOpen] = useState(extrasSet.length > 0);
+  const [moreOpen, setMoreOpen] = useState(openMore || extrasSet.length > 0);
   const kind = KIND_INFO.find((k) => k.id === f.kind)!;
 
   if (picking)

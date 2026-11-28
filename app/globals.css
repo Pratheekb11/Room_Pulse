@@ -263,12 +263,6 @@ body,
   from { opacity: 0.9; scale: 0.4; }
   to { opacity: 0; scale: 1.6; }
 }
-.demo-rise { display: inline-block; animation: rise 480ms var(--ease-out-soft) both; }
-.demo-pop { animation: pop 320ms var(--ease-spring); }
-.demo-grow { animation: demo-grow 900ms var(--ease-out-soft) both; transform-origin: left; }
-@keyframes demo-grow {
-  from { scale: 0 1; }
-}
 
 /* ---- Quiet: the site's own look (the home page, sign-in, dashboard, builder, report, account pages, 404) ----
    Near-black and soft grey, one weight of type, hairlines, one calm blue. A page that carries the `quiet` marker

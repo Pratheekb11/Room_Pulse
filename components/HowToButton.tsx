@@ -1,7 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
-import { HowToDialog } from "./admin/HowToDialog";
+
+// Loaded on the first tap: the walkthrough draws the builder's own pieces, which the home page shouldn't carry.
+const HowToDialog = dynamic(() => import("./admin/HowToDialog").then((m) => m.HowToDialog), { ssr: false });
 
 /** "See how it works": opens the walkthrough only when someone asks for it. */
 export function HowToButton({ label = "See how it works", className = "" }: { label?: string; className?: string }) {

@@ -27,14 +27,16 @@ describe("walkthrough demos: a short click-through of making a question", () => 
 
       it("starts in the builder, never goes back to it, shows a phone answering, and ends on the results", () => {
         const order = steps.map((s) => s.state.screen).filter((x, i, a) => a[i - 1] !== x);
-        expect(order[0]).toBe("builder");
-        expect(order.lastIndexOf("builder")).toBe(0);
+        expect(order.slice(0, 2)).toEqual(["types", "builder"]);
+        expect(order.lastIndexOf("types")).toBe(0);
+        expect(order.lastIndexOf("builder")).toBe(1);
         expect(order).toContain("phone");
         expect(order[order.length - 1]).toBe("results");
       });
 
-      it("starts by picking the question type, and keeps that type afterwards", () => {
-        expect(steps[0].target).toBe("kind");
+      it("starts with Write your own, then picks the question type, and keeps that type afterwards", () => {
+        expect(steps[0].target).toBe("blank");
+        expect(steps[1].target).toBe("kind");
         expect(steps[0].state.kind).toBe(demo.kind);
         for (const s of steps) expect(s.state.kind).toBe(demo.kind);
       });

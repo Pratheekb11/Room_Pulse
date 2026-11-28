@@ -240,7 +240,10 @@ describe("quick to pick up", () => {
   const editor = read(`${dir}/QuestionEditor.tsx`);
 
   it("starts with three big choices; templates and activities open as their own list with a way back", () => {
-    for (const s of ["Write your own", "Pick a template", "Team activity"]) expect(form, s).toContain(s);
+    // the tiles are their own piece, shared with the "See how it works" walkthrough
+    const tiles = read("components/admin/builder/StartChoices.tsx");
+    expect(form).toMatch(/<StartChoices[\s>]/);
+    for (const s of ["Write your own", "Pick a template", "Team activity"]) expect(tiles, s).toContain(s);
     expect(form).toMatch(/startView === "templates"/);
     expect(form).toMatch(/startView === "activities"/);
     expect(form).toContain("← Back");
@@ -258,12 +261,13 @@ describe("quick to pick up", () => {
     });
 
     it("accounts get a fourth start tile, Write with AI", () => {
-      expect(form).toMatch(/aiAvailable && !guest[\s\S]{0,200}id: "ai"( as const)?, label: "Write with AI"/);
+      expect(form).toMatch(/<StartChoices\s+ai=\{aiAvailable && !guest\}/);
+      expect(read("components/admin/builder/StartChoices.tsx")).toMatch(/ai\s*\?[\s\S]{0,40}id: "ai"( as const)?, label: "Write with AI"/);
     });
 
     it("guests get one line, after the start choices, inviting them to save their account to unlock AI", () => {
       const invite = form.indexOf("Save your account to unlock it");
-      expect(invite).toBeGreaterThan(form.indexOf("Write your own"));
+      expect(invite).toBeGreaterThan(form.indexOf("<StartChoices"));
       expect(form.slice(invite - 900, invite)).toMatch(/aiAvailable && guest/);
       expect(form.slice(invite, invite + 700)).toMatch(/onNeedAccount/);
       // no prompt box for a guest to type into and then be refused
