@@ -205,6 +205,12 @@ Suggested after the live-room sweep and parked by the owner (building 3, 4, 5, 6
 - **"Clear all answers" leaves finished phones stuck** (found 2026-11-21): phones keep their local answers and lock after the presenter clears, so they can't answer a new round. Fix: `sessions.answers_round` bumped by `resetSession`, carried in the status poll; a phone seeing a new round drops its answers, lock and pending saves (keeps name and voter id) and starts at question 1. Needs a production schema change (own SQL file).
 - **Server-side Finish lock** (low priority): the lock is on the phone; only someone sending answers to the API by hand with their old voter id can get round it (clearing storage also drops the voter id). Fix if a presenter ever reports tampering: record `finished_at` per voter, refuse changes to answers saved before it.
 
+### Privacy page (2026-11-23, no database change)
+
+Built test-first (`test/privacy.test.ts`), checked at 390px and 1440px. The home footer said "We don't store names or IP addresses", untrue since names on answers and the abuse limits' hashed addresses shipped. Now it says "Answers are anonymous unless the presenter asks for names." with a link to `/privacy` (`app/privacy/page.tsx`, a Quiet page). The words live in `lib/privacy.ts` (`PRIVACY_SECTIONS`, `SERVICES`, `PRIVACY_CONTACT`, `PRIVACY_UPDATED`); guest retention comes from `GUEST_DAYS`. **Keep it true**: when a feature stores something new, adds an outside service (add Resend to `SERVICES` once sign-up emails are on in production) or changes how long data is kept, update `lib/privacy.ts`, the date, and the test.
+
+Not done yet: voters' phones don't link to the page (their header says whether answers are anonymous); no terms of use; no legal review (worth one before charging money or signing company customers).
+
 ### Speed (first visit must feel instant)
 
 - The home page is static and served from the CDN (`○` in the build). It gets its CSP from `next.config.ts` (no nonce, `'unsafe-inline'` scripts; it shows no user content). Every other page needs this request's nonce from `proxy.ts`, so it exports `dynamic = "force-dynamic"` (guarded by `test/speed.test.ts`). A new page must do the same.
