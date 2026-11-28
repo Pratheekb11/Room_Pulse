@@ -27,7 +27,8 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
   const large = size === "large";
   return (
     <ol
-      className={large ? "flex flex-col gap-[clamp(0.6rem,1.6vh,1.3rem)]" : "grid gap-x-10 gap-y-2"}
+      // Large: a container, so a narrow card (a phone) drops the votes column by its own width, not the window's.
+      className={large ? "@container flex flex-col gap-[clamp(0.6rem,1.6vh,1.3rem)]" : "grid gap-x-10 gap-y-2"}
       // Compact view: two columns read top-to-bottom, so long lists still fit a 16:9 screen.
       style={
         !large && data.length > 4
@@ -45,6 +46,7 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
         const rank = d.rank === undefined ? (d.value === null ? null : pos + 1) : d.rank;
         const pct = d.value === null ? 0 : (d.value / scaleMax) * 100;
         const color = topicColor(d.index);
+        const votes = `${d.n} ${d.n === 1 ? "vote" : "votes"}`;
         return (
           <li key={d.id} className="flex items-center gap-3">
             {ranked && (
@@ -73,6 +75,7 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
                   {d.description}
                 </span>
               )}
+              {large && <span className="text-[clamp(0.75rem,1vw,0.95rem)] font-semibold text-ink-soft @md:hidden">{votes}</span>}
             </span>
             <span
               className={`relative flex-1 overflow-hidden rounded-full border border-line-strong bg-white ${
@@ -92,8 +95,8 @@ export function OverallBars({ data, scaleMax, size = "compact", ranked = false }
               <CountUp value={d.value} format={(v) => v.toFixed(1)} />
             </span>
             {large && (
-              <span className="w-[9ch] shrink-0 whitespace-nowrap text-[clamp(0.85rem,1vw,1.15rem)] font-semibold text-ink-soft">
-                {d.n} {d.n === 1 ? "vote" : "votes"}
+              <span className="hidden w-[9ch] shrink-0 whitespace-nowrap text-[clamp(0.85rem,1vw,1.15rem)] font-semibold text-ink-soft @md:block">
+                {votes}
               </span>
             )}
           </li>
