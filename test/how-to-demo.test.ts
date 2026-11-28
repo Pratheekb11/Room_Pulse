@@ -29,6 +29,16 @@ describe("See how it works draws the real screens", () => {
     expect(demo).not.toMatch(/>\s*Question 1\s*</);
   });
 
+  // Found on production (2026-11-28): scale and pan shared one eased transform, so each new screen started life-size
+  // and shrank for half a second, cut off at the right meanwhile. Only the camera's pan may ease.
+  it("a new screen appears at its size at once: the scale never eases, only the pan does", () => {
+    const scaleLine = demo.split("\n").find((l) => l.includes("scale(${fit.scale})"))!;
+    expect(scaleLine).not.toContain("translateY");
+    const scaled = demo.slice(demo.lastIndexOf("<div", demo.indexOf("scale(${fit.scale})")), demo.indexOf("scale(${fit.scale})"));
+    expect(scaled).not.toMatch(/transition/);
+    expect(demo).toMatch(/transition-transform[\s\S]{0,200}translateY\(\$\{-fit\.pan\}px\)|translateY\(\$\{-\(fit\?\.pan/);
+  });
+
   it("the drawn screens can't be tabbed into or tapped: they're a picture", () => {
     expect(demo).toMatch(/\binert\b/);
     expect(demo).toMatch(/aria-hidden/);

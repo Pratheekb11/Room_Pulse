@@ -221,13 +221,14 @@ function Frame({
         className={`relative shrink-0 overflow-hidden ${bezel ? "rounded-[1.75rem] border-[5px] border-[#26251e]" : "rounded-lg"} ${fit ? "" : "opacity-0"}`}
         style={fit ? { width: fw, height: fh } : { width: "100%", height: "100%" }}
       >
-        <div
-          ref={content}
-          inert
-          className={`relative flex origin-top-left flex-col ${still ? "" : "transition-transform duration-500 ease-out"}`}
-          style={{ width: w, minHeight: whole !== undefined ? w * whole : fit?.viewH, transform: fit ? `scale(${fit.scale}) translateY(${-fit.pan}px)` : undefined }}
-        >
-          {children}
+        {/* the scale is set at once (eased, a new screen would start life-size and shrink); only the pan eases */}
+        <div ref={content} inert className="relative origin-top-left" style={{ width: w, transform: fit ? `scale(${fit.scale})` : undefined }}>
+          <div
+            className={`flex flex-col ${still ? "" : "transition-transform duration-500 ease-out"}`}
+            style={{ minHeight: whole !== undefined ? w * whole : fit?.viewH, transform: `translateY(${-(fit?.pan ?? 0)}px)` }}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>
